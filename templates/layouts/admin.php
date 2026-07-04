@@ -20,7 +20,7 @@
             <a href="<?= url('/admin/settings') ?>">Налаштування</a>
             <a href="<?= url('/') ?>">Переглянути сайт</a>
             <form method="post" action="<?= url('/admin/logout') ?>" style="margin-top:16px">
-                <?= App\Core\Csrf::field() ?>
+                <?= \App\Core\Csrf::field() ?>
                 <button class="button secondary" type="submit">Вийти</button>
             </form>
         </aside>

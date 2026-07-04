@@ -20,8 +20,9 @@ final class App
 
     public function boot(): void
     {
+        Debug::register($this->basePath);
         date_default_timezone_set($this->config('app.timezone', 'Europe/Kyiv'));
-        session_start();
+        $this->startSession();
 
         Container::set('config', [
             'app' => $this->loadConfig('app'),
@@ -33,6 +34,27 @@ final class App
         Container::set('auth', new Auth(Container::get('db')));
 
         $this->routes();
+    }
+
+    private function startSession(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            return;
+        }
+
+        $sessionPath = $this->basePath . '/storage/sessions';
+        if (!is_dir($sessionPath)) {
+            mkdir($sessionPath, 0775, true);
+        }
+        if (is_writable($sessionPath)) {
+            session_save_path($sessionPath);
+        }
+
+        session_start([
+            'cookie_httponly' => true,
+            'cookie_samesite' => 'Lax',
+            'use_strict_mode' => true,
+        ]);
     }
 
     public function handle(Request $request): Response
@@ -54,6 +76,7 @@ final class App
         $this->router->get('/public-info', [$public, 'publicInfo']);
         $this->router->get('/assets/{path}', [$public, 'asset']);
         $this->router->get('/uploads/{path}', [$public, 'upload']);
+        $this->router->get('/debug', [$public, 'debug']);
 
         $this->router->get('/install', [$install, 'show']);
         $this->router->post('/install', [$install, 'store']);

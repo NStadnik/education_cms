@@ -8,6 +8,7 @@ use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Installer;
+use Throwable;
 
 final class InstallController extends BaseController
 {
@@ -20,6 +21,7 @@ final class InstallController extends BaseController
         return $this->render('install/show', [
             'title' => 'Встановлення',
             'requirements' => Installer::requirements(),
+            'old' => [],
         ], 'layouts/minimal');
     }
 
@@ -35,10 +37,20 @@ final class InstallController extends BaseController
                 'title' => 'Встановлення',
                 'requirements' => Installer::requirements(),
                 'error' => 'Вкажіть email і пароль адміністратора.',
+                'old' => $request->post,
             ], 'layouts/minimal');
         }
 
-        (new Installer())->install($request->post);
-        redirect('/admin/login');
+        try {
+            (new Installer())->install($request->post);
+            redirect('/admin/login');
+        } catch (Throwable $e) {
+            return $this->render('install/show', [
+                'title' => 'Встановлення',
+                'requirements' => Installer::requirements(),
+                'error' => $e->getMessage(),
+                'old' => $request->post,
+            ], 'layouts/minimal');
+        }
     }
 }

@@ -1,0 +1,5 @@
+Delete ".example" from this filename to enable debug mode:
+
+storage/debug.enabled
+
+Remove the file after debugging.

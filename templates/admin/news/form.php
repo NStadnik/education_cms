@@ -1,6 +1,6 @@
 <h1>Новина</h1>
 <form class="form-grid" method="post" action="<?= url('/admin/news/save') ?>">
-    <?= App\Core\Csrf::field() ?>
+    <?= \App\Core\Csrf::field() ?>
     <input type="hidden" name="id" value="<?= e((string) ($item['id'] ?? '')) ?>">
     <label>Назва<input name="title" value="<?= e($item['title'] ?? '') ?>" required></label>
     <label>Slug<input name="slug" value="<?= e($item['slug'] ?? '') ?>"></label>

@@ -1,7 +1,7 @@
 <h1>Користувачі</h1>
 <div class="card">
     <form class="form-grid" method="post" action="<?= url('/admin/users/save') ?>">
-        <?= App\Core\Csrf::field() ?>
+        <?= \App\Core\Csrf::field() ?>
         <div class="grid grid-3">
             <label>Ім'я<input name="name" required></label>
             <label>Email<input type="email" name="email" required></label>

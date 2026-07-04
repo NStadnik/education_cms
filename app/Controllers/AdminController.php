@@ -216,7 +216,7 @@ final class AdminController extends BaseController
     public function settings(): Response
     {
         $this->guard('settings.manage');
-        return $this->admin('admin/settings', ['title' => 'Налаштування', 'settings' => $this->settings()]);
+        return $this->admin('admin/settings', ['title' => 'Налаштування', 'settings' => $this->siteSettings()]);
     }
 
     public function settingsSave(Request $request): Response
@@ -252,7 +252,11 @@ final class AdminController extends BaseController
     {
         $value = strtolower(trim($value));
         $value = preg_replace('/[^a-z0-9а-яіїєґ]+/u', '-', $value);
-        return trim($value ?: 'item', '-');
+        $value = trim($value ?: 'item', '-');
+        if (function_exists('mb_substr')) {
+            return mb_substr($value, 0, 180);
+        }
+        return substr($value, 0, 180);
     }
 
     private function blocksFromText(string $text): array

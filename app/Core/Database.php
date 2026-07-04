@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Core;
 
 use PDO;
+use RuntimeException;
 
 final class Database
 {
@@ -21,6 +22,9 @@ final class Database
         }
 
         if (($this->config['driver'] ?? 'sqlite') === 'mysql') {
+            if (!extension_loaded('pdo_mysql')) {
+                throw new RuntimeException('На сервері не увімкнено PHP-розширення pdo_mysql. Увімкніть його на хостингу або оберіть інший тип бази.');
+            }
             $dsn = sprintf(
                 'mysql:host=%s;port=%s;dbname=%s;charset=%s',
                 $this->config['host'],
@@ -30,6 +34,9 @@ final class Database
             );
             $this->pdo = new PDO($dsn, $this->config['user'], $this->config['password']);
         } else {
+            if (!extension_loaded('pdo_sqlite')) {
+                throw new RuntimeException('На сервері не увімкнено PHP-розширення pdo_sqlite. Для цього хостингу оберіть MySQL/MariaDB або увімкніть pdo_sqlite.');
+            }
             $this->pdo = new PDO('sqlite:' . $this->config['database']);
         }
 

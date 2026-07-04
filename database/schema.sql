@@ -6,7 +6,7 @@ create table if not exists settings (
 create table if not exists users (
     id integer primary key autoincrement,
     name varchar(160) not null,
-    email varchar(190) not null unique,
+    email varchar(180) not null unique,
     password_hash varchar(255) not null,
     role varchar(80) not null default 'editor',
     is_active tinyint not null default 1,
@@ -16,7 +16,7 @@ create table if not exists users (
 create table if not exists pages (
     id integer primary key autoincrement,
     title varchar(220) not null,
-    slug varchar(220) not null unique,
+    slug varchar(180) not null unique,
     excerpt text null,
     blocks_json text not null,
     status varchar(40) not null default 'draft',
@@ -28,7 +28,7 @@ create table if not exists pages (
 create table if not exists news (
     id integer primary key autoincrement,
     title varchar(220) not null,
-    slug varchar(220) not null unique,
+    slug varchar(180) not null unique,
     body text not null,
     status varchar(40) not null default 'draft',
     published_at varchar(32) null,
@@ -51,7 +51,7 @@ create table if not exists documents (
 create table if not exists public_info_sections (
     id integer primary key autoincrement,
     title varchar(220) not null,
-    slug varchar(220) not null unique,
+    slug varchar(180) not null unique,
     description text null,
     is_required tinyint not null default 1,
     sort_order integer not null default 0

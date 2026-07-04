@@ -24,6 +24,15 @@ final class Csrf
         $token = $_POST['_csrf'] ?? '';
         if (!$token || !hash_equals($_SESSION['_csrf'] ?? '', $token)) {
             http_response_code(419);
+            if (Debug::enabled(base_path())) {
+                exit(
+                    'CSRF token mismatch' . "\n\n" .
+                    'POST token: ' . ($token ? 'present' : 'missing') . "\n" .
+                    'Session token: ' . (!empty($_SESSION['_csrf']) ? 'present' : 'missing') . "\n" .
+                    'Session id: ' . session_id() . "\n" .
+                    'Session path: ' . session_save_path()
+                );
+            }
             exit('CSRF token mismatch');
         }
     }

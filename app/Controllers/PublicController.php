@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Core\Debug;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Installer;
@@ -33,7 +34,7 @@ final class PublicController extends BaseController
     {
         return $this->render('public/news', [
             'title' => 'Новини',
-            'settings' => $this->settings(),
+            'settings' => $this->siteSettings(),
             'items' => $this->db()->fetchAll('select * from news where status = ? order by published_at desc, id desc', ['published']),
             'menu' => $this->menu(),
         ]);
@@ -48,7 +49,7 @@ final class PublicController extends BaseController
 
         return $this->render('public/news-show', [
             'title' => $item['title'],
-            'settings' => $this->settings(),
+            'settings' => $this->siteSettings(),
             'item' => $item,
             'menu' => $this->menu(),
         ]);
@@ -58,7 +59,7 @@ final class PublicController extends BaseController
     {
         return $this->render('public/documents', [
             'title' => 'Документи',
-            'settings' => $this->settings(),
+            'settings' => $this->siteSettings(),
             'items' => $this->db()->fetchAll('select * from documents where status = ? order by category, created_at desc', ['published']),
             'menu' => $this->menu(),
         ]);
@@ -75,7 +76,7 @@ final class PublicController extends BaseController
 
         return $this->render('public/public-info', [
             'title' => 'Публічна інформація',
-            'settings' => $this->settings(),
+            'settings' => $this->siteSettings(),
             'sections' => $sections,
             'menu' => $this->menu(),
         ]);
@@ -121,11 +122,24 @@ final class PublicController extends BaseController
         ]);
     }
 
+    public function debug(): Response
+    {
+        if (!Debug::enabled(base_path())) {
+            return new Response('Not found', 404);
+        }
+
+        return $this->render('debug/show', [
+            'title' => 'Debug',
+            'info' => Debug::info(base_path()),
+            'session' => $_SESSION,
+        ], 'layouts/minimal');
+    }
+
     private function renderPage(array $page): Response
     {
         return $this->render('public/page', [
             'title' => $page['title'],
-            'settings' => $this->settings(),
+            'settings' => $this->siteSettings(),
             'page' => $page,
             'blocks' => json_decode($page['blocks_json'] ?? '[]', true) ?: [],
             'menu' => $this->menu(),

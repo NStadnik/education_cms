@@ -1,7 +1,7 @@
 <h1>Документи</h1>
 <div class="card">
     <form class="form-grid" method="post" action="<?= url('/admin/documents/save') ?>" enctype="multipart/form-data">
-        <?= App\Core\Csrf::field() ?>
+        <?= \App\Core\Csrf::field() ?>
         <label>Назва<input name="title" required></label>
         <div class="grid grid-3">
             <label>Категорія<input name="category" value="Загальні документи"></label>

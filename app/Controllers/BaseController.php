@@ -26,7 +26,7 @@ abstract class BaseController
         return new Response($this->view()->render($template, $data, $layout));
     }
 
-    protected function settings(): array
+    protected function siteSettings(): array
     {
         $rows = $this->db()->fetchAll('select name, value from settings');
         return array_column($rows, 'value', 'name');

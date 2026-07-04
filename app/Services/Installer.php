@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Database;
-use PDO;
+use RuntimeException;
 
 final class Installer
 {
@@ -19,6 +19,8 @@ final class Installer
         return [
             'PHP 8.2+' => version_compare(PHP_VERSION, '8.2.0', '>='),
             'PDO' => extension_loaded('pdo'),
+            'PDO MySQL' => extension_loaded('pdo_mysql'),
+            'PDO SQLite' => extension_loaded('pdo_sqlite'),
             'JSON' => extension_loaded('json'),
             'Fileinfo' => extension_loaded('fileinfo'),
             'storage writable' => is_writable(base_path('storage')),
@@ -28,7 +30,7 @@ final class Installer
 
     public function install(array $data): void
     {
-        $driver = $data['driver'] ?? 'sqlite';
+        $driver = $data['driver'] ?? 'mysql';
         $dbConfig = $driver === 'mysql'
             ? [
                 'driver' => 'mysql',
@@ -44,11 +46,24 @@ final class Installer
                 'database' => base_path('storage/app.sqlite'),
             ];
 
-        $this->writeLocalConfig($dbConfig, $data);
+        $this->validateDriver($driver);
         $db = new Database($dbConfig);
+        $db->pdo();
         $this->migrate($db, $driver);
         $this->seed($db, $data);
+        $this->writeLocalConfig($dbConfig, $data);
         file_put_contents(base_path('storage/installed.lock'), date('c'));
+    }
+
+    private function validateDriver(string $driver): void
+    {
+        if ($driver === 'mysql' && !extension_loaded('pdo_mysql')) {
+            throw new RuntimeException('На сервері немає pdo_mysql. Попросіть хостинг увімкнути PHP extension pdo_mysql.');
+        }
+
+        if ($driver === 'sqlite' && !extension_loaded('pdo_sqlite')) {
+            throw new RuntimeException('На сервері немає pdo_sqlite. Оберіть MySQL/MariaDB або попросіть хостинг увімкнути pdo_sqlite.');
+        }
     }
 
     private function writeLocalConfig(array $dbConfig, array $data): void
@@ -62,9 +77,39 @@ final class Installer
 
     private function migrate(Database $db, string $driver): void
     {
+        $this->dropPartialInstall($db, $driver);
         $file = $driver === 'mysql' ? 'database/mysql_schema.sql' : 'database/schema.sql';
         $sql = file_get_contents(base_path($file));
         $db->pdo()->exec($sql);
+    }
+
+    private function dropPartialInstall(Database $db, string $driver): void
+    {
+        $pdo = $db->pdo();
+        if ($driver === 'mysql') {
+            $pdo->exec('set foreign_key_checks = 0');
+        } else {
+            $pdo->exec('pragma foreign_keys = off');
+        }
+
+        foreach ([
+            'audit_logs',
+            'public_info_items',
+            'public_info_sections',
+            'documents',
+            'news',
+            'pages',
+            'users',
+            'settings',
+        ] as $table) {
+            $pdo->exec("drop table if exists {$table}");
+        }
+
+        if ($driver === 'mysql') {
+            $pdo->exec('set foreign_key_checks = 1');
+        } else {
+            $pdo->exec('pragma foreign_keys = on');
+        }
     }
 
     private function seed(Database $db, array $data): void

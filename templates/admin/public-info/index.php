@@ -3,7 +3,7 @@
     <details class="card" style="margin-bottom:12px">
         <summary><strong><?= e($section['title']) ?></strong> <span class="status <?= $section['status'] === 'published' ? 'ok' : 'warn' ?>"><?= e($section['status'] ?? 'missing') ?></span></summary>
         <form class="form-grid" method="post" action="<?= url('/admin/public-info/save') ?>" enctype="multipart/form-data" style="margin-top:16px">
-            <?= App\Core\Csrf::field() ?>
+            <?= \App\Core\Csrf::field() ?>
             <input type="hidden" name="item_id" value="<?= e((string) $section['item_id']) ?>">
             <label>Назва<input name="title" value="<?= e($section['item_title'] ?: $section['title']) ?>"></label>
             <label>Опис / текст<textarea name="body"><?= e($section['body'] ?? '') ?></textarea></label>
