@@ -32,11 +32,11 @@ final class InstallController extends BaseController
         }
         Csrf::verify();
 
-        if (!$request->input('admin_email') || !$request->input('admin_password')) {
+        if (!$request->input('db_name') || !$request->input('db_user') || !$request->input('institution_name') || !$request->input('admin_email') || !$request->input('admin_password')) {
             return $this->render('install/show', [
                 'title' => 'Встановлення',
                 'requirements' => Installer::requirements(),
-                'error' => 'Вкажіть email і пароль адміністратора.',
+                'error' => 'Заповніть назву БД, користувача БД, назву закладу, email і пароль адміністратора.',
                 'old' => $request->post,
             ], 'layouts/minimal');
         }

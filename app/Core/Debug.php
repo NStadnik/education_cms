@@ -68,7 +68,6 @@ final class Debug
             'config_writable' => is_writable($basePath . '/config') ? 'yes' : 'no',
             'pdo' => extension_loaded('pdo') ? 'yes' : 'no',
             'pdo_mysql' => extension_loaded('pdo_mysql') ? 'yes' : 'no',
-            'pdo_sqlite' => extension_loaded('pdo_sqlite') ? 'yes' : 'no',
             'fileinfo' => extension_loaded('fileinfo') ? 'yes' : 'no',
             'json' => extension_loaded('json') ? 'yes' : 'no',
             'debug_log' => $basePath . '/storage/debug.log',

@@ -68,16 +68,25 @@ final class PublicController extends BaseController
     public function publicInfo(): Response
     {
         $sections = $this->db()->fetchAll(
-            'select s.*, i.id as item_id, i.body, i.file_path, i.status, i.responsible, i.approved_at, i.published_at, i.updated_at
+            'select s.*, count(d.id) as documents_count, max(d.updated_at) as last_document_at
              from public_info_sections s
-             left join public_info_items i on i.section_id = s.id
+             left join documents d on d.public_info_section_id = s.id and d.status = \'published\'
+             group by s.id, s.title, s.slug, s.description, s.is_required, s.sort_order
              order by s.sort_order asc'
+        );
+        $documents = $this->db()->fetchAll(
+            'select d.*, s.slug as section_slug, s.title as section_title
+             from documents d
+             left join public_info_sections s on s.id = d.public_info_section_id
+             where d.public_info_section_id is not null and d.status = \'published\'
+             order by s.sort_order asc, d.published_at desc, d.updated_at desc'
         );
 
         return $this->render('public/public-info', [
             'title' => 'Публічна інформація',
             'settings' => $this->siteSettings(),
             'sections' => $sections,
+            'documentsBySection' => $this->groupBy($documents, 'public_info_section_id'),
             'menu' => $this->menu(),
         ]);
     }
@@ -155,8 +164,17 @@ final class PublicController extends BaseController
 
     private function publicInfoStats(): array
     {
-        $total = (int) ($this->db()->fetch('select count(*) as c from public_info_items')['c'] ?? 0);
-        $filled = (int) ($this->db()->fetch("select count(*) as c from public_info_items where status = 'published'")['c'] ?? 0);
+        $total = (int) ($this->db()->fetch('select count(*) as c from public_info_sections')['c'] ?? 0);
+        $filled = (int) ($this->db()->fetch("select count(distinct public_info_section_id) as c from documents where status = 'published' and public_info_section_id is not null")['c'] ?? 0);
         return ['total' => $total, 'filled' => $filled, 'percent' => $total ? (int) round($filled / $total * 100) : 0];
+    }
+
+    private function groupBy(array $items, string $key): array
+    {
+        $grouped = [];
+        foreach ($items as $item) {
+            $grouped[$item[$key]][] = $item;
+        }
+        return $grouped;
     }
 }

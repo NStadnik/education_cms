@@ -21,24 +21,22 @@ final class Database
             return $this->pdo;
         }
 
-        if (($this->config['driver'] ?? 'sqlite') === 'mysql') {
-            if (!extension_loaded('pdo_mysql')) {
-                throw new RuntimeException('На сервері не увімкнено PHP-розширення pdo_mysql. Увімкніть його на хостингу або оберіть інший тип бази.');
-            }
-            $dsn = sprintf(
-                'mysql:host=%s;port=%s;dbname=%s;charset=%s',
-                $this->config['host'],
-                $this->config['port'] ?? '3306',
-                $this->config['name'],
-                $this->config['charset'] ?? 'utf8mb4'
-            );
-            $this->pdo = new PDO($dsn, $this->config['user'], $this->config['password']);
-        } else {
-            if (!extension_loaded('pdo_sqlite')) {
-                throw new RuntimeException('На сервері не увімкнено PHP-розширення pdo_sqlite. Для цього хостингу оберіть MySQL/MariaDB або увімкніть pdo_sqlite.');
-            }
-            $this->pdo = new PDO('sqlite:' . $this->config['database']);
+        if (($this->config['driver'] ?? 'mysql') !== 'mysql') {
+            throw new RuntimeException('Підтримується тільки MySQL/MariaDB.');
         }
+
+        if (!extension_loaded('pdo_mysql')) {
+            throw new RuntimeException('На сервері не увімкнено PHP-розширення pdo_mysql. Увімкніть його на хостингу.');
+        }
+
+        $dsn = sprintf(
+            'mysql:host=%s;port=%s;dbname=%s;charset=%s',
+            $this->config['host'],
+            $this->config['port'] ?? '3306',
+            $this->config['name'],
+            $this->config['charset'] ?? 'utf8mb4'
+        );
+        $this->pdo = new PDO($dsn, $this->config['user'], $this->config['password']);
 
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);

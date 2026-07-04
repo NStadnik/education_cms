@@ -36,18 +36,6 @@ create table if not exists news (
     updated_at varchar(32) not null
 );
 
-create table if not exists documents (
-    id integer primary key autoincrement,
-    title varchar(220) not null,
-    category varchar(160) not null default 'Загальні документи',
-    file_path varchar(255) null,
-    description text null,
-    status varchar(40) not null default 'published',
-    approved_at varchar(32) null,
-    created_at varchar(32) not null,
-    updated_at varchar(32) not null
-);
-
 create table if not exists public_info_sections (
     id integer primary key autoincrement,
     title varchar(220) not null,
@@ -57,18 +45,20 @@ create table if not exists public_info_sections (
     sort_order integer not null default 0
 );
 
-create table if not exists public_info_items (
+create table if not exists documents (
     id integer primary key autoincrement,
-    section_id integer not null,
+    public_info_section_id integer null,
     title varchar(220) not null,
-    body text null,
+    category varchar(160) not null default 'Загальні документи',
     file_path varchar(255) null,
-    status varchar(40) not null default 'missing',
+    description text null,
+    status varchar(40) not null default 'published',
     responsible varchar(160) null,
     approved_at varchar(32) null,
     published_at varchar(32) null,
+    created_at varchar(32) not null,
     updated_at varchar(32) not null,
-    foreign key(section_id) references public_info_sections(id)
+    foreign key(public_info_section_id) references public_info_sections(id)
 );
 
 create table if not exists audit_logs (

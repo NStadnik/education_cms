@@ -36,18 +36,6 @@ create table if not exists news (
     updated_at varchar(32) not null
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
-create table if not exists documents (
-    id bigint unsigned primary key auto_increment,
-    title varchar(220) not null,
-    category varchar(160) not null default 'Загальні документи',
-    file_path varchar(255) null,
-    description text null,
-    status varchar(40) not null default 'published',
-    approved_at varchar(32) null,
-    created_at varchar(32) not null,
-    updated_at varchar(32) not null
-) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
-
 create table if not exists public_info_sections (
     id bigint unsigned primary key auto_increment,
     title varchar(220) not null,
@@ -57,18 +45,21 @@ create table if not exists public_info_sections (
     sort_order int not null default 0
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
-create table if not exists public_info_items (
+create table if not exists documents (
     id bigint unsigned primary key auto_increment,
-    section_id bigint unsigned not null,
+    public_info_section_id bigint unsigned null,
     title varchar(220) not null,
-    body text null,
+    category varchar(160) not null default 'Загальні документи',
     file_path varchar(255) null,
-    status varchar(40) not null default 'missing',
+    description text null,
+    status varchar(40) not null default 'published',
     responsible varchar(160) null,
     approved_at varchar(32) null,
     published_at varchar(32) null,
+    created_at varchar(32) not null,
     updated_at varchar(32) not null,
-    constraint public_info_items_section_id_foreign foreign key(section_id) references public_info_sections(id)
+    index documents_public_info_section_id_index (public_info_section_id),
+    constraint documents_public_info_section_id_foreign foreign key(public_info_section_id) references public_info_sections(id)
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
 create table if not exists audit_logs (

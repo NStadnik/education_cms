@@ -7,6 +7,8 @@ namespace App\Core;
 use App\Controllers\AdminController;
 use App\Controllers\InstallController;
 use App\Controllers\PublicController;
+use App\Services\Installer;
+use App\Services\SchemaUpgrade;
 
 final class App
 {
@@ -32,6 +34,9 @@ final class App
         Container::set('view', new View($this->basePath . '/templates'));
         Container::set('db', new Database(Container::get('config')['database']));
         Container::set('auth', new Auth(Container::get('db')));
+        if (Installer::installed()) {
+            SchemaUpgrade::ensure(Container::get('db'));
+        }
 
         $this->routes();
     }

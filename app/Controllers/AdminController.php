@@ -41,8 +41,8 @@ final class AdminController extends BaseController
             'pages' => $this->count('pages'),
             'news' => $this->count('news'),
             'documents' => $this->count('documents'),
-            'publicFilled' => $this->db()->fetch("select count(*) as c from public_info_items where status = 'published'")['c'] ?? 0,
-            'publicTotal' => $this->count('public_info_items'),
+            'publicFilled' => $this->db()->fetch("select count(distinct public_info_section_id) as c from documents where status = 'published' and public_info_section_id is not null")['c'] ?? 0,
+            'publicTotal' => $this->count('public_info_sections'),
         ];
         return $this->admin('admin/dashboard', ['title' => 'Панель керування', 'stats' => $stats]);
     }
@@ -139,6 +139,7 @@ final class AdminController extends BaseController
         return $this->admin('admin/documents/index', [
             'title' => 'Документи',
             'items' => $this->db()->fetchAll('select * from documents order by id desc'),
+            'sections' => $this->db()->fetchAll('select id, title from public_info_sections order by sort_order asc'),
         ]);
     }
 
@@ -149,8 +150,20 @@ final class AdminController extends BaseController
         $filePath = Files::upload($request->files['file'] ?? []);
         $now = date('c');
         $this->db()->execute(
-            'insert into documents (title, category, file_path, description, status, approved_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)',
-            [$request->input('title'), $request->input('category'), $filePath, $request->input('description'), $request->input('status', 'published'), $request->input('approved_at'), $now, $now]
+            'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                $request->input('public_info_section_id') ?: null,
+                $request->input('title'),
+                $request->input('category'),
+                $filePath,
+                $request->input('description'),
+                $request->input('status', 'published'),
+                $request->input('responsible'),
+                $request->input('approved_at'),
+                $request->input('published_at') ?: ($request->input('status') === 'published' ? $now : null),
+                $now,
+                $now,
+            ]
         );
         $this->audit('create', 'document', (int) $this->db()->lastInsertId());
         redirect('/admin/documents');
@@ -162,8 +175,18 @@ final class AdminController extends BaseController
         return $this->admin('admin/public-info/index', [
             'title' => 'Публічна інформація',
             'sections' => $this->db()->fetchAll(
-                'select s.*, i.id as item_id, i.title as item_title, i.body, i.file_path, i.status, i.responsible, i.approved_at, i.published_at, i.updated_at
-                 from public_info_sections s left join public_info_items i on i.section_id = s.id order by s.sort_order asc'
+                'select s.*, count(d.id) as documents_count, max(d.updated_at) as last_document_at
+                 from public_info_sections s
+                 left join documents d on d.public_info_section_id = s.id and d.status = \'published\'
+                 group by s.id, s.title, s.slug, s.description, s.is_required, s.sort_order
+                 order by s.sort_order asc'
+            ),
+            'documents' => $this->db()->fetchAll(
+                'select d.*, s.title as section_title
+                 from documents d
+                 left join public_info_sections s on s.id = d.public_info_section_id
+                 where d.public_info_section_id is not null
+                 order by s.sort_order asc, d.updated_at desc'
             ),
         ]);
     }
@@ -172,24 +195,25 @@ final class AdminController extends BaseController
     {
         $this->guard('public_info.manage');
         Csrf::verify();
-        $id = (int) $request->input('item_id');
-        $current = $this->db()->fetch('select * from public_info_items where id = ?', [$id]);
-        $filePath = Files::upload($request->files['file'] ?? []) ?: ($current['file_path'] ?? null);
+        $filePath = Files::upload($request->files['file'] ?? []);
+        $now = date('c');
         $this->db()->execute(
-            'update public_info_items set title=?, body=?, file_path=?, status=?, responsible=?, approved_at=?, published_at=?, updated_at=? where id=?',
+            'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
+                $request->input('public_info_section_id'),
                 $request->input('title'),
-                $request->input('body'),
+                'Публічна інформація',
                 $filePath,
-                $request->input('status', 'missing'),
+                $request->input('description'),
+                $request->input('status', 'published'),
                 $request->input('responsible'),
                 $request->input('approved_at'),
-                $request->input('published_at'),
-                date('c'),
-                $id,
+                $request->input('published_at') ?: ($request->input('status') === 'published' ? $now : null),
+                $now,
+                $now,
             ]
         );
-        $this->audit('update', 'public_info', $id);
+        $this->audit('create', 'public_info_document', (int) $this->db()->lastInsertId());
         redirect('/admin/public-info');
     }
 
