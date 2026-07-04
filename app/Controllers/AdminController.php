@@ -9,6 +9,7 @@ use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Files;
+use Throwable;
 
 final class AdminController extends BaseController
 {
@@ -175,9 +176,9 @@ final class AdminController extends BaseController
         return $this->admin('admin/public-info/index', [
             'title' => 'Публічна інформація',
             'sections' => $this->db()->fetchAll(
-                'select s.*, count(d.id) as documents_count, max(d.updated_at) as last_document_at
+                'select s.*, count(d.id) as documents_count, sum(case when d.status = \'published\' then 1 else 0 end) as published_documents_count, max(d.updated_at) as last_document_at
                  from public_info_sections s
-                 left join documents d on d.public_info_section_id = s.id and d.status = \'published\'
+                 left join documents d on d.public_info_section_id = s.id
                  group by s.id, s.title, s.slug, s.description, s.is_required, s.sort_order
                  order by s.sort_order asc'
             ),
@@ -222,32 +223,48 @@ final class AdminController extends BaseController
         $this->guard('public_info.manage');
         Csrf::verify();
 
-        $id = (int) $request->input('id', 0);
-        $title = trim((string) $request->input('title'));
-        if ($title === '') {
-            redirect('/admin/public-info');
+        try {
+            $id = (int) $request->input('id', 0);
+            $title = trim((string) $request->input('title'));
+            if ($title === '') {
+                return $this->json(['ok' => false, 'message' => 'Вкажіть назву розділу.'], 422);
+            }
+
+            $slug = $this->slug((string) ($request->input('slug') ?: $title));
+            $description = (string) $request->input('description', '');
+            $isRequired = $request->input('is_required') ? 1 : 0;
+            $sortOrder = (int) $request->input('sort_order', 0);
+
+            if ($id) {
+                $this->db()->execute(
+                    'update public_info_sections set title=?, slug=?, description=?, is_required=?, sort_order=? where id=?',
+                    [$title, $slug, $description, $isRequired, $sortOrder, $id]
+                );
+            } else {
+                $this->db()->execute(
+                    'insert into public_info_sections (title, slug, description, is_required, sort_order) values (?, ?, ?, ?, ?)',
+                    [$title, $slug, $description, $isRequired, $sortOrder]
+                );
+                $id = (int) $this->db()->lastInsertId();
+            }
+
+            $this->audit('save', 'public_info_section', $id);
+            return $this->json([
+                'ok' => true,
+                'message' => 'Розділ збережено.',
+                'section' => [
+                    'id' => $id,
+                    'title' => $title,
+                    'slug' => $slug,
+                    'description' => $description,
+                    'is_required' => $isRequired,
+                    'sort_order' => $sortOrder,
+                ],
+                'created' => !$request->input('id'),
+            ]);
+        } catch (Throwable $e) {
+            return $this->json(['ok' => false, 'message' => $e->getMessage()], 500);
         }
-
-        $slug = $this->slug((string) ($request->input('slug') ?: $title));
-        $description = $request->input('description');
-        $isRequired = $request->input('is_required') ? 1 : 0;
-        $sortOrder = (int) $request->input('sort_order', 0);
-
-        if ($id) {
-            $this->db()->execute(
-                'update public_info_sections set title=?, slug=?, description=?, is_required=?, sort_order=? where id=?',
-                [$title, $slug, $description, $isRequired, $sortOrder, $id]
-            );
-        } else {
-            $this->db()->execute(
-                'insert into public_info_sections (title, slug, description, is_required, sort_order) values (?, ?, ?, ?, ?)',
-                [$title, $slug, $description, $isRequired, $sortOrder]
-            );
-            $id = (int) $this->db()->lastInsertId();
-        }
-
-        $this->audit('save', 'public_info_section', $id);
-        redirect('/admin/public-info');
     }
 
     public function publicInfoSectionDelete(Request $request): Response
@@ -255,14 +272,22 @@ final class AdminController extends BaseController
         $this->guard('public_info.manage');
         Csrf::verify();
 
-        $id = (int) $request->input('id', 0);
-        $documents = (int) ($this->db()->fetch('select count(*) as c from documents where public_info_section_id = ?', [$id])['c'] ?? 0);
-        if ($id && $documents === 0) {
+        try {
+            $id = (int) $request->input('id', 0);
+            $documents = (int) ($this->db()->fetch('select count(*) as c from documents where public_info_section_id = ?', [$id])['c'] ?? 0);
+            if (!$id) {
+                return $this->json(['ok' => false, 'message' => 'Розділ не знайдено.'], 404);
+            }
+            if ($documents > 0) {
+                return $this->json(['ok' => false, 'message' => 'Розділ має документи, тому його не можна видалити.'], 422);
+            }
+
             $this->db()->execute('delete from public_info_sections where id = ?', [$id]);
             $this->audit('delete', 'public_info_section', $id);
+            return $this->json(['ok' => true, 'message' => 'Розділ видалено.', 'id' => $id]);
+        } catch (Throwable $e) {
+            return $this->json(['ok' => false, 'message' => $e->getMessage()], 500);
         }
-
-        redirect('/admin/public-info');
     }
 
     public function users(): Response

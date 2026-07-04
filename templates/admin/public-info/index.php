@@ -3,7 +3,7 @@
 
 <details class="card" style="margin-bottom:16px">
     <summary><strong>Додати розділ до переліку</strong></summary>
-    <form class="form-grid" method="post" action="<?= url('/admin/public-info/sections/save') ?>" style="margin-top:16px">
+    <form class="form-grid" method="post" action="<?= url('/admin/public-info/sections/save') ?>" data-section-save data-new-section style="margin-top:16px">
         <?= \App\Core\Csrf::field() ?>
         <label>Назва розділу<input name="title" required></label>
         <div class="grid grid-3">
@@ -17,15 +17,15 @@
 </details>
 
 <?php foreach ($sections as $section): ?>
-    <details class="card" style="margin-bottom:12px">
+    <details class="card" style="margin-bottom:12px" data-section-card="<?= e((string) $section['id']) ?>">
         <summary>
-            <strong><?= e($section['title']) ?></strong>
-            <span class="status <?= ((int) $section['documents_count']) > 0 ? 'ok' : 'warn' ?>">
-                <?= ((int) $section['documents_count']) > 0 ? 'документи є' : 'немає документів' ?>
+            <strong data-section-title><?= e($section['title']) ?></strong>
+            <span class="status <?= ((int) $section['published_documents_count']) > 0 ? 'ok' : 'warn' ?>">
+                <?= ((int) $section['published_documents_count']) > 0 ? 'документи є' : 'немає документів' ?>
             </span>
         </summary>
         <h2>Налаштування розділу</h2>
-        <form class="form-grid" method="post" action="<?= url('/admin/public-info/sections/save') ?>" style="margin-top:16px">
+        <form class="form-grid" method="post" action="<?= url('/admin/public-info/sections/save') ?>" data-section-save style="margin-top:16px">
             <?= \App\Core\Csrf::field() ?>
             <input type="hidden" name="id" value="<?= e((string) $section['id']) ?>">
             <label>Назва розділу<input name="title" value="<?= e($section['title']) ?>" required></label>
@@ -38,7 +38,7 @@
             <button type="submit">Зберегти розділ</button>
         </form>
         <?php if ((int) $section['documents_count'] === 0): ?>
-            <form method="post" action="<?= url('/admin/public-info/sections/delete') ?>" style="margin-top:10px">
+            <form method="post" action="<?= url('/admin/public-info/sections/delete') ?>" data-section-delete style="margin-top:10px">
                 <?= \App\Core\Csrf::field() ?>
                 <input type="hidden" name="id" value="<?= e((string) $section['id']) ?>">
                 <button class="button danger" type="submit">Видалити порожній розділ</button>
@@ -79,3 +79,80 @@
         <?php endif; ?>
     </details>
 <?php endforeach; ?>
+
+<script>
+document.addEventListener('submit', async function (event) {
+    const saveForm = event.target.closest('[data-section-save]');
+    const deleteForm = event.target.closest('[data-section-delete]');
+    if (!saveForm && !deleteForm) {
+        return;
+    }
+
+    event.preventDefault();
+    const form = saveForm || deleteForm;
+    const button = form.querySelector('button[type="submit"]');
+    const originalText = button ? button.textContent : '';
+    setFormMessage(form, 'Збереження...', false);
+    if (button) {
+        button.disabled = true;
+    }
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        });
+        const data = await response.json();
+        if (!data.ok) {
+            throw new Error(data.message || 'Помилка запиту.');
+        }
+
+        if (saveForm) {
+            if (form.hasAttribute('data-new-section')) {
+                setFormMessage(form, data.message || 'Розділ додано.', false);
+                window.setTimeout(function () { window.location.reload(); }, 500);
+                return;
+            }
+
+            const card = form.closest('[data-section-card]');
+            if (card && data.section) {
+                const title = card.querySelector('[data-section-title]');
+                if (title) {
+                    title.textContent = data.section.title;
+                }
+                form.querySelector('[name="slug"]').value = data.section.slug;
+                form.querySelector('[name="sort_order"]').value = data.section.sort_order;
+            }
+        }
+
+        if (deleteForm) {
+            const card = form.closest('[data-section-card]');
+            if (card) {
+                card.remove();
+            }
+            return;
+        }
+
+        setFormMessage(form, data.message || 'Збережено.', false);
+    } catch (error) {
+        setFormMessage(form, error.message, true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
+});
+
+function setFormMessage(form, message, isError) {
+    let node = form.querySelector('[data-ajax-message]');
+    if (!node) {
+        node = document.createElement('p');
+        node.setAttribute('data-ajax-message', '');
+        form.appendChild(node);
+    }
+    node.className = isError ? 'alert' : 'meta';
+    node.textContent = message;
+}
+</script>

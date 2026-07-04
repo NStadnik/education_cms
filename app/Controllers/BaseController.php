@@ -26,6 +26,13 @@ abstract class BaseController
         return new Response($this->view()->render($template, $data, $layout));
     }
 
+    protected function json(array $data, int $status = 200): Response
+    {
+        return new Response(json_encode($data, JSON_UNESCAPED_UNICODE), $status, [
+            'Content-Type' => 'application/json; charset=UTF-8',
+        ]);
+    }
+
     protected function siteSettings(): array
     {
         $rows = $this->db()->fetchAll('select name, value from settings');
