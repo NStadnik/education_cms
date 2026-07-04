@@ -96,6 +96,31 @@ final class PublicController extends BaseController
         ]);
     }
 
+    public function asset(Request $request, array $params): Response
+    {
+        $path = str_replace(['..', '\\'], '', $params['path']);
+        $file = base_path('public/assets/' . $path);
+        if (!is_file($file)) {
+            return new Response('Not found', 404);
+        }
+
+        $types = [
+            'css' => 'text/css; charset=UTF-8',
+            'js' => 'application/javascript; charset=UTF-8',
+            'png' => 'image/png',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+        ];
+        $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+
+        return new Response((string) file_get_contents($file), 200, [
+            'Content-Type' => $types[$extension] ?? 'application/octet-stream',
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
     private function renderPage(array $page): Response
     {
         return $this->render('public/page', [

@@ -1,0 +1,12 @@
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteRule ^(\.git|app|config|database|storage|templates|\.vscode)(/|$) - [F,L]
+    RewriteRule ^(README\.md|composer\.(json|lock)|package(-lock)?\.json)$ - [F,L]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>

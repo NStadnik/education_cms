@@ -1,44 +1,59 @@
 # Education CMS
 
-Self-hosted PHP CMS for education institutions. It is intentionally framework-free:
-plain PHP 8.2+, PDO, server-rendered templates, a small admin panel, roles,
-documents, news, pages, and a structured public information module.
+Самостійна PHP CMS для сайтів закладів освіти. Система навмисно зроблена без
+фреймворків: чистий PHP 8.2+, PDO, серверні шаблони, невелика адмінка, ролі,
+документи, новини, сторінки та структурований модуль публічної інформації.
 
-## Local demo
+## Локальний запуск
 
 ```bash
 php -S 127.0.0.1:8080 -t public
 ```
 
-Open `http://127.0.0.1:8080/install` and use SQLite for a quick demo.
+Відкрийте `http://127.0.0.1:8080/install` і використайте SQLite для швидкого
+демо-запуску.
 
-## Shared hosting install
+Якщо хочете перевірити режим “усе в корені”, запустіть:
 
-1. Upload the project files to hosting.
-2. Point the web root to `public/`.
-3. Open `/install`.
-4. Choose MySQL/MariaDB, enter database credentials, institution details, and
-   first administrator account.
-5. Remove write access to `config/local.php` after installation if your hosting
-   panel allows it.
+```bash
+php -S 127.0.0.1:8080
+```
 
-Default writable directories:
+У цьому режимі працює кореневий `index.php`, а системні папки закриті через
+`.htaccess` на Apache-хостингу.
+
+## Встановлення на хостинг
+
+1. Завантажте файли проєкту на хостинг.
+2. Відкрийте домен у браузері або одразу перейдіть на `/install`.
+3. Оберіть MySQL/MariaDB, введіть дані підключення до бази, інформацію про
+   заклад та дані першого адміністратора.
+4. Після встановлення приберіть право запису для `config/local.php`, якщо це
+   дозволяє панель керування хостингом.
+
+Рекомендований простий варіант для більшості хостингів: завантажити всі файли
+в корінь сайту, де вже лежить `index.php`.
+
+Більш ізольований варіант для VPS або гнучкого хостингу: вказати web root на
+папку `public/`. Обидва режими підтримуються.
+
+Директорії, які мають бути доступні для запису:
 
 - `storage/`
 - `storage/uploads/`
 - `storage/cache/`
 
-## Core modules
+## Основні модулі
 
-- Pages with block-based content.
-- News.
-- Documents.
-- Public information checklist.
-- Users, roles, permissions.
-- Audit log.
-- Installer.
+- Сторінки з блоковим наповненням.
+- Новини.
+- Документи.
+- Чекліст публічної інформації.
+- Користувачі, ролі та права доступу.
+- Журнал дій.
+- Інсталятор.
 
-## Notes
+## Примітки
 
-The admin panel is compact on purpose. It is meant to be a solid foundation for
-a distributable education-site product, not a full framework clone.
+Адмінка навмисно компактна. Це основа для коробкового продукту під сайти
+закладів освіти, а не спроба відтворити повноцінний фреймворк.

@@ -52,6 +52,7 @@ final class App
         $this->router->get('/news/{slug}', [$public, 'newsShow']);
         $this->router->get('/documents', [$public, 'documents']);
         $this->router->get('/public-info', [$public, 'publicInfo']);
+        $this->router->get('/assets/{path}', [$public, 'asset']);
         $this->router->get('/uploads/{path}', [$public, 'upload']);
 
         $this->router->get('/install', [$install, 'show']);
