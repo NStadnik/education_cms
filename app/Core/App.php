@@ -100,6 +100,8 @@ final class App
         $this->router->post('/admin/documents/save', [$admin, 'documentSave']);
         $this->router->get('/admin/public-info', [$admin, 'publicInfo']);
         $this->router->post('/admin/public-info/save', [$admin, 'publicInfoSave']);
+        $this->router->post('/admin/public-info/sections/save', [$admin, 'publicInfoSectionSave']);
+        $this->router->post('/admin/public-info/sections/delete', [$admin, 'publicInfoSectionDelete']);
         $this->router->get('/admin/users', [$admin, 'users']);
         $this->router->post('/admin/users/save', [$admin, 'userSave']);
         $this->router->get('/admin/settings', [$admin, 'settings']);

@@ -1,5 +1,21 @@
 <h1>Публічна інформація</h1>
 <p class="meta">Цей розділ є чеклістом документів. Додавайте один або кілька документів до кожного обов'язкового розділу.</p>
+
+<details class="card" style="margin-bottom:16px">
+    <summary><strong>Додати розділ до переліку</strong></summary>
+    <form class="form-grid" method="post" action="<?= url('/admin/public-info/sections/save') ?>" style="margin-top:16px">
+        <?= \App\Core\Csrf::field() ?>
+        <label>Назва розділу<input name="title" required></label>
+        <div class="grid grid-3">
+            <label>Slug<input name="slug" placeholder="napryklad-rozdil"></label>
+            <label>Порядок<input type="number" name="sort_order" value="100"></label>
+            <label><input type="checkbox" name="is_required" value="1" checked> Обов'язковий розділ</label>
+        </div>
+        <label>Опис<textarea name="description"></textarea></label>
+        <button type="submit">Додати розділ</button>
+    </form>
+</details>
+
 <?php foreach ($sections as $section): ?>
     <details class="card" style="margin-bottom:12px">
         <summary>
@@ -8,6 +24,27 @@
                 <?= ((int) $section['documents_count']) > 0 ? 'документи є' : 'немає документів' ?>
             </span>
         </summary>
+        <h2>Налаштування розділу</h2>
+        <form class="form-grid" method="post" action="<?= url('/admin/public-info/sections/save') ?>" style="margin-top:16px">
+            <?= \App\Core\Csrf::field() ?>
+            <input type="hidden" name="id" value="<?= e((string) $section['id']) ?>">
+            <label>Назва розділу<input name="title" value="<?= e($section['title']) ?>" required></label>
+            <div class="grid grid-3">
+                <label>Slug<input name="slug" value="<?= e($section['slug']) ?>"></label>
+                <label>Порядок<input type="number" name="sort_order" value="<?= e((string) $section['sort_order']) ?>"></label>
+                <label><input type="checkbox" name="is_required" value="1" <?= checked((int) $section['is_required']) ?>> Обов'язковий розділ</label>
+            </div>
+            <label>Опис<textarea name="description"><?= e($section['description'] ?? '') ?></textarea></label>
+            <button type="submit">Зберегти розділ</button>
+        </form>
+        <?php if ((int) $section['documents_count'] === 0): ?>
+            <form method="post" action="<?= url('/admin/public-info/sections/delete') ?>" style="margin-top:10px">
+                <?= \App\Core\Csrf::field() ?>
+                <input type="hidden" name="id" value="<?= e((string) $section['id']) ?>">
+                <button class="button danger" type="submit">Видалити порожній розділ</button>
+            </form>
+        <?php endif; ?>
+        <h2>Документи розділу</h2>
         <form class="form-grid" method="post" action="<?= url('/admin/public-info/save') ?>" enctype="multipart/form-data" style="margin-top:16px">
             <?= \App\Core\Csrf::field() ?>
             <input type="hidden" name="public_info_section_id" value="<?= e((string) $section['id']) ?>">
@@ -22,7 +59,11 @@
             <label>Файл<input type="file" name="file"></label>
             <button type="submit">Додати документ</button>
         </form>
-        <?php $sectionDocuments = array_filter($documents, fn($document) => (int) $document['public_info_section_id'] === (int) $section['id']); ?>
+        <?php
+            $sectionDocuments = array_filter($documents, static function ($document) use ($section) {
+                return (int) $document['public_info_section_id'] === (int) $section['id'];
+            });
+        ?>
         <?php if ($sectionDocuments): ?>
             <table style="margin-top:16px">
                 <tr><th>Документ</th><th>Статус</th><th>Оновлено</th><th>Файл</th></tr>

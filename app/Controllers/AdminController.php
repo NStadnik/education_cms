@@ -217,6 +217,54 @@ final class AdminController extends BaseController
         redirect('/admin/public-info');
     }
 
+    public function publicInfoSectionSave(Request $request): Response
+    {
+        $this->guard('public_info.manage');
+        Csrf::verify();
+
+        $id = (int) $request->input('id', 0);
+        $title = trim((string) $request->input('title'));
+        if ($title === '') {
+            redirect('/admin/public-info');
+        }
+
+        $slug = $this->slug((string) ($request->input('slug') ?: $title));
+        $description = $request->input('description');
+        $isRequired = $request->input('is_required') ? 1 : 0;
+        $sortOrder = (int) $request->input('sort_order', 0);
+
+        if ($id) {
+            $this->db()->execute(
+                'update public_info_sections set title=?, slug=?, description=?, is_required=?, sort_order=? where id=?',
+                [$title, $slug, $description, $isRequired, $sortOrder, $id]
+            );
+        } else {
+            $this->db()->execute(
+                'insert into public_info_sections (title, slug, description, is_required, sort_order) values (?, ?, ?, ?, ?)',
+                [$title, $slug, $description, $isRequired, $sortOrder]
+            );
+            $id = (int) $this->db()->lastInsertId();
+        }
+
+        $this->audit('save', 'public_info_section', $id);
+        redirect('/admin/public-info');
+    }
+
+    public function publicInfoSectionDelete(Request $request): Response
+    {
+        $this->guard('public_info.manage');
+        Csrf::verify();
+
+        $id = (int) $request->input('id', 0);
+        $documents = (int) ($this->db()->fetch('select count(*) as c from documents where public_info_section_id = ?', [$id])['c'] ?? 0);
+        if ($id && $documents === 0) {
+            $this->db()->execute('delete from public_info_sections where id = ?', [$id]);
+            $this->audit('delete', 'public_info_section', $id);
+        }
+
+        redirect('/admin/public-info');
+    }
+
     public function users(): Response
     {
         $this->guard('users.manage');
