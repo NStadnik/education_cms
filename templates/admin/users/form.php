@@ -1,4 +1,7 @@
-<?php $isEdit = !empty($item['id']); ?>
+<?php
+    $isEdit = !empty($item['id']);
+    $canDelete = $isEdit && (int) $item['id'] !== (int) ($_SESSION['user_id'] ?? 0);
+?>
 <div class="page-head">
     <div>
         <p class="eyebrow">Доступ</p>
@@ -47,8 +50,18 @@
             </div>
             <div class="form-actions stacked">
                 <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти користувача</span></button>
+                <?php if ($canDelete): ?>
+                    <button class="button danger" type="submit" form="userDeleteForm"><span class="mdi mdi-delete-outline" aria-hidden="true"></span><span>Видалити</span></button>
+                <?php endif; ?>
                 <a class="button secondary" href="<?= url('/admin/users') ?>"><span class="mdi mdi-close" aria-hidden="true"></span><span>Скасувати</span></a>
             </div>
         </aside>
     </div>
 </form>
+<?php if ($canDelete): ?>
+    <form id="userDeleteForm" method="post" action="<?= url('/admin/users/bulk') ?>" data-no-ajax data-delete-confirm="Видалити цього користувача?" data-after-success-url="<?= url('/admin/users') ?>">
+        <?= \App\Core\Csrf::field() ?>
+        <input type="hidden" name="bulk_action" value="delete">
+        <input type="hidden" name="ids[]" value="<?= e((string) $item['id']) ?>">
+    </form>
+<?php endif; ?>

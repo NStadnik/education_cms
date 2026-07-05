@@ -57,6 +57,9 @@ img { max-width: 100%; height: auto; }
 .list-panel { margin-top: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; overflow: hidden; }
 .list-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-bottom: 1px solid var(--line); background: #fbfcff; }
 .list-tools input { max-width: 380px; }
+.bulk-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.bulk-actions select { width: auto !important; min-width: 150px; }
+.table-scroll input[data-bulk-check], .table-scroll input[data-bulk-check-all], .table-responsive input[data-bulk-check], .table-responsive input[data-bulk-check-all] { width: auto !important; min-height: 0 !important; }
 .list-sentinel { min-height: 1px; }
 .list-status { margin: 12px 14px 14px; }
 .table-scroll { width: 100%; overflow-x: auto; }
@@ -106,6 +109,10 @@ img { max-width: 100%; height: auto; }
 .document-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: #fbfcff; }
 .document-row p { margin: 4px 0 0; }
 .document-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.accordion-title-row { display: flex; align-items: stretch; width: 100%; background: #fff; }
+.accordion-check { display: flex !important; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; margin: 0; border-right: 1px solid var(--line); }
+.accordion-check input { width: auto !important; min-height: 0 !important; }
+.accordion-title-row .accordion-button { flex: 1 1 auto; min-width: 0; }
 .media-file { display: flex; align-items: center; gap: 10px; min-width: 260px; }
 .media-thumb { flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 6px; object-fit: cover; background: #f1f4f9; }
 .media-thumb-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--brand); font-size: 24px; line-height: 1; }
@@ -218,6 +225,7 @@ tr[hidden], .accordion-item[hidden] { display: none !important; }
 
 @media (max-width: 800px) {
     .topbar-inner, .toolbar, .page-head, .list-tools, .document-row, .document-actions, .form-actions { align-items: flex-start; flex-direction: column; }
+    .bulk-actions { justify-content: flex-start; }
     .grid-3 { grid-template-columns: 1fr; }
     .metrics { grid-template-columns: 1fr; }
     .list-tools input { max-width: none; }

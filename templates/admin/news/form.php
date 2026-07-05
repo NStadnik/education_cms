@@ -73,8 +73,18 @@
 
             <div class="form-actions stacked">
                 <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти новину</span></button>
+                <?php if ($isEdit): ?>
+                    <button class="button danger" type="submit" form="newsDeleteForm"><span class="mdi mdi-delete-outline" aria-hidden="true"></span><span>Видалити</span></button>
+                <?php endif; ?>
                 <a class="button secondary" href="<?= url('/admin/news') ?>"><span class="mdi mdi-close" aria-hidden="true"></span><span>Скасувати</span></a>
             </div>
         </aside>
     </div>
 </form>
+<?php if ($isEdit): ?>
+    <form id="newsDeleteForm" method="post" action="<?= url('/admin/news/bulk') ?>" data-no-ajax data-delete-confirm="Видалити цю новину?" data-after-success-url="<?= url('/admin/news') ?>">
+        <?= \App\Core\Csrf::field() ?>
+        <input type="hidden" name="bulk_action" value="delete">
+        <input type="hidden" name="ids[]" value="<?= e((string) $item['id']) ?>">
+    </form>
+<?php endif; ?>

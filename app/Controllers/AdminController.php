@@ -133,6 +133,28 @@ final class AdminController extends BaseController
         }
     }
 
+    public function pagesBulk(Request $request): Response
+    {
+        $this->guard('pages.manage');
+        Csrf::verify();
+        $ids = $this->bulkIds($request);
+        $action = (string) $request->input('bulk_action', '');
+        if ($ids && in_array($action, ['publish', 'draft'], true)) {
+            $status = $action === 'publish' ? 'published' : 'draft';
+            $this->bulkUpdateStatus('pages', $ids, $status);
+            $this->audit('bulk_' . $action, 'pages', null, 'ids: ' . implode(',', $ids));
+        } elseif ($ids && $action === 'delete') {
+            $this->bulkDelete('pages', $ids);
+            $this->audit('bulk_delete', 'pages', null, 'ids: ' . implode(',', $ids));
+        }
+
+        if ($this->isAjax($request)) {
+            return $this->json($this->adminListPayload('pages', $request, 'Групову дію виконано.'));
+        }
+
+        redirect('/admin/pages');
+    }
+
     public function news(Request $request): Response
     {
         $this->guard();
@@ -207,6 +229,31 @@ final class AdminController extends BaseController
         } catch (Throwable $e) {
             return $this->ajaxError($request, $e);
         }
+    }
+
+    public function newsBulk(Request $request): Response
+    {
+        $this->guard('news.manage');
+        Csrf::verify();
+        $ids = $this->bulkIds($request);
+        $action = (string) $request->input('bulk_action', '');
+        if ($ids && in_array($action, ['publish', 'draft'], true)) {
+            $status = $action === 'publish' ? 'published' : 'draft';
+            $this->bulkUpdateStatus('news', $ids, $status);
+            if ($status === 'published') {
+                $this->bulkFillPublishedAt('news', $ids);
+            }
+            $this->audit('bulk_' . $action, 'news', null, 'ids: ' . implode(',', $ids));
+        } elseif ($ids && $action === 'delete') {
+            $this->bulkDelete('news', $ids);
+            $this->audit('bulk_delete', 'news', null, 'ids: ' . implode(',', $ids));
+        }
+
+        if ($this->isAjax($request)) {
+            return $this->json($this->adminListPayload('news', $request, 'Групову дію виконано.'));
+        }
+
+        redirect('/admin/news');
     }
 
     public function documents(Request $request): Response
@@ -309,6 +356,31 @@ final class AdminController extends BaseController
         }
     }
 
+    public function documentsBulk(Request $request): Response
+    {
+        $this->guard('documents.manage');
+        Csrf::verify();
+        $ids = $this->bulkIds($request);
+        $action = (string) $request->input('bulk_action', '');
+        if ($ids && in_array($action, ['publish', 'draft'], true)) {
+            $status = $action === 'publish' ? 'published' : 'draft';
+            $this->bulkUpdateStatus('documents', $ids, $status);
+            if ($status === 'published') {
+                $this->bulkFillPublishedAt('documents', $ids);
+            }
+            $this->audit('bulk_' . $action, 'documents', null, 'ids: ' . implode(',', $ids));
+        } elseif ($ids && $action === 'delete') {
+            $this->bulkDelete('documents', $ids);
+            $this->audit('bulk_delete', 'documents', null, 'ids: ' . implode(',', $ids));
+        }
+
+        if ($this->isAjax($request)) {
+            return $this->json($this->adminListPayload('documents', $request, 'Групову дію виконано.'));
+        }
+
+        redirect('/admin/documents');
+    }
+
     public function media(Request $request): Response
     {
         $this->guard('media.manage');
@@ -400,6 +472,41 @@ final class AdminController extends BaseController
                 'message' => 'Файл видалено.',
                 'deleted_path' => $path,
             ]));
+        }
+
+        redirect('/admin/media');
+    }
+
+    public function mediaBulk(Request $request): Response
+    {
+        $this->guard('media.manage');
+        Csrf::verify();
+
+        $paths = $request->input('paths', []);
+        $paths = is_array($paths) ? $paths : [];
+        $paths = array_values(array_unique(array_filter(array_map(static fn ($path): string => Files::normalize((string) $path), $paths))));
+        $action = (string) $request->input('bulk_action', '');
+        $deleted = 0;
+
+        if ($paths && $action === 'delete') {
+            $references = $this->mediaReferences();
+            foreach ($paths as $path) {
+                if ($path === '' || isset($references[$path])) {
+                    continue;
+                }
+                try {
+                    Files::delete($path);
+                    $deleted++;
+                } catch (Throwable) {
+                    continue;
+                }
+            }
+            $this->audit('bulk_delete', 'media', null, 'paths: ' . implode(',', $paths));
+        }
+
+        if ($this->isAjax($request)) {
+            $message = $deleted > 0 ? 'Файли видалено: ' . $deleted . '.' : 'Немає файлів для видалення.';
+            return $this->json($this->adminListPayload('media', $request, $message));
         }
 
         redirect('/admin/media');
@@ -604,6 +711,50 @@ final class AdminController extends BaseController
         }
     }
 
+    public function publicInfoBulk(Request $request): Response
+    {
+        $this->guard('public_info.manage');
+        Csrf::verify();
+
+        $action = (string) $request->input('bulk_action', '');
+        $sectionIds = $this->bulkIdsFrom($request, 'section_ids');
+        $documentIds = $this->bulkIdsFrom($request, 'document_ids');
+        $message = 'Групову дію виконано.';
+        $handled = false;
+
+        if ($documentIds && in_array($action, ['publish_documents', 'draft_documents'], true)) {
+            $status = $action === 'publish_documents' ? 'published' : 'draft';
+            $this->bulkUpdateStatus('documents', $documentIds, $status);
+            if ($status === 'published') {
+                $this->bulkFillPublishedAt('documents', $documentIds);
+            }
+            $this->audit('bulk_' . $status, 'public_info_documents', null, 'ids: ' . implode(',', $documentIds));
+            $handled = true;
+        } elseif ($documentIds && $action === 'delete_documents') {
+            $this->bulkDelete('documents', $documentIds);
+            $this->audit('bulk_delete', 'public_info_documents', null, 'ids: ' . implode(',', $documentIds));
+            $handled = true;
+        } elseif ($sectionIds && in_array($action, ['require_sections', 'optional_sections'], true)) {
+            $this->bulkUpdatePublicInfoRequired($sectionIds, $action === 'require_sections' ? 1 : 0);
+            $this->audit('bulk_' . $action, 'public_info_sections', null, 'ids: ' . implode(',', $sectionIds));
+            $handled = true;
+        } elseif ($sectionIds && $action === 'delete_sections') {
+            $deleted = $this->bulkDeletePublicInfoSections($sectionIds);
+            $message = $deleted > 0 ? 'Розділи видалено: ' . $deleted . '.' : 'Вибрані розділи мають документи або вже видалені.';
+            $this->audit('bulk_delete', 'public_info_sections', null, 'ids: ' . implode(',', $sectionIds));
+            $handled = true;
+        }
+
+        if ($this->isAjax($request)) {
+            if (!$handled) {
+                return $this->json(['ok' => false, 'message' => 'Оберіть записи відповідного типу для цієї групової дії.'], 422);
+            }
+            return $this->json($this->adminListPayload('public-info', $request, $message));
+        }
+
+        redirect('/admin/public-info');
+    }
+
     public function users(Request $request): Response
     {
         $this->guard('users.manage');
@@ -667,6 +818,27 @@ final class AdminController extends BaseController
         } catch (Throwable $e) {
             return $this->ajaxError($request, $e);
         }
+    }
+
+    public function usersBulk(Request $request): Response
+    {
+        $this->guard('users.manage');
+        Csrf::verify();
+        $ids = array_values(array_filter($this->bulkIds($request), static fn (int $id): bool => $id !== (int) ($_SESSION['user_id'] ?? 0)));
+        $action = (string) $request->input('bulk_action', '');
+        if ($ids && in_array($action, ['activate', 'deactivate'], true)) {
+            $this->bulkUpdateUsers($ids, $action === 'activate' ? 1 : 0);
+            $this->audit('bulk_' . $action, 'users', null, 'ids: ' . implode(',', $ids));
+        } elseif ($ids && $action === 'delete') {
+            $this->bulkDelete('users', $ids);
+            $this->audit('bulk_delete', 'users', null, 'ids: ' . implode(',', $ids));
+        }
+
+        if ($this->isAjax($request)) {
+            return $this->json($this->adminListPayload('users', $request, 'Групову дію виконано.'));
+        }
+
+        redirect('/admin/users');
     }
 
     public function settings(): Response
@@ -869,6 +1041,101 @@ final class AdminController extends BaseController
         ]);
     }
 
+    private function adminListPayload(string $resource, Request $request, string $message = ''): array
+    {
+        $query = trim((string) $request->input('q', ''));
+        $pagination = [
+            'limit' => (int) ($request->input('limit', self::LIST_LIMIT) ?: self::LIST_LIMIT),
+            'offset' => 0,
+        ];
+        if ($pagination['limit'] <= 0 || $pagination['limit'] > 100) {
+            $pagination['limit'] = self::LIST_LIMIT;
+        }
+
+        if ($resource === 'media') {
+            return array_replace($this->mediaListPayload($query, $pagination), ['message' => $message]);
+        }
+
+        if ($resource === 'public-info') {
+            [$where, $params] = $this->publicInfoSearchWhere($query);
+            $sections = $this->db()->fetchAll(
+                'select s.*, count(d.id) as documents_count, sum(case when d.status = \'published\' then 1 else 0 end) as published_documents_count, max(d.updated_at) as last_document_at
+                 from public_info_sections s
+                 left join documents d on d.public_info_section_id = s.id
+                 ' . $where . '
+                 group by s.id, s.title, s.slug, s.description, s.is_required, s.sort_order
+                 order by s.sort_order asc
+                 limit ' . $pagination['limit'] . ' offset 0',
+                $params
+            );
+            $total = (int) ($this->db()->fetch('select count(*) as c from public_info_sections s ' . $where, $params)['c'] ?? 0);
+            $documents = $this->publicInfoDocuments($sections);
+            $loaded = count($sections);
+
+            return [
+                'ok' => true,
+                'html' => $this->view()->partial('admin/public-info/rows', ['sections' => $sections, 'documents' => $documents]),
+                'total' => $total,
+                'next_offset' => $loaded,
+                'has_more' => $loaded < $total,
+                'message' => $message,
+                'stats' => [
+                    'total' => $this->count('public_info_sections'),
+                    'filled' => (int) ($this->db()->fetch("select count(distinct public_info_section_id) as c from documents where status = 'published' and public_info_section_id is not null")['c'] ?? 0),
+                    'required' => (int) ($this->db()->fetch('select count(*) as c from public_info_sections where is_required = 1')['c'] ?? 0),
+                ],
+            ];
+        }
+
+        $map = [
+            'pages' => ['table' => 'pages', 'template' => 'admin/pages/rows', 'columns' => ['title', 'slug', 'excerpt', 'status'], 'order' => 'sort_order asc, id desc'],
+            'news' => ['table' => 'news', 'template' => 'admin/news/rows', 'columns' => ['title', 'body', 'status', 'published_at'], 'order' => 'id desc'],
+            'documents' => ['table' => 'documents', 'template' => 'admin/documents/rows', 'columns' => ['title', 'category', 'description', 'status', 'responsible'], 'order' => 'id desc'],
+            'users' => ['table' => 'users', 'template' => 'admin/users/rows', 'columns' => ['name', 'email', 'role'], 'order' => 'id desc'],
+        ];
+        if (!isset($map[$resource])) {
+            return ['ok' => true, 'message' => $message];
+        }
+
+        $config = $map[$resource];
+        [$where, $params] = $this->searchWhere($query, $config['columns']);
+        $items = $this->db()->fetchAll(
+            'select * from ' . $config['table'] . ' ' . $where . ' order by ' . $config['order'] . ' limit ' . $pagination['limit'] . ' offset 0',
+            $params
+        );
+        $total = (int) ($this->db()->fetch('select count(*) as c from ' . $config['table'] . ' ' . $where, $params)['c'] ?? 0);
+        $loaded = count($items);
+
+        return [
+            'ok' => true,
+            'html' => $this->view()->partial($config['template'], ['items' => $items]),
+            'total' => $total,
+            'next_offset' => $loaded,
+            'has_more' => $loaded < $total,
+            'message' => $message,
+            'stats' => $this->adminListStats($resource),
+        ];
+    }
+
+    private function adminListStats(string $resource): array
+    {
+        if (in_array($resource, ['pages', 'news'], true)) {
+            return $this->statusStats($resource);
+        }
+        if ($resource === 'documents') {
+            return [
+                'total' => $this->count('documents'),
+                'published' => (int) ($this->db()->fetch("select count(*) as c from documents where status = 'published'")['c'] ?? 0),
+                'linked' => (int) ($this->db()->fetch('select count(*) as c from documents where public_info_section_id is not null')['c'] ?? 0),
+            ];
+        }
+        if ($resource === 'users') {
+            return ['total' => $this->count('users')];
+        }
+
+        return [];
+    }
+
     private function searchWhere(string $query, array $columns): array
     {
         if ($query === '') {
@@ -961,6 +1228,107 @@ final class AdminController extends BaseController
                 'accent' => '#9a6700',
             ],
         ];
+    }
+
+    private function bulkIds(Request $request): array
+    {
+        return $this->bulkIdsFrom($request, 'ids');
+    }
+
+    private function bulkIdsFrom(Request $request, string $name): array
+    {
+        $ids = $request->input($name, []);
+        if (!is_array($ids)) {
+            return [];
+        }
+
+        $ids = array_map(static fn ($id): int => (int) $id, $ids);
+        $ids = array_values(array_unique(array_filter($ids, static fn (int $id): bool => $id > 0)));
+        return array_slice($ids, 0, 200);
+    }
+
+    private function bulkUpdatePublicInfoRequired(array $ids, int $isRequired): void
+    {
+        if (!$ids) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $this->db()->execute(
+            "update public_info_sections set is_required = ? where id in ({$placeholders})",
+            [$isRequired, ...$ids]
+        );
+    }
+
+    private function bulkDeletePublicInfoSections(array $ids): int
+    {
+        if (!$ids) {
+            return 0;
+        }
+
+        $deleted = 0;
+        foreach ($ids as $id) {
+            $documents = (int) ($this->db()->fetch('select count(*) as c from documents where public_info_section_id = ?', [$id])['c'] ?? 0);
+            if ($documents > 0) {
+                continue;
+            }
+            $this->db()->execute('delete from public_info_sections where id = ?', [$id]);
+            $deleted++;
+        }
+
+        return $deleted;
+    }
+
+    private function bulkUpdateStatus(string $table, array $ids, string $status): void
+    {
+        $allowedTables = ['pages', 'news', 'documents'];
+        if (!in_array($table, $allowedTables, true) || !$ids) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $this->db()->execute(
+            "update {$table} set status = ?, updated_at = ? where id in ({$placeholders})",
+            [$status, date('c'), ...$ids]
+        );
+    }
+
+    private function bulkFillPublishedAt(string $table, array $ids): void
+    {
+        $allowedTables = ['news', 'documents'];
+        if (!in_array($table, $allowedTables, true) || !$ids) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $this->db()->execute(
+            "update {$table} set published_at = ? where id in ({$placeholders}) and (published_at is null or published_at = '')",
+            [date('c'), ...$ids]
+        );
+    }
+
+    private function bulkUpdateUsers(array $ids, int $isActive): void
+    {
+        if (!$ids) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $this->db()->execute(
+            "update users set is_active = ? where id in ({$placeholders})",
+            [$isActive, ...$ids]
+        );
+    }
+
+    private function bulkDelete(string $table, array $ids): void
+    {
+        $allowedTables = ['pages', 'news', 'documents', 'users'];
+        if (!in_array($table, $allowedTables, true) || !$ids) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $this->db()->execute("delete from {$table} where id in ({$placeholders})", $ids);
     }
 
     private function importOptions(): array

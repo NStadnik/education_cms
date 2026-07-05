@@ -1,6 +1,11 @@
 <?php foreach ($items as $item): ?>
     <tr data-list-row>
         <td>
+            <?php if (empty($item['is_used'])): ?>
+                <input type="checkbox" name="paths[]" value="<?= e($item['path']) ?>" data-bulk-check form="mediaBulkForm" aria-label="Вибрати">
+            <?php endif; ?>
+        </td>
+        <td>
             <div class="media-file">
                 <?php if (!empty($item['is_image'])): ?>
                     <img class="media-thumb" src="<?= url('/uploads/' . $item['path']) ?>" alt="">

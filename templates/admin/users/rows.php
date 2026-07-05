@@ -1,5 +1,6 @@
 <?php foreach ($items as $item): ?>
     <tr data-list-row>
+        <td><input type="checkbox" name="ids[]" value="<?= e((string) $item['id']) ?>" data-bulk-check aria-label="Вибрати"></td>
         <td><?= e($item['name']) ?></td>
         <td><?= e($item['email']) ?></td>
         <td><?= e($item['role']) ?></td>

@@ -34,14 +34,24 @@
     </form>
 </section>
 
-<div class="list-panel" data-infinite-list data-list-url="<?= url('/admin/media') ?>" data-list-target="#mediaRows" data-list-offset="<?= e((string) count($items)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($items) < $total ? '1' : '0' ?>">
+<form id="mediaBulkForm" method="post" action="<?= url('/admin/media/bulk') ?>" data-no-ajax data-list-panel="#mediaListPanel">
+    <?= \App\Core\Csrf::field() ?>
+</form>
+<div id="mediaListPanel" class="list-panel" data-infinite-list data-list-url="<?= url('/admin/media') ?>" data-list-target="#mediaRows" data-list-offset="<?= e((string) count($items)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($items) < $total ? '1' : '0' ?>" data-list-empty-label="файли">
     <div class="list-tools">
         <input data-filter-input type="search" value="<?= e($query ?? '') ?>" placeholder="Пошук файлів" aria-label="Пошук медіафайлів">
-        <span class="meta"><span data-filter-count><?= e((string) $total) ?></span> файлів · <span data-media-stat="size"><?= e($stats['size']) ?></span></span>
+        <div class="bulk-actions">
+            <select name="bulk_action" form="mediaBulkForm" aria-label="Групова дія">
+                <option value="">Групова дія</option>
+                <option value="delete">Видалити</option>
+            </select>
+            <button class="button secondary compact" type="submit" form="mediaBulkForm"><span class="mdi mdi-check" aria-hidden="true"></span><span>Застосувати</span></button>
+            <span class="meta"><span data-filter-count><?= e((string) $total) ?></span> файлів · <span data-media-stat="size"><?= e($stats['size']) ?></span></span>
+        </div>
     </div>
     <div class="table-scroll">
         <table>
-            <thead><tr><th>Файл</th><th>Тип</th><th>Розмір</th><th>Оновлено</th><th>Використання</th><th></th></tr></thead>
+            <thead><tr><th><input type="checkbox" data-bulk-check-all form="mediaBulkForm" aria-label="Вибрати всі"></th><th>Файл</th><th>Тип</th><th>Розмір</th><th>Оновлено</th><th>Використання</th><th></th></tr></thead>
             <tbody id="mediaRows"><?= $this->partial('admin/media/rows', ['items' => $items]) ?></tbody>
         </table>
     </div>
