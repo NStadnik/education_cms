@@ -61,7 +61,7 @@ function safe_html(?string $value): string
         return $match[0];
     }, (string) $value) ?? '';
 
-    $html = strip_tags($value, '<p><br><strong><b><em><i><u><ul><ol><li><a><img><blockquote><h2><h3><h4><div><span><hr>');
+    $html = strip_tags($value, '<p><br><strong><b><em><i><u><ul><ol><li><a><img><blockquote><h2><h3><h4><div><span><figure><figcaption><hr>');
     $html = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? '';
     $html = preg_replace('/<(script|style|iframe|object|embed)\b[^>]*>.*?<\/\1>/is', '', $html) ?? '';
 
@@ -94,9 +94,20 @@ function safe_html(?string $value): string
             }
         }
 
-        if (in_array($tag, ['p', 'div', 'span', 'h2', 'h3', 'h4'], true)
-            && preg_match('/\sstyle\s*=\s*("|\')[^"\']*text-align\s*:\s*(left|right|center|justify)[^"\']*\1/i', $attributes, $styleMatch)) {
-            $safeAttributes .= ' style="text-align: ' . strtolower($styleMatch[2]) . '"';
+        if (preg_match('/\sclass\s*=\s*("|\')([^"\']+)\1/i', $attributes, $classMatch)) {
+            $classes = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', html_entity_decode($classMatch[2], ENT_QUOTES, 'UTF-8')) ?? '';
+            $classes = trim(preg_replace('/\s+/', ' ', $classes) ?? '');
+            if ($classes !== '') {
+                $safeAttributes .= ' class="' . e($classes) . '"';
+            }
+        }
+
+        if (preg_match('/\sstyle\s*=\s*("|\')([^"\']*)\1/i', $attributes, $styleMatch)) {
+            $style = trim(html_entity_decode($styleMatch[2], ENT_QUOTES, 'UTF-8'));
+            if ($style !== ''
+                && !preg_match('/(?:expression\s*\(|javascript\s*:|data\s*:|vbscript\s*:|@import|behavior\s*:)/i', $style)) {
+                $safeAttributes .= ' style="' . e($style) . '"';
+            }
         }
 
         return '<' . $tag . $safeAttributes . '>';

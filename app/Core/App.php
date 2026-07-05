@@ -122,6 +122,7 @@ final class App
         $this->router->post('/admin/documents/save', [$adminDocuments, 'documentSave']);
         $this->router->post('/admin/documents/bulk', [$adminDocuments, 'documentsBulk']);
         $this->router->get('/admin/media', [$adminMedia, 'media']);
+        $this->router->get('/admin/media/picker', [$adminMedia, 'mediaPicker']);
         $this->router->post('/admin/media/upload', [$adminMedia, 'mediaUpload']);
         $this->router->post('/admin/media/delete', [$adminMedia, 'mediaDelete']);
         $this->router->post('/admin/media/bulk', [$adminMedia, 'mediaBulk']);

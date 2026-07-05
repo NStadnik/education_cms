@@ -58,8 +58,65 @@
             <?= $content ?>
         </main>
     </div>
+    <div class="modal fade" id="richMediaModal" tabindex="-1" aria-labelledby="richMediaTitle" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h2 class="modal-title h5" id="richMediaTitle">Вставити медіафайл</h2>
+                        <p class="meta mb-0">Оберіть один файл або кілька зображень для галереї.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="rich-media-tools">
+                        <input type="search" class="form-control" data-rich-media-search placeholder="Пошук за назвою або шляхом">
+                        <label class="button secondary mb-0">
+                            <span class="mdi mdi-upload" aria-hidden="true"></span><span>Завантажити</span>
+                            <input type="file" data-rich-media-upload hidden>
+                        </label>
+                    </div>
+                    <div class="rich-media-options">
+                        <label>Режим
+                            <select data-rich-media-mode>
+                                <option value="single">Один файл</option>
+                                <option value="gallery">Галерея</option>
+                            </select>
+                        </label>
+                        <label>Розташування
+                            <select data-rich-media-align>
+                                <option value="center">По центру</option>
+                                <option value="left">Ліворуч</option>
+                                <option value="right">Праворуч</option>
+                                <option value="wide">На всю ширину</option>
+                            </select>
+                        </label>
+                        <label>Колонки галереї
+                            <select data-rich-media-columns>
+                                <option value="2">2</option>
+                                <option value="3" selected>3</option>
+                                <option value="4">4</option>
+                            </select>
+                        </label>
+                        <label>Підпис
+                            <input type="text" data-rich-media-caption placeholder="Необов'язково">
+                        </label>
+                    </div>
+                    <div class="rich-media-status meta" data-rich-media-status></div>
+                    <div class="rich-media-grid" data-rich-media-grid></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="button secondary" data-bs-dismiss="modal">Скасувати</button>
+                    <button type="button" class="button" data-rich-media-insert>
+                        <span class="mdi mdi-plus" aria-hidden="true"></span><span>Вставити</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    const adminCsrfToken = <?= json_encode(\App\Core\Csrf::token(), JSON_UNESCAPED_UNICODE) ?>;
     document.querySelectorAll('[data-infinite-list]').forEach(function (panel) {
         const input = panel.querySelector('[data-filter-input]');
         const count = panel.querySelector('[data-filter-count]');
@@ -314,6 +371,7 @@
     }, true);
 
     initRichEditors();
+    initCategoryPickers();
 
     document.addEventListener('submit', async function (event) {
         const form = event.target.closest('form[method="post"]:not([data-no-ajax]):not([data-section-save]):not([data-section-delete])');
@@ -475,12 +533,83 @@
         return String(value).replace(/["\\]/g, '\\$&');
     }
 
+    function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (character) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            }[character];
+        });
+    }
+
     document.addEventListener('submit', function (event) {
         const form = event.target.closest('form');
         if (form) {
             syncRichEditors(form);
         }
     }, true);
+
+    function initCategoryPickers() {
+        document.querySelectorAll('[data-category-picker]').forEach(function (picker) {
+            if (picker.dataset.categoryPickerReady === '1') {
+                return;
+            }
+            picker.dataset.categoryPickerReady = '1';
+
+            const filter = picker.querySelector('[data-category-filter]');
+            const items = Array.from(picker.querySelectorAll('[data-category-item]'));
+            const empty = picker.querySelector('[data-category-empty]');
+
+            function updateSummary() {
+                const selected = items.filter(function (item) {
+                    const input = item.querySelector('input[type="checkbox"]');
+                    return input && input.checked;
+                });
+                const titles = selected.map(function (item) {
+                    return (item.getAttribute('data-category-title') || item.textContent || '').trim();
+                });
+                const count = picker.querySelector('[data-category-count]');
+                const summary = picker.querySelector('[data-category-summary]');
+                if (count) {
+                    count.textContent = String(selected.length);
+                }
+                if (summary) {
+                    summary.textContent = titles.length ? titles.join(', ') : 'Категорії не вибрано';
+                }
+            }
+
+            function applyFilter() {
+                const needle = filter ? filter.value.trim().toLowerCase() : '';
+                let visible = 0;
+                items.forEach(function (item) {
+                    const title = (item.getAttribute('data-category-title') || item.textContent || '').toLowerCase();
+                    const matches = needle === '' || title.indexOf(needle) !== -1;
+                    item.hidden = !matches;
+                    if (matches) {
+                        visible++;
+                    }
+                });
+                if (empty) {
+                    empty.hidden = visible !== 0;
+                }
+            }
+
+            picker.addEventListener('change', function (event) {
+                if (event.target.matches('input[type="checkbox"]')) {
+                    updateSummary();
+                }
+            });
+            if (filter) {
+                filter.addEventListener('input', applyFilter);
+            }
+
+            updateSummary();
+            applyFilter();
+        });
+    }
 
     function initRichEditors() {
         document.querySelectorAll('textarea[data-rich-editor]').forEach(function (textarea) {
@@ -509,13 +638,24 @@
                     '<button type="button" data-rich-command="justifyLeft" title="Ліворуч"><span class="mdi mdi-format-align-left" aria-hidden="true"></span></button>' +
                     '<button type="button" data-rich-command="justifyCenter" title="По центру"><span class="mdi mdi-format-align-center" aria-hidden="true"></span></button>' +
                     '<button type="button" data-rich-command="justifyRight" title="Праворуч"><span class="mdi mdi-format-align-right" aria-hidden="true"></span></button>' +
+                    '<span class="rich-editor-divider" aria-hidden="true"></span>' +
+                    '<button type="button" data-rich-media-open title="Медіафайл"><span class="mdi mdi-image-plus-outline" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-align="left" title="Медіа ліворуч"><span class="mdi mdi-image-align-left" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-align="center" title="Медіа по центру"><span class="mdi mdi-image-align-center" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-align="right" title="Медіа праворуч"><span class="mdi mdi-image-align-right" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-align="wide" title="Медіа на всю ширину"><span class="mdi mdi-arrow-expand-horizontal" aria-hidden="true"></span></button>' +
+                    '<span class="rich-editor-divider" aria-hidden="true"></span>' +
                     '<button type="button" data-rich-link title="Посилання"><span class="mdi mdi-link-variant" aria-hidden="true"></span></button>' +
                     '<button type="button" data-rich-command="removeFormat" title="Очистити формат"><span class="mdi mdi-format-clear" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-source-toggle title="Джерело HTML"><span class="mdi mdi-code-tags" aria-hidden="true"></span></button>' +
                 '</div>' +
-                '<div class="rich-editor-area" contenteditable="true"></div>';
+                '<div class="rich-editor-area" contenteditable="true"></div>' +
+                '<textarea class="rich-editor-code" spellcheck="false" aria-label="HTML джерело"></textarea>';
 
             const area = editor.querySelector('.rich-editor-area');
+            const code = editor.querySelector('.rich-editor-code');
             area.innerHTML = textarea.value.trim() === '' ? '' : textarea.value;
+            code.value = textarea.value;
             textarea.insertAdjacentElement('afterend', editor);
 
             editor.querySelectorAll('[data-rich-command]').forEach(function (control) {
@@ -534,8 +674,36 @@
                 }
             });
 
+            editor.querySelector('[data-rich-media-open]').addEventListener('click', function () {
+                openRichMediaModal(area, textarea);
+            });
+
+            editor.querySelectorAll('[data-rich-align]').forEach(function (control) {
+                control.addEventListener('click', function () {
+                    setSelectedMediaAlign(area, control.getAttribute('data-rich-align'));
+                    syncRichEditor(textarea);
+                });
+            });
+
+            editor.querySelector('[data-rich-source-toggle]').addEventListener('click', function () {
+                toggleRichSourceMode(editor, textarea);
+            });
+
             area.addEventListener('input', function () {
                 syncRichEditor(textarea);
+            });
+            area.addEventListener('click', function (event) {
+                const media = event.target.closest('.rich-media-block, .rich-gallery, img, a');
+                area.querySelectorAll('.rich-media-selected').forEach(function (node) {
+                    node.classList.remove('rich-media-selected');
+                });
+                const block = richMediaBlock(media);
+                if (block) {
+                    block.classList.add('rich-media-selected');
+                }
+            });
+            code.addEventListener('input', function () {
+                textarea.value = code.value;
             });
             syncRichEditor(textarea);
         });
@@ -547,6 +715,250 @@
         syncRichEditor(textarea);
     }
 
+    function toggleRichSourceMode(editor, textarea) {
+        const area = editor.querySelector('.rich-editor-area');
+        const code = editor.querySelector('.rich-editor-code');
+        const button = editor.querySelector('[data-rich-source-toggle]');
+        const sourceMode = !editor.classList.contains('is-source-mode');
+
+        if (sourceMode) {
+            code.value = area.innerHTML.trim();
+        } else {
+            area.innerHTML = code.value;
+        }
+        textarea.value = sourceMode ? code.value : area.innerHTML.trim();
+        editor.classList.toggle('is-source-mode', sourceMode);
+        button.classList.toggle('is-active', sourceMode);
+        (sourceMode ? code : area).focus();
+    }
+
+    const richMediaState = {
+        modal: null,
+        area: null,
+        textarea: null,
+        items: [],
+        selected: new Set(),
+        loading: false,
+        searchTimer: null
+    };
+
+    function openRichMediaModal(area, textarea) {
+        const modalNode = document.getElementById('richMediaModal');
+        if (!modalNode || !window.bootstrap) {
+            return;
+        }
+
+        richMediaState.area = area;
+        richMediaState.textarea = textarea;
+        richMediaState.selected = new Set();
+        richMediaState.modal = richMediaState.modal || new window.bootstrap.Modal(modalNode);
+        modalNode.querySelector('[data-rich-media-caption]').value = '';
+        modalNode.querySelector('[data-rich-media-mode]').value = 'single';
+        modalNode.querySelector('[data-rich-media-align]').value = 'center';
+        bindRichMediaModal(modalNode);
+        richMediaState.modal.show();
+        loadRichMediaItems();
+    }
+
+    function bindRichMediaModal(modalNode) {
+        if (modalNode.dataset.richMediaBound === '1') {
+            return;
+        }
+        modalNode.dataset.richMediaBound = '1';
+
+        modalNode.querySelector('[data-rich-media-search]').addEventListener('input', function () {
+            window.clearTimeout(richMediaState.searchTimer);
+            richMediaState.searchTimer = window.setTimeout(loadRichMediaItems, 250);
+        });
+        modalNode.querySelector('[data-rich-media-mode]').addEventListener('change', function () {
+            if (this.value === 'single' && richMediaState.selected.size > 1) {
+                const first = Array.from(richMediaState.selected)[0];
+                richMediaState.selected = new Set([first]);
+                renderRichMediaItems();
+            }
+        });
+        modalNode.querySelector('[data-rich-media-insert]').addEventListener('click', insertSelectedRichMedia);
+        modalNode.querySelector('[data-rich-media-upload]').addEventListener('change', uploadRichMediaFile);
+    }
+
+    async function loadRichMediaItems() {
+        const modalNode = document.getElementById('richMediaModal');
+        const grid = modalNode.querySelector('[data-rich-media-grid]');
+        const status = modalNode.querySelector('[data-rich-media-status]');
+        const search = modalNode.querySelector('[data-rich-media-search]').value.trim();
+        const url = new URL('<?= url('/admin/media/picker') ?>', window.location.origin);
+        url.searchParams.set('limit', '80');
+        if (search !== '') {
+            url.searchParams.set('q', search);
+        }
+
+        richMediaState.loading = true;
+        status.textContent = 'Завантаження...';
+        grid.innerHTML = '';
+
+        try {
+            const response = await fetch(url.toString(), {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.message || 'Не вдалося завантажити медіафайли.');
+            }
+            richMediaState.items = data.items || [];
+            renderRichMediaItems();
+            status.textContent = richMediaState.items.length ? 'Знайдено файлів: ' + data.total + '.' : 'Файлів не знайдено.';
+        } catch (error) {
+            status.textContent = error.message || 'Помилка завантаження.';
+        } finally {
+            richMediaState.loading = false;
+        }
+    }
+
+    function renderRichMediaItems() {
+        const modalNode = document.getElementById('richMediaModal');
+        const grid = modalNode.querySelector('[data-rich-media-grid]');
+        const mode = modalNode.querySelector('[data-rich-media-mode]').value;
+        grid.innerHTML = '';
+
+        richMediaState.items.forEach(function (item) {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'rich-media-card' + (richMediaState.selected.has(item.path) ? ' is-selected' : '');
+            card.innerHTML = (item.is_image
+                ? '<img src="' + escapeHtml(item.url) + '" alt="">'
+                : '<span class="mdi mdi-file-outline rich-media-file-icon" aria-hidden="true"></span>') +
+                '<span class="rich-media-card-name">' + escapeHtml(item.name) + '</span>' +
+                '<small>' + escapeHtml(item.type) + ' · ' + escapeHtml(item.size_label) + '</small>';
+            card.addEventListener('click', function () {
+                if (mode === 'single') {
+                    richMediaState.selected = new Set([item.path]);
+                } else {
+                    if (!item.is_image) {
+                        return;
+                    }
+                    if (richMediaState.selected.has(item.path)) {
+                        richMediaState.selected.delete(item.path);
+                    } else {
+                        richMediaState.selected.add(item.path);
+                    }
+                }
+                renderRichMediaItems();
+            });
+            grid.appendChild(card);
+        });
+    }
+
+    async function uploadRichMediaFile(event) {
+        const input = event.target;
+        const file = input.files && input.files[0] ? input.files[0] : null;
+        if (!file) {
+            return;
+        }
+
+        const modalNode = document.getElementById('richMediaModal');
+        const status = modalNode.querySelector('[data-rich-media-status]');
+        const formData = new FormData();
+        formData.append('_csrf', adminCsrfToken);
+        formData.append('file', file);
+        status.textContent = 'Завантаження файлу...';
+
+        try {
+            const response = await fetch('<?= url('/admin/media/upload') ?>', {
+                method: 'POST',
+                body: formData,
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.message || 'Не вдалося завантажити файл.');
+            }
+            richMediaState.selected = new Set(data.uploaded_path ? [data.uploaded_path] : []);
+            input.value = '';
+            await loadRichMediaItems();
+            status.textContent = 'Файл завантажено.';
+        } catch (error) {
+            status.textContent = error.message || 'Помилка завантаження.';
+        }
+    }
+
+    function insertSelectedRichMedia() {
+        const modalNode = document.getElementById('richMediaModal');
+        const selected = richMediaState.items.filter(function (item) {
+            return richMediaState.selected.has(item.path);
+        });
+        if (!selected.length || !richMediaState.area || !richMediaState.textarea) {
+            modalNode.querySelector('[data-rich-media-status]').textContent = 'Оберіть файл для вставки.';
+            return;
+        }
+
+        const mode = modalNode.querySelector('[data-rich-media-mode]').value;
+        const align = modalNode.querySelector('[data-rich-media-align]').value;
+        const columns = modalNode.querySelector('[data-rich-media-columns]').value;
+        const caption = modalNode.querySelector('[data-rich-media-caption]').value.trim();
+        const html = mode === 'gallery'
+            ? buildRichGalleryHtml(selected.filter(function (item) { return item.is_image; }), align, columns, caption)
+            : buildRichMediaHtml(selected[0], align, caption);
+        if (html === '') {
+            modalNode.querySelector('[data-rich-media-status]').textContent = 'Для галереї оберіть зображення.';
+            return;
+        }
+
+        richMediaState.area.focus();
+        document.execCommand('insertHTML', false, html);
+        syncRichEditor(richMediaState.textarea);
+        richMediaState.modal.hide();
+    }
+
+    function buildRichMediaHtml(item, align, caption) {
+        if (item.is_image) {
+            return '<figure class="rich-media-block media-align-' + escapeHtml(align) + '"><img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(caption || item.name) + '">' +
+                (caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '') + '</figure>';
+        }
+
+        return '<p class="rich-file-link media-align-' + escapeHtml(align) + '"><a href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener">' +
+            escapeHtml(caption || item.name) + '</a></p>';
+    }
+
+    function buildRichGalleryHtml(items, align, columns, caption) {
+        if (!items.length) {
+            return '';
+        }
+
+        const images = items.map(function (item) {
+            return '<figure><img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(item.name) + '"></figure>';
+        }).join('');
+
+        return '<div class="rich-gallery rich-gallery-cols-' + escapeHtml(columns) + ' media-align-' + escapeHtml(align) + '">' + images + '</div>' +
+            (caption ? '<p class="rich-gallery-caption media-align-' + escapeHtml(align) + '">' + escapeHtml(caption) + '</p>' : '');
+    }
+
+    function setSelectedMediaAlign(area, align) {
+        const selection = window.getSelection();
+        let node = area.querySelector('.rich-media-selected');
+        if (!node && selection && selection.rangeCount) {
+            const anchor = selection.anchorNode;
+            node = anchor ? richMediaBlock(anchor.nodeType === 1 ? anchor : anchor.parentElement) : null;
+        }
+        node = richMediaBlock(node);
+        if (!node) {
+            return;
+        }
+
+        ['media-align-left', 'media-align-center', 'media-align-right', 'media-align-wide'].forEach(function (className) {
+            node.classList.remove(className);
+        });
+        node.classList.add('media-align-' + align);
+    }
+
+    function richMediaBlock(node) {
+        if (!node) {
+            return null;
+        }
+        const element = node.nodeType === 1 ? node : node.parentElement;
+        if (!element) {
+            return null;
+        }
+        return element.closest('.rich-media-block, .rich-gallery, .rich-gallery-caption, .rich-file-link') || (element.tagName === 'IMG' ? element.closest('figure') : null);
+    }
+
     function syncRichEditors(root) {
         (root || document).querySelectorAll('textarea[data-rich-editor]').forEach(syncRichEditor);
     }
@@ -554,8 +966,16 @@
     function syncRichEditor(textarea) {
         const editor = textarea.nextElementSibling;
         const area = editor ? editor.querySelector('.rich-editor-area') : null;
+        const code = editor ? editor.querySelector('.rich-editor-code') : null;
+        if (editor && editor.classList.contains('is-source-mode') && code) {
+            textarea.value = code.value;
+            return;
+        }
         if (area) {
             textarea.value = area.innerHTML.trim();
+            if (code) {
+                code.value = textarea.value;
+            }
         }
     }
     </script>

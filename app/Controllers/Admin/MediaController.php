@@ -36,6 +36,34 @@ final class MediaController extends \App\Controllers\AdminBaseController
         ]);
     }
 
+    public function mediaPicker(Request $request): Response
+    {
+        $this->guard('media.manage');
+
+        $query = trim((string) $request->input('q', ''));
+        $pagination = $this->pagination($request);
+        $list = $this->mediaListPayload($query, $pagination);
+        $items = array_map(static function (array $item): array {
+            return [
+                'path' => (string) ($item['path'] ?? ''),
+                'name' => (string) ($item['name'] ?? ''),
+                'extension' => (string) ($item['extension'] ?? ''),
+                'type' => (string) ($item['type'] ?? ''),
+                'size_label' => (string) ($item['size_label'] ?? ''),
+                'is_image' => !empty($item['is_image']),
+                'url' => url('/uploads/' . (string) ($item['path'] ?? '')),
+            ];
+        }, $list['items']);
+
+        return $this->json([
+            'ok' => true,
+            'items' => $items,
+            'total' => $list['total'],
+            'next_offset' => $list['next_offset'],
+            'has_more' => $list['has_more'],
+        ]);
+    }
+
     public function mediaUpload(Request $request): Response
     {
         $this->guard('media.manage');

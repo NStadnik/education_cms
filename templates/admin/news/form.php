@@ -73,20 +73,36 @@
                             <option value="published" <?= selected($currentStatus, 'published') ?>>Опубліковано</option>
                         </select>
                     </label>
-                    <label>Категорії
-                        <span class="field-with-action category-picker-row">
-                            <span class="checkbox-list">
+                    <div class="form-field">
+                        <div class="field-label">Категорії</div>
+                        <div class="category-picker" data-category-picker>
+                            <div class="category-picker-head">
+                                <div class="category-picker-summary">
+                                    <strong><span data-category-count><?= e((string) count($selectedCategoryTitles)) ?></span> вибрано</strong>
+                                    <small data-category-summary><?= e($categorySummary) ?></small>
+                                </div>
+                                <a class="button secondary icon-button" href="<?= url('/admin/news/categories') ?>" title="Редагувати категорії" aria-label="Редагувати категорії"><span class="mdi mdi-shape-outline" aria-hidden="true"></span></a>
+                            </div>
+                            <label class="category-picker-search">
+                                <span class="mdi mdi-magnify" aria-hidden="true"></span>
+                                <input type="search" data-category-filter placeholder="Шукати категорію">
+                            </label>
+                            <div class="category-picker-list" data-category-list>
                                 <?php foreach (($categories ?? []) as $category): ?>
-                                    <?php $isSelectedCategory = in_array((int) ($category['id'] ?? 0), $selectedCategoryIds, true) || (!$selectedCategoryIds && ($category['category'] ?? '') === $currentCategory); ?>
-                                    <label class="check-row category-check">
+                                    <?php
+                                        $categoryTitle = (string) ($category['label'] ?? $category['category']);
+                                        $isSelectedCategory = in_array((int) ($category['id'] ?? 0), $selectedCategoryIds, true) || (!$selectedCategoryIds && ($category['category'] ?? '') === $currentCategory);
+                                    ?>
+                                    <label class="category-option" data-category-item data-category-title="<?= e($categoryTitle) ?>">
                                         <input type="checkbox" name="category_ids[]" value="<?= e((string) $category['id']) ?>" <?= checked($isSelectedCategory) ?>>
-                                        <span><?= e($category['label'] ?? $category['category']) ?></span>
+                                        <span class="category-option-box"><span class="mdi mdi-check" aria-hidden="true"></span></span>
+                                        <span class="category-option-title"><?= e($categoryTitle) ?></span>
                                     </label>
                                 <?php endforeach; ?>
-                            </span>
-                            <a class="button secondary icon-button" href="<?= url('/admin/news/categories') ?>" title="Редагувати категорії" aria-label="Редагувати категорії"><span class="mdi mdi-shape-outline" aria-hidden="true"></span></a>
-                        </span>
-                    </label>
+                            </div>
+                            <div class="category-picker-empty meta" data-category-empty hidden>Категорій не знайдено.</div>
+                        </div>
+                    </div>
                     <label>Дата публікації<input name="published_at" value="<?= e($item['published_at'] ?? '') ?>" placeholder="2026-07-05"></label>
                 </div>
             </div>
