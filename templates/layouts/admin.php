@@ -29,7 +29,7 @@
     <div class="admin-shell">
         <aside class="admin-sidebar">
             <div class="mb-4">
-                <h2 class="h4 mb-1 text-white">CMS</h2>
+                <h2 class="h4 mb-1 text-white">Education CMS</h2>
                 <p class="small text-white-50 mb-0"><?= e($user['name'] ?? '') ?></p>
             </div>
             <nav class="nav nav-pills flex-column gap-1">
@@ -192,6 +192,8 @@
         });
     });
 
+    initRichEditors();
+
     document.addEventListener('submit', async function (event) {
         const form = event.target.closest('form[method="post"]:not([data-no-ajax]):not([data-section-save]):not([data-section-delete])');
         if (!form || event.defaultPrevented) {
@@ -199,6 +201,7 @@
         }
 
         event.preventDefault();
+        syncRichEditors(form);
         const button = form.querySelector('button[type="submit"]');
         const originalHtml = button ? button.innerHTML : '';
         setAjaxFormMessage(form, 'Збереження...', false);
@@ -267,6 +270,90 @@
         }
         node.className = isError ? 'alert alert-warning mt-3 mb-0' : 'alert alert-success mt-3 mb-0';
         node.textContent = message;
+    }
+
+    document.addEventListener('submit', function (event) {
+        const form = event.target.closest('form');
+        if (form) {
+            syncRichEditors(form);
+        }
+    }, true);
+
+    function initRichEditors() {
+        document.querySelectorAll('textarea[data-rich-editor]').forEach(function (textarea) {
+            if (textarea.dataset.richEditorReady === '1') {
+                return;
+            }
+            textarea.dataset.richEditorReady = '1';
+            textarea.classList.add('rich-editor-source');
+            textarea.required = false;
+
+            const editor = document.createElement('div');
+            editor.className = 'rich-editor';
+            editor.innerHTML =
+                '<div class="rich-editor-toolbar" aria-label="Панель форматування">' +
+                    '<select data-rich-command="formatBlock" title="Стиль">' +
+                        '<option value="p">Абзац</option>' +
+                        '<option value="h2">Заголовок 2</option>' +
+                        '<option value="h3">Заголовок 3</option>' +
+                        '<option value="blockquote">Цитата</option>' +
+                    '</select>' +
+                    '<button type="button" data-rich-command="bold" title="Жирний"><span class="mdi mdi-format-bold" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-command="italic" title="Курсив"><span class="mdi mdi-format-italic" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-command="underline" title="Підкреслення"><span class="mdi mdi-format-underline" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-command="insertUnorderedList" title="Маркований список"><span class="mdi mdi-format-list-bulleted" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-command="insertOrderedList" title="Нумерований список"><span class="mdi mdi-format-list-numbered" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-command="justifyLeft" title="Ліворуч"><span class="mdi mdi-format-align-left" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-command="justifyCenter" title="По центру"><span class="mdi mdi-format-align-center" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-command="justifyRight" title="Праворуч"><span class="mdi mdi-format-align-right" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-link title="Посилання"><span class="mdi mdi-link-variant" aria-hidden="true"></span></button>' +
+                    '<button type="button" data-rich-command="removeFormat" title="Очистити формат"><span class="mdi mdi-format-clear" aria-hidden="true"></span></button>' +
+                '</div>' +
+                '<div class="rich-editor-area" contenteditable="true"></div>';
+
+            const area = editor.querySelector('.rich-editor-area');
+            area.innerHTML = textarea.value.trim() === '' ? '' : textarea.value;
+            textarea.insertAdjacentElement('afterend', editor);
+
+            editor.querySelectorAll('[data-rich-command]').forEach(function (control) {
+                const eventName = control.tagName === 'SELECT' ? 'change' : 'click';
+                control.addEventListener(eventName, function () {
+                    runRichCommand(control.getAttribute('data-rich-command'), control.value || null, area, textarea);
+                });
+            });
+
+            editor.querySelector('[data-rich-link]').addEventListener('click', function () {
+                area.focus();
+                const href = window.prompt('URL посилання');
+                if (href) {
+                    document.execCommand('createLink', false, href);
+                    syncRichEditor(textarea);
+                }
+            });
+
+            area.addEventListener('input', function () {
+                syncRichEditor(textarea);
+            });
+            syncRichEditor(textarea);
+        });
+    }
+
+    function runRichCommand(command, value, area, textarea) {
+        area.focus();
+        document.execCommand(command, false, value);
+        syncRichEditor(textarea);
+    }
+
+    function syncRichEditors(root) {
+        (root || document).querySelectorAll('textarea[data-rich-editor]').forEach(syncRichEditor);
+    }
+
+    function syncRichEditor(textarea) {
+        const editor = textarea.nextElementSibling;
+        const area = editor ? editor.querySelector('.rich-editor-area') : null;
+        if (area) {
+            textarea.value = area.innerHTML.trim();
+        }
     }
     </script>
 </body>

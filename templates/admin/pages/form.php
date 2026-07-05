@@ -41,7 +41,7 @@
                 <label>Slug<input name="slug" value="<?= e($item['slug'] ?? '') ?>" placeholder="storinka"></label>
                 <label>Короткий опис<textarea class="textarea-small" name="excerpt"><?= e($item['excerpt'] ?? '') ?></textarea></label>
                 <label>Блоки тексту
-                    <textarea class="textarea-large" name="blocks_text" placeholder="Заголовок блоку&#10;Текст блоку"><?php foreach (($blocks ?: []) as $block): ?><?= e($block['title'] ?? 'Текст') . "\n" . e($block['text'] ?? '') . "\n\n" ?><?php endforeach; ?></textarea>
+                    <textarea class="textarea-large" name="blocks_text" data-rich-editor placeholder="Текст сторінки"><?php foreach (($blocks ?: []) as $block): ?><?= e($block['text'] ?? '') ?><?php endforeach; ?></textarea>
                 </label>
             </div>
         </section>

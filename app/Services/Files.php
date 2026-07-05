@@ -13,8 +13,16 @@ final class Files
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
             return null;
         }
-        if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-            throw new \RuntimeException('Upload failed');
+
+        $error = (int) ($file['error'] ?? UPLOAD_ERR_OK);
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new \RuntimeException(self::uploadErrorMessage($error));
+        }
+
+        $size = (int) ($file['size'] ?? 0);
+        $limit = self::uploadLimitBytes();
+        if ($limit > 0 && $size > $limit) {
+            throw new \RuntimeException('Файл завеликий. Поточний PHP-ліміт: ' . self::formatBytes($limit) . '.');
         }
 
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -105,6 +113,21 @@ final class Files
         return implode('/', $parts);
     }
 
+    public static function uploadLimitBytes(): int
+    {
+        $upload = self::parseIniBytes((string) ini_get('upload_max_filesize'));
+        $post = self::parseIniBytes((string) ini_get('post_max_size'));
+        $limits = array_filter([$upload, $post], static fn (int $value): bool => $value > 0);
+
+        return $limits ? min($limits) : 0;
+    }
+
+    public static function uploadLimitLabel(): string
+    {
+        $limit = self::uploadLimitBytes();
+        return $limit > 0 ? self::formatBytes($limit) : 'не обмежено PHP';
+    }
+
     private static function uploadsRoot(): string
     {
         return base_path('storage/uploads');
@@ -128,7 +151,7 @@ final class Files
         return strtoupper($extension ?: 'file');
     }
 
-    private static function formatBytes(int $bytes): string
+    public static function formatBytes(int $bytes): string
     {
         $units = ['Б', 'КБ', 'МБ', 'ГБ'];
         $value = (float) $bytes;
@@ -139,5 +162,34 @@ final class Files
         }
 
         return ($unit === 0 ? (string) $bytes : number_format($value, 1, '.', '')) . ' ' . $units[$unit];
+    }
+
+    private static function uploadErrorMessage(int $error): string
+    {
+        return match ($error) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Файл перевищує дозволений розмір завантаження.',
+            UPLOAD_ERR_PARTIAL => 'Файл завантажено не повністю.',
+            UPLOAD_ERR_NO_TMP_DIR => 'На сервері немає тимчасової папки для завантажень.',
+            UPLOAD_ERR_CANT_WRITE => 'Сервер не зміг записати файл.',
+            UPLOAD_ERR_EXTENSION => 'PHP-розширення зупинило завантаження.',
+            default => 'Upload failed',
+        };
+    }
+
+    private static function parseIniBytes(string $value): int
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return 0;
+        }
+
+        $unit = strtolower($value[strlen($value) - 1]);
+        $number = (float) $value;
+        return match ($unit) {
+            'g' => (int) ($number * 1024 * 1024 * 1024),
+            'm' => (int) ($number * 1024 * 1024),
+            'k' => (int) ($number * 1024),
+            default => (int) $number,
+        };
     }
 }

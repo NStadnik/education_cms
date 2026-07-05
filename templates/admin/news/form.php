@@ -40,7 +40,7 @@
             <div class="form-grid wide">
                 <label>Назва<input name="title" value="<?= e($item['title'] ?? '') ?>" required></label>
                 <label>Slug<input name="slug" value="<?= e($item['slug'] ?? '') ?>" placeholder="nazva-novyny"></label>
-                <label>Текст<textarea class="textarea-large" name="body" required><?= e($item['body'] ?? '') ?></textarea></label>
+                <label>Текст<textarea class="textarea-large" name="body" data-rich-editor required><?= e($item['body'] ?? '') ?></textarea></label>
             </div>
         </section>
 

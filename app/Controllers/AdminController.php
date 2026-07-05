@@ -309,22 +309,21 @@ final class AdminController extends BaseController
         $this->guard('media.manage');
         $query = trim((string) $request->input('q', ''));
         $pagination = $this->pagination($request);
-        $allItems = Files::all($this->mediaReferences());
-        $filteredItems = $this->filterMedia($allItems, $query);
-        $total = count($filteredItems);
-        $items = array_slice($filteredItems, $pagination['offset'], $pagination['limit']);
+        $list = $this->mediaListPayload($query, $pagination);
 
         if ($this->isAjaxRequest()) {
-            return $this->listJson('admin/media/rows', ['items' => $items], $pagination, $total);
+            return $this->json($list);
         }
 
         return $this->admin('admin/media/index', [
             'title' => 'Медіафайли',
-            'items' => $items,
-            'total' => $total,
+            'items' => $list['items'],
+            'total' => $list['total'],
             'limit' => $pagination['limit'],
-            'stats' => $this->mediaStats($allItems),
+            'stats' => $list['stats'],
             'query' => $query,
+            'uploadLimitBytes' => Files::uploadLimitBytes(),
+            'uploadLimitLabel' => Files::uploadLimitLabel(),
         ]);
     }
 
@@ -340,8 +339,22 @@ final class AdminController extends BaseController
             }
 
             $this->audit('upload', 'media', null, $filePath);
+            if ($this->isAjax($request)) {
+                return $this->json(array_replace($this->mediaListPayload(trim((string) $request->input('q', '')), [
+                    'limit' => self::LIST_LIMIT,
+                    'offset' => 0,
+                ]), [
+                    'message' => 'Файл завантажено.',
+                    'uploaded_path' => $filePath,
+                ]));
+            }
+
             redirect('/admin/media');
         } catch (Throwable $e) {
+            if ($this->isAjax($request)) {
+                return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
+            }
+
             $allItems = Files::all($this->mediaReferences());
             return $this->admin('admin/media/index', [
                 'title' => 'Медіафайли',
@@ -350,6 +363,8 @@ final class AdminController extends BaseController
                 'limit' => self::LIST_LIMIT,
                 'stats' => $this->mediaStats($allItems),
                 'query' => '',
+                'uploadLimitBytes' => Files::uploadLimitBytes(),
+                'uploadLimitLabel' => Files::uploadLimitLabel(),
                 'error' => $e->getMessage(),
             ]);
         }
@@ -363,11 +378,25 @@ final class AdminController extends BaseController
         $path = Files::normalize((string) $request->input('path', ''));
         $references = $this->mediaReferences();
         if ($path === '' || isset($references[$path])) {
+            if ($this->isAjax($request)) {
+                return $this->json(['ok' => false, 'message' => 'Файл використовується або не знайдений.'], 422);
+            }
+
             return new Response('Cannot delete file', 422);
         }
 
         Files::delete($path);
         $this->audit('delete', 'media', null, $path);
+        if ($this->isAjax($request)) {
+            return $this->json(array_replace($this->mediaListPayload(trim((string) $request->input('q', '')), [
+                'limit' => self::LIST_LIMIT,
+                'offset' => 0,
+            ]), [
+                'message' => 'Файл видалено.',
+                'deleted_path' => $path,
+            ]));
+        }
+
         redirect('/admin/media');
     }
 
@@ -805,6 +834,25 @@ final class AdminController extends BaseController
         }));
     }
 
+    private function mediaListPayload(string $query, array $pagination): array
+    {
+        $allItems = Files::all($this->mediaReferences());
+        $filteredItems = $this->filterMedia($allItems, $query);
+        $total = count($filteredItems);
+        $items = array_slice($filteredItems, $pagination['offset'], $pagination['limit']);
+        $loaded = $pagination['offset'] + count($items);
+
+        return [
+            'ok' => true,
+            'items' => $items,
+            'html' => $this->view()->partial('admin/media/rows', ['items' => $items]),
+            'total' => $total,
+            'next_offset' => $loaded,
+            'has_more' => $loaded < $total,
+            'stats' => $this->mediaStats($allItems),
+        ];
+    }
+
     private function mediaStats(array $items): array
     {
         $size = 0;
@@ -870,6 +918,15 @@ final class AdminController extends BaseController
 
     private function blocksFromText(string $text): array
     {
+        if ($text !== strip_tags($text)) {
+            $title = 'Текст';
+            if (preg_match('/<h[1-4][^>]*>(.*?)<\/h[1-4]>/is', $text, $match)) {
+                $title = trim(strip_tags($match[1])) ?: $title;
+            }
+
+            return [['type' => 'text', 'title' => $title, 'text' => trim($text)]];
+        }
+
         $blocks = [];
         foreach (preg_split('/\R{2,}/', trim($text)) ?: [] as $part) {
             $lines = preg_split('/\R/', trim($part)) ?: [];

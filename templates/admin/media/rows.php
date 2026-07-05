@@ -26,11 +26,11 @@
         </td>
         <td>
             <div class="form-actions">
-                <a class="button secondary compact" href="<?= url('/uploads/' . $item['path']) ?>">
-                    <span class="mdi mdi-open-in-new" aria-hidden="true"></span><span>Відкрити</span>
-                </a>
+                <button class="button secondary compact" type="button" data-media-preview data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-type="<?= e($item['type']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>">
+                    <span class="mdi mdi-eye-outline" aria-hidden="true"></span><span>Переглянути</span>
+                </button>
                 <?php if (empty($item['is_used'])): ?>
-                    <form method="post" action="<?= url('/admin/media/delete') ?>" data-no-ajax onsubmit="return confirm('Видалити цей файл?');">
+                    <form method="post" action="<?= url('/admin/media/delete') ?>" data-media-delete>
                         <?= \App\Core\Csrf::field() ?>
                         <input type="hidden" name="path" value="<?= e($item['path']) ?>">
                         <button class="button danger compact" type="submit"><span class="mdi mdi-trash-can-outline" aria-hidden="true"></span><span>Видалити</span></button>

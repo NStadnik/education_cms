@@ -56,7 +56,7 @@
                 <article class="card content-card">
                     <p class="eyebrow">Сторінка</p>
                     <h2><?= e($block['title'] ?? $page['title']) ?></h2>
-                    <div><?= nl2br(e($block['text'] ?? '')) ?></div>
+                    <div class="rich-content"><?= safe_html($block['text'] ?? '') ?></div>
                 </article>
             </div>
         </section>
