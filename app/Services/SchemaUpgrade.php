@@ -27,6 +27,13 @@ final class SchemaUpgrade
                 $db->execute('insert into settings (name, value) values (?, ?)', ['schema_pages_template', '1']);
             }
 
+            $newsCategoryDone = $db->fetch('select value from settings where name = ?', ['schema_news_category']);
+            if (($newsCategoryDone['value'] ?? '') !== '1') {
+                self::addNewsCategoryColumn($db);
+                $db->execute('delete from settings where name = ?', ['schema_news_category']);
+                $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_category', '1']);
+            }
+
             self::ensureSetting($db, 'site_template', 'official');
             self::migrateGlobalFields($db);
         } catch (Throwable) {
@@ -57,6 +64,15 @@ final class SchemaUpgrade
         }
 
         $db->pdo()->exec("alter table pages add column template varchar(80) not null default 'default'");
+    }
+
+    private static function addNewsCategoryColumn(Database $db): void
+    {
+        if (self::hasColumn($db, 'news', 'category')) {
+            return;
+        }
+
+        $db->pdo()->exec("alter table news add column category varchar(160) not null default 'Загальні'");
     }
 
     private static function ensureSetting(Database $db, string $name, string $value): void

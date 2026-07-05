@@ -30,12 +30,22 @@ final class PublicController extends BaseController
         return $this->renderPage($page);
     }
 
-    public function news(): Response
+    public function news(Request $request): Response
     {
+        $category = trim((string) $request->input('category', ''));
+        $where = 'where status = ?';
+        $params = ['published'];
+        if ($category !== '') {
+            $where .= ' and category = ?';
+            $params[] = $category;
+        }
+
         return $this->render('public/news', [
             'title' => 'Новини',
             'settings' => $this->siteSettings(),
-            'items' => $this->db()->fetchAll('select * from news where status = ? order by published_at desc, id desc', ['published']),
+            'items' => $this->db()->fetchAll('select * from news ' . $where . ' order by published_at desc, id desc', $params),
+            'categories' => $this->newsCategories(),
+            'activeCategory' => $category,
             'menu' => $this->menu(),
         ]);
     }
@@ -53,6 +63,18 @@ final class PublicController extends BaseController
             'item' => $item,
             'menu' => $this->menu(),
         ]);
+    }
+
+    private function newsCategories(): array
+    {
+        return $this->db()->fetchAll(
+            "select category, count(*) as items_count
+             from news
+             where status = ? and category is not null and category <> ''
+             group by category
+             order by category asc",
+            ['published']
+        );
     }
 
     public function documents(): Response

@@ -14,6 +14,9 @@ use Throwable;
 abstract class AdminBaseController extends BaseController
 {
     protected const LIST_LIMIT = 20;
+    protected const IMPORT_TITLE_LIMIT = 220;
+
+    protected array $lastImportStats = [];
 
     protected function guard(?string $permission = null): void
     {
@@ -105,7 +108,7 @@ abstract class AdminBaseController extends BaseController
 
         $map = [
             'pages' => ['table' => 'pages', 'template' => 'admin/pages/rows', 'columns' => ['title', 'slug', 'excerpt', 'status'], 'order' => 'sort_order asc, id desc'],
-            'news' => ['table' => 'news', 'template' => 'admin/news/rows', 'columns' => ['title', 'body', 'status', 'published_at'], 'order' => 'id desc'],
+            'news' => ['table' => 'news', 'template' => 'admin/news/rows', 'columns' => ['title', 'category', 'body', 'status', 'published_at'], 'order' => 'id desc'],
             'documents' => ['table' => 'documents', 'template' => 'admin/documents/rows', 'columns' => ['title', 'category', 'description', 'status', 'responsible'], 'order' => 'id desc'],
             'users' => ['table' => 'users', 'template' => 'admin/users/rows', 'columns' => ['name', 'email', 'role'], 'order' => 'id desc'],
         ];
@@ -464,21 +467,16 @@ abstract class AdminBaseController extends BaseController
         $prefix = $this->sanitizeDbIdentifier((string) $request->input('db_prefix', 'wp_'));
         $table = $prefix . 'posts';
         $limit = $preview ? 10 : max(1, min(1000, (int) $request->input('db_limit', 200)));
-        $status = (string) $request->input('wp_status', 'publish');
-        if (!in_array($status, ['publish', 'draft', 'any'], true)) {
-            $status = 'publish';
-        }
+        $offset = $preview ? 0 : max(0, (int) $request->input('db_offset', 0));
+        [$where, $params] = $this->wordPressPostsWhere($request);
 
-        $where = "post_type in ('post', 'page')";
-        $params = [];
-        if ($status !== 'any') {
-            $where .= ' and post_status = ?';
-            $params[] = $status;
-        }
+        $countStmt = $pdo->prepare("select count(*) as c from {$table} where {$where}");
+        $countStmt->execute($params);
+        $total = (int) ($countStmt->fetch(\PDO::FETCH_ASSOC)['c'] ?? 0);
 
         $mediaMap = [];
-        if (!$preview && $request->input('wp_import_media')) {
-            $mediaMap = $this->importWordPressMedia($pdo, $prefix, $request);
+        if (!$preview && $this->shouldImportWordPressMedia($request)) {
+            $mediaMap = $this->importWordPressMedia($pdo, $prefix, $request, !$request->input('wp_media_replace_only'));
         }
 
         $stmt = $pdo->prepare(
@@ -486,7 +484,7 @@ abstract class AdminBaseController extends BaseController
              from {$table}
              where {$where}
              order by post_date desc, ID desc
-             limit {$limit}"
+             limit {$limit} offset {$offset}"
         );
         $stmt->execute($params);
 
@@ -510,16 +508,90 @@ abstract class AdminBaseController extends BaseController
             ];
         }
 
+        $this->lastImportStats = array_replace($this->lastImportStats, [
+            'posts_total' => $total,
+            'posts_offset' => $offset,
+            'posts_limit' => $limit,
+            'posts_loaded' => count($rows),
+            'posts_next_offset' => $offset + count($rows),
+            'posts_has_more' => ($offset + count($rows)) < $total,
+        ]);
+
         return $rows;
     }
 
-    protected function importWordPressMedia(\PDO $pdo, string $prefix, Request $request): array
+    protected function wordPressPostsWhere(Request $request): array
+    {
+        $status = (string) $request->input('wp_status', 'publish');
+        if (!in_array($status, ['publish', 'draft', 'any'], true)) {
+            $status = 'publish';
+        }
+
+        $postType = (string) $request->input('wp_post_type', 'any');
+        if (!in_array($postType, ['post', 'page', 'any'], true)) {
+            $postType = 'any';
+        }
+
+        $where = $postType === 'any' ? "post_type in ('post', 'page')" : 'post_type = ?';
+        $params = $postType === 'any' ? [] : [$postType];
+        if ($status !== 'any') {
+            $where .= ' and post_status = ?';
+            $params[] = $status;
+        }
+
+        $search = trim((string) $request->input('wp_search', ''));
+        if ($search !== '') {
+            $where .= ' and (post_title like ? or post_content like ? or post_name like ?)';
+            $like = '%' . $search . '%';
+            array_push($params, $like, $like, $like);
+        }
+
+        $dateFrom = trim((string) $request->input('wp_date_from', ''));
+        if ($dateFrom !== '') {
+            $where .= ' and post_date >= ?';
+            $params[] = $dateFrom . ' 00:00:00';
+        }
+
+        $dateTo = trim((string) $request->input('wp_date_to', ''));
+        if ($dateTo !== '') {
+            $where .= ' and post_date <= ?';
+            $params[] = $dateTo . ' 23:59:59';
+        }
+
+        return [$where, $params];
+    }
+
+    protected function shouldImportWordPressMedia(Request $request): bool
+    {
+        if ((string) $request->input('wp_import_scope', 'all') === 'posts') {
+            return false;
+        }
+
+        return (bool) $request->input('wp_import_media');
+    }
+
+    protected function runWordPressMediaBatch(Request $request): array
+    {
+        $pdo = $this->externalImportPdo($request);
+        $prefix = $this->sanitizeDbIdentifier((string) $request->input('db_prefix', 'wp_'));
+        $this->importWordPressMedia($pdo, $prefix, $request);
+
+        return $this->lastImportStats;
+    }
+
+    protected function importWordPressMedia(\PDO $pdo, string $prefix, Request $request, bool $download = true): array
     {
         $postsTable = $prefix . 'posts';
         $metaTable = $prefix . 'postmeta';
         $siteUrl = rtrim(trim((string) $request->input('wp_site_url', '')), '/');
         $uploadsPath = rtrim(trim((string) $request->input('wp_uploads_path', '')), '/\\');
-        $limit = max(1, min(5000, (int) $request->input('wp_media_limit', 1000)));
+        $offset = max(0, (int) $request->input('wp_media_offset', 0));
+        $maxLimit = $download ? 5000 : 50000;
+        $limitInput = $request->input('wp_media_map_limit', $request->input('wp_media_limit', 1000));
+        $limit = max(1, min($maxLimit, (int) $limitInput));
+
+        $countStmt = $pdo->query("select count(*) as c from {$postsTable} where post_type = 'attachment'");
+        $total = (int) ($countStmt->fetch(\PDO::FETCH_ASSOC)['c'] ?? 0);
 
         $stmt = $pdo->prepare(
             "select p.ID, p.guid, p.post_title, p.post_name, p.post_mime_type, m.meta_value as attached_file, mm.meta_value as attachment_metadata
@@ -528,12 +600,15 @@ abstract class AdminBaseController extends BaseController
              left join {$metaTable} mm on mm.post_id = p.ID and mm.meta_key = '_wp_attachment_metadata'
              where p.post_type = 'attachment'
              order by p.ID asc
-             limit {$limit}"
+             limit {$limit} offset {$offset}"
         );
         $stmt->execute();
 
         $map = [];
+        $loaded = 0;
+        $saved = 0;
         foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $attachment) {
+            $loaded++;
             $relativeSource = trim((string) ($attachment['attached_file'] ?? ''), '/');
             $sourceUrl = trim((string) ($attachment['guid'] ?? ''));
             $source = $this->wordPressMediaSource($relativeSource, $sourceUrl, $siteUrl, $uploadsPath);
@@ -541,10 +616,11 @@ abstract class AdminBaseController extends BaseController
                 continue;
             }
 
-            $savedPath = $this->saveImportedMedia($source, $relativeSource, $sourceUrl, (int) ($attachment['ID'] ?? 0));
+            $savedPath = $this->saveImportedMedia($source, $relativeSource, $sourceUrl, (int) ($attachment['ID'] ?? 0), $download);
             if ($savedPath === '') {
                 continue;
             }
+            $saved++;
 
             $newUrl = url('/uploads/' . $savedPath);
             foreach ($this->wordPressMediaAliases($relativeSource, $sourceUrl, $siteUrl, (string) ($attachment['attachment_metadata'] ?? ''), (string) ($attachment['post_name'] ?? ''), (int) ($attachment['ID'] ?? 0)) as $alias) {
@@ -553,6 +629,15 @@ abstract class AdminBaseController extends BaseController
         }
 
         uksort($map, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+        $this->lastImportStats = array_replace($this->lastImportStats, [
+            'media_total' => $total,
+            'media_offset' => $offset,
+            'media_limit' => $limit,
+            'media_loaded' => $loaded,
+            'media_imported' => $saved,
+            'media_next_offset' => $offset + $loaded,
+            'media_has_more' => ($offset + $loaded) < $total,
+        ]);
         return $map;
     }
 
@@ -576,7 +661,7 @@ abstract class AdminBaseController extends BaseController
         return '';
     }
 
-    protected function saveImportedMedia(string $source, string $relativeSource, string $sourceUrl, int $id): string
+    protected function saveImportedMedia(string $source, string $relativeSource, string $sourceUrl, int $id, bool $download = true): string
     {
         $name = basename($relativeSource ?: (parse_url($sourceUrl, PHP_URL_PATH) ?: ''));
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
@@ -592,6 +677,9 @@ abstract class AdminBaseController extends BaseController
         }
         if (is_file($target)) {
             return $targetRelative;
+        }
+        if (!$download) {
+            return '';
         }
 
         $context = stream_context_create(['http' => ['timeout' => 15], 'https' => ['timeout' => 15]]);
@@ -854,18 +942,22 @@ abstract class AdminBaseController extends BaseController
             if ($title === '') {
                 continue;
             }
+            $slugSource = $this->importValue($row, ['slug', 'адреса']) ?: $title;
+            $title = $this->importTitle($title);
 
             $status = $this->importStatus($this->importValue($row, ['status', 'статус']), 'draft');
             $publishedAt = $this->importValue($row, ['published_at', 'дата_публікації', 'дата']);
             if ($status === 'published' && $publishedAt === '') {
                 $publishedAt = $now;
             }
+            $category = $this->importValue($row, ['category', 'категорія', 'rubric', 'рубрика']) ?: 'Загальні';
 
             $this->db()->execute(
-                'insert into news (title, slug, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)',
+                'insert into news (title, slug, category, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     $title,
-                    $this->uniqueSlug('news', $this->importValue($row, ['slug', 'адреса']) ?: $title),
+                    $this->uniqueSlug('news', $slugSource),
+                    $category,
                     $this->importValue($row, ['body', 'text', 'контент', 'текст', 'опис']),
                     $status,
                     $publishedAt ?: null,
@@ -888,6 +980,8 @@ abstract class AdminBaseController extends BaseController
             if ($title === '') {
                 continue;
             }
+            $slugSource = $this->importValue($row, ['slug', 'адреса']) ?: $title;
+            $title = $this->importTitle($title);
 
             $template = $this->importValue($row, ['template', 'шаблон']) ?: 'default';
             if (!array_key_exists($template, $this->pageTemplates())) {
@@ -900,7 +994,7 @@ abstract class AdminBaseController extends BaseController
                 'insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     $title,
-                    $this->uniqueSlug('pages', $this->importValue($row, ['slug', 'адреса']) ?: $title),
+                    $this->uniqueSlug('pages', $slugSource),
                     $this->importValue($row, ['excerpt', 'анонс', 'короткий_опис']),
                     $template,
                     $blocks === false ? '[]' : $blocks,
@@ -925,6 +1019,7 @@ abstract class AdminBaseController extends BaseController
             if ($title === '') {
                 continue;
             }
+            $title = $this->importTitle($title);
 
             $status = $this->importStatus($this->importValue($row, ['status', 'статус']), 'published');
             $publishedAt = $this->importValue($row, ['published_at', 'дата_публікації', 'дата']);
@@ -962,12 +1057,14 @@ abstract class AdminBaseController extends BaseController
             if ($title === '') {
                 continue;
             }
+            $slugSource = $this->importValue($row, ['slug', 'адреса']) ?: $title;
+            $title = $this->importTitle($title);
 
             $this->db()->execute(
                 'insert into public_info_sections (title, slug, description, is_required, sort_order) values (?, ?, ?, ?, ?)',
                 [
                     $title,
-                    $this->uniqueSlug('public_info_sections', $this->importValue($row, ['slug', 'адреса']) ?: $title),
+                    $this->uniqueSlug('public_info_sections', $slugSource),
                     $this->importValue($row, ['description', 'опис']),
                     $this->importBool($this->importValue($row, ['is_required', 'обовязковий', 'обов_язковий']), true) ? 1 : 0,
                     (int) ($this->importValue($row, ['sort_order', 'порядок']) ?: 0),
@@ -1059,6 +1156,28 @@ abstract class AdminBaseController extends BaseController
         }
 
         return '';
+    }
+
+    protected function importTitle(string $title): string
+    {
+        $title = trim($title);
+        if ($title === '') {
+            return '';
+        }
+
+        $limit = self::IMPORT_TITLE_LIMIT;
+        $length = function_exists('mb_strlen') ? mb_strlen($title, 'UTF-8') : strlen($title);
+        if ($length <= $limit) {
+            return $title;
+        }
+
+        $suffix = '...';
+        $sliceLength = $limit - strlen($suffix);
+        if (function_exists('mb_substr')) {
+            return rtrim(mb_substr($title, 0, $sliceLength, 'UTF-8')) . $suffix;
+        }
+
+        return rtrim(substr($title, 0, $sliceLength)) . $suffix;
     }
 
     protected function importStatus(string $status, string $default): string

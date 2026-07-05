@@ -36,8 +36,35 @@ final class ImportController extends \App\Controllers\AdminBaseController
                 throw new \RuntimeException('Невідомий тип імпорту.');
             }
 
+            if ($type === 'wordpress' && ($request->input('wp_media_only') || (string) $request->input('wp_import_scope', 'all') === 'media')) {
+                $stats = $this->runWordPressMediaBatch($request);
+                $result = [
+                    'ok' => true,
+                    'message' => 'Пакет файлів WordPress оброблено.',
+                    'created' => 0,
+                    'total' => (int) ($stats['media_total'] ?? 0),
+                    'stats' => $stats,
+                    'next_offset' => (int) ($stats['media_next_offset'] ?? 0),
+                    'has_more' => (bool) ($stats['media_has_more'] ?? false),
+                ];
+
+                return $this->json($result);
+            }
+
             $rows = $this->readImportRows($request, false);
             if (!$rows) {
+                if ($type === 'wordpress') {
+                    $stats = $this->lastImportStats;
+                    return $this->json([
+                        'ok' => true,
+                        'message' => 'Немає записів WordPress для цього пакета.',
+                        'created' => 0,
+                        'total' => (int) ($stats['posts_total'] ?? 0),
+                        'stats' => $stats,
+                        'next_offset' => (int) ($stats['posts_next_offset'] ?? 0),
+                        'has_more' => false,
+                    ]);
+                }
                 throw new \RuntimeException('Файл або текст імпорту не містить записів.');
             }
 
@@ -53,7 +80,14 @@ final class ImportController extends \App\Controllers\AdminBaseController
                 'message' => 'Імпорт завершено.',
                 'created' => $created,
                 'total' => count($rows),
+                'stats' => $this->lastImportStats,
             ];
+
+            if ($type === 'wordpress') {
+                $result['next_offset'] = (int) ($this->lastImportStats['posts_next_offset'] ?? count($rows));
+                $result['has_more'] = (bool) ($this->lastImportStats['posts_has_more'] ?? false);
+                $result['total'] = (int) ($this->lastImportStats['posts_total'] ?? count($rows));
+            }
 
             if ($this->isAjax($request)) {
                 return $this->json($result);
@@ -105,6 +139,7 @@ final class ImportController extends \App\Controllers\AdminBaseController
                 'total' => count($rows),
                 'summary' => $this->importPreviewSummary($type, $rows),
                 'rows' => array_slice($this->importPreviewRows($type, $rows), 0, 10),
+                'stats' => $this->lastImportStats,
             ]);
         } catch (Throwable $e) {
             return $this->json(['ok' => false, 'message' => $e->getMessage()], 500);

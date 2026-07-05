@@ -8,10 +8,20 @@
             </div>
             <span class="status"><?= e((string) count($items)) ?> записів</span>
         </div>
+        <?php if (!empty($categories)): ?>
+            <div class="bulk-actions" style="justify-content:flex-start;margin-bottom:18px">
+                <a class="status <?= empty($activeCategory) ? 'ok' : '' ?>" href="<?= url('/news') ?>">Усі</a>
+                <?php foreach ($categories as $category): ?>
+                    <a class="status <?= ($activeCategory ?? '') === $category['category'] ? 'ok' : '' ?>" href="<?= url('/news?category=' . urlencode($category['category'])) ?>">
+                        <?= e($category['category']) ?> · <?= e((string) $category['items_count']) ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
         <div class="grid grid-3 news-grid">
             <?php foreach ($items as $item): ?>
                 <article class="card content-card">
-                    <p class="meta"><?= e($item['published_at'] ?? '') ?></p>
+                    <p class="meta"><?= e($item['category'] ?? 'Загальні') ?> · <?= e($item['published_at'] ?? '') ?></p>
                     <h2><a href="<?= url('/news/' . $item['slug']) ?>"><?= e($item['title']) ?></a></h2>
                     <p><?= e(excerpt($item['body'], 180)) ?></p>
                     <a class="read-more" href="<?= url('/news/' . $item['slug']) ?>">Читати</a>

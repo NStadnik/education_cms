@@ -18,7 +18,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
         $this->guard();
         $query = trim((string) $request->input('q', ''));
         $pagination = $this->pagination($request);
-        [$where, $params] = $this->searchWhere($query, ['title', 'slug', 'body', 'status']);
+        [$where, $params] = $this->searchWhere($query, ['title', 'slug', 'category', 'body', 'status']);
         $items = $this->db()->fetchAll(
             'select * from news ' . $where . ' order by id desc limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
             $params
@@ -44,7 +44,11 @@ final class NewsController extends \App\Controllers\AdminBaseController
         $this->guard();
         $id = (int) $request->input('id', 0);
         $item = $id ? $this->db()->fetch('select * from news where id = ?', [$id]) : null;
-        return $this->admin('admin/news/form', ['title' => 'Новина', 'item' => $item]);
+        return $this->admin('admin/news/form', [
+            'title' => 'Новина',
+            'item' => $item,
+            'categories' => $this->newsCategories(),
+        ]);
     }
 
     public function newsSave(Request $request): Response
@@ -56,18 +60,23 @@ final class NewsController extends \App\Controllers\AdminBaseController
             $id = (int) $request->input('id', 0);
             $slug = $this->slug((string) $request->input('slug', $request->input('title')));
             $publishedAt = $request->input('status') === 'published' ? ($request->input('published_at') ?: $now) : null;
+            $category = trim((string) $request->input('category', ''));
+            if ($category === '') {
+                $category = 'Загальні';
+            }
             $data = [
                 $request->input('title'),
                 $slug,
+                $category,
                 $request->input('body'),
                 $request->input('status', 'draft'),
                 $publishedAt,
                 $now,
             ];
             if ($id) {
-                $this->db()->execute('update news set title=?, slug=?, body=?, status=?, published_at=?, updated_at=? where id=?', [...$data, $id]);
+                $this->db()->execute('update news set title=?, slug=?, category=?, body=?, status=?, published_at=?, updated_at=? where id=?', [...$data, $id]);
             } else {
-                $this->db()->execute('insert into news (title, slug, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
+                $this->db()->execute('insert into news (title, slug, category, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
                 $id = (int) $this->db()->lastInsertId();
             }
             $this->audit('save', 'news', $id);
@@ -112,5 +121,10 @@ final class NewsController extends \App\Controllers\AdminBaseController
         }
 
         redirect('/admin/news');
+    }
+
+    private function newsCategories(): array
+    {
+        return $this->db()->fetchAll("select distinct category from news where category is not null and category <> '' order by category asc");
     }
 }

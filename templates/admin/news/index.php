@@ -34,7 +34,7 @@
     </div>
     <div class="table-scroll">
         <table>
-            <thead><tr><th><input type="checkbox" data-bulk-check-all aria-label="Вибрати всі"></th><th>Назва</th><th>Статус</th><th>Дата публікації</th><th>Оновлено</th><th></th></tr></thead>
+            <thead><tr><th><input type="checkbox" data-bulk-check-all aria-label="Вибрати всі"></th><th>Назва</th><th>Категорія</th><th>Статус</th><th>Дата публікації</th><th>Оновлено</th><th></th></tr></thead>
             <tbody id="newsRows"><?= $this->partial('admin/news/rows', ['items' => $items]) ?></tbody>
         </table>
     </div>

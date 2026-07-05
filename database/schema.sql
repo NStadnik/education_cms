@@ -30,6 +30,7 @@ create table if not exists news (
     id integer primary key autoincrement,
     title varchar(220) not null,
     slug varchar(180) not null unique,
+    category varchar(160) not null default 'Загальні',
     body text not null,
     status varchar(40) not null default 'draft',
     published_at varchar(32) null,

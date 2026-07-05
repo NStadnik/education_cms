@@ -39,6 +39,14 @@
 
             <div class="form-grid wide">
                 <label>Назва<input name="title" value="<?= e($item['title'] ?? '') ?>" required></label>
+                <label>Категорія
+                    <input name="category" value="<?= e($item['category'] ?? 'Загальні') ?>" list="newsCategories" required>
+                    <datalist id="newsCategories">
+                        <?php foreach (($categories ?? []) as $category): ?>
+                            <option value="<?= e($category['category']) ?>"></option>
+                        <?php endforeach; ?>
+                    </datalist>
+                </label>
                 <label>Текст<textarea class="textarea-large" name="body" data-rich-editor required><?= e($item['body'] ?? '') ?></textarea></label>
             </div>
         </section>
