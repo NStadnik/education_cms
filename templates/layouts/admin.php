@@ -365,6 +365,10 @@
             if (data.reset) {
                 form.reset();
             }
+            if (form.dataset.afterSuccessUrl) {
+                window.location.href = form.dataset.afterSuccessUrl;
+                return;
+            }
 
             setAjaxFormMessage(form, data.message || 'Збережено.', false);
         } catch (error) {

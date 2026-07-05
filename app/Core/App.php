@@ -112,7 +112,10 @@ final class App
         $this->router->post('/admin/pages/bulk', [$adminPages, 'pagesBulk']);
         $this->router->get('/admin/news', [$adminNews, 'news']);
         $this->router->get('/admin/news/edit', [$adminNews, 'newsForm']);
+        $this->router->get('/admin/news/categories', [$adminNews, 'newsCategories']);
         $this->router->post('/admin/news/save', [$adminNews, 'newsSave']);
+        $this->router->post('/admin/news/categories/save', [$adminNews, 'newsCategorySave']);
+        $this->router->post('/admin/news/categories/delete', [$adminNews, 'newsCategoryDelete']);
         $this->router->post('/admin/news/bulk', [$adminNews, 'newsBulk']);
         $this->router->get('/admin/documents', [$adminDocuments, 'documents']);
         $this->router->get('/admin/documents/edit', [$adminDocuments, 'documentForm']);

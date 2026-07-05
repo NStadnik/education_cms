@@ -57,6 +57,7 @@
                     <h2>Публікація</h2>
                     <p class="meta">Для опублікованої новини дата заповниться автоматично, якщо її не вказати.</p>
                 </div>
+                <a class="button secondary compact" href="<?= url('/admin/news/categories') ?>"><span class="mdi mdi-shape-outline" aria-hidden="true"></span><span>Категорії</span></a>
             </div>
 
             <div class="form-grid">

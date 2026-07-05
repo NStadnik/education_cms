@@ -80,6 +80,7 @@ final class Installer
             'audit_logs',
             'documents',
             'public_info_sections',
+            'news_categories',
             'news',
             'pages',
             'users',
@@ -116,6 +117,7 @@ final class Installer
         );
 
         $this->seedPages($db, $now);
+        $this->seedNewsCategories($db, $now);
         $this->seedPublicInfo($db, $now);
     }
 
@@ -135,6 +137,14 @@ final class Installer
         $db->execute(
             'insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, 10, ?, ?)',
             ['Про заклад', 'about', 'Коротка інформація про заклад', 'default', json_encode([['type' => 'text', 'title' => 'Про заклад', 'text' => 'Додайте опис, історію та пріоритети закладу освіти.']], JSON_UNESCAPED_UNICODE), 'published', $now, $now]
+        );
+    }
+
+    private function seedNewsCategories(Database $db, string $now): void
+    {
+        $db->execute(
+            'insert into news_categories (title, slug, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?)',
+            ['Загальні', 'загальні', 100, $now, $now]
         );
     }
 

@@ -951,6 +951,7 @@ abstract class AdminBaseController extends BaseController
                 $publishedAt = $now;
             }
             $category = $this->importValue($row, ['category', 'категорія', 'rubric', 'рубрика']) ?: 'Загальні';
+            $this->ensureImportedNewsCategory($category, $now);
 
             $this->db()->execute(
                 'insert into news (title, slug, category, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -969,6 +970,19 @@ abstract class AdminBaseController extends BaseController
         }
 
         return $created;
+    }
+
+    protected function ensureImportedNewsCategory(string $title, string $now): void
+    {
+        $title = trim($title);
+        if ($title === '' || $this->db()->fetch('select id from news_categories where title = ?', [$title])) {
+            return;
+        }
+
+        $this->db()->execute(
+            'insert into news_categories (title, slug, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?)',
+            [$title, $this->uniqueSlug('news_categories', $title), 100, $now, $now]
+        );
     }
 
     protected function importPageRows(array $rows): int

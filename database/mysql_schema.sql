@@ -38,6 +38,15 @@ create table if not exists news (
     updated_at varchar(32) not null
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
+create table if not exists news_categories (
+    id bigint unsigned primary key auto_increment,
+    title varchar(160) not null unique,
+    slug varchar(180) not null unique,
+    sort_order int not null default 100,
+    created_at varchar(32) not null,
+    updated_at varchar(32) not null
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
 create table if not exists public_info_sections (
     id bigint unsigned primary key auto_increment,
     title varchar(220) not null,

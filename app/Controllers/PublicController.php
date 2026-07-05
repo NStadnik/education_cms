@@ -68,11 +68,11 @@ final class PublicController extends BaseController
     private function newsCategories(): array
     {
         return $this->db()->fetchAll(
-            "select category, count(*) as items_count
-             from news
-             where status = ? and category is not null and category <> ''
-             group by category
-             order by category asc",
+            "select c.title as category, count(n.id) as items_count
+             from news_categories c
+             inner join news n on n.category = c.title and n.status = ?
+             group by c.id, c.title, c.sort_order
+             order by c.sort_order asc, c.title asc",
             ['published']
         );
     }

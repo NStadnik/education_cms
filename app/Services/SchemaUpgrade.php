@@ -34,6 +34,14 @@ final class SchemaUpgrade
                 $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_category', '1']);
             }
 
+            $newsCategoriesTableDone = $db->fetch('select value from settings where name = ?', ['schema_news_categories_table']);
+            if (($newsCategoriesTableDone['value'] ?? '') !== '1') {
+                self::createNewsCategoriesTable($db);
+                self::seedNewsCategories($db);
+                $db->execute('delete from settings where name = ?', ['schema_news_categories_table']);
+                $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_categories_table', '1']);
+            }
+
             self::ensureSetting($db, 'site_template', 'official');
             self::migrateGlobalFields($db);
         } catch (Throwable) {
@@ -73,6 +81,63 @@ final class SchemaUpgrade
         }
 
         $db->pdo()->exec("alter table news add column category varchar(160) not null default 'Загальні'");
+    }
+
+    private static function createNewsCategoriesTable(Database $db): void
+    {
+        $db->pdo()->exec(
+            "create table if not exists news_categories (
+                id bigint unsigned primary key auto_increment,
+                title varchar(160) not null unique,
+                slug varchar(180) not null unique,
+                sort_order int not null default 100,
+                created_at varchar(32) not null,
+                updated_at varchar(32) not null
+            ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci"
+        );
+    }
+
+    private static function seedNewsCategories(Database $db): void
+    {
+        $now = date('c');
+        $categories = $db->fetchAll("select distinct category from news where category is not null and category <> '' order by category asc");
+        if (!$categories) {
+            $categories = [['category' => 'Загальні']];
+        }
+
+        $sortOrder = 100;
+        foreach ($categories as $category) {
+            $title = trim((string) ($category['category'] ?? ''));
+            if ($title === '' || $db->fetch('select id from news_categories where title = ?', [$title])) {
+                continue;
+            }
+
+            $db->execute(
+                'insert into news_categories (title, slug, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?)',
+                [$title, self::uniqueCategorySlug($db, self::categorySlug($title)), $sortOrder, $now, $now]
+            );
+            $sortOrder += 10;
+        }
+    }
+
+    private static function uniqueCategorySlug(Database $db, string $slug): string
+    {
+        $slug = $slug ?: 'category';
+        $base = $slug;
+        $index = 2;
+        while ($db->fetch('select id from news_categories where slug = ?', [$slug])) {
+            $slug = $base . '-' . $index;
+            $index++;
+        }
+
+        return $slug;
+    }
+
+    private static function categorySlug(string $value): string
+    {
+        $value = function_exists('mb_strtolower') ? mb_strtolower(trim($value), 'UTF-8') : strtolower(trim($value));
+        $value = preg_replace('/[^a-z0-9а-яіїєґ]+/u', '-', $value) ?? '';
+        return trim($value, '-') ?: 'category';
     }
 
     private static function ensureSetting(Database $db, string $name, string $value): void

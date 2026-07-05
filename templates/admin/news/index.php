@@ -4,10 +4,16 @@
         <h1>Новини</h1>
         <p class="page-subtitle">Готуйте й публікуйте новини закладу з датою виходу.</p>
     </div>
-    <a class="button" href="<?= url('/admin/news/edit') ?>">
-        <span class="mdi mdi-plus" aria-hidden="true"></span>
-        <span>Додати новину</span>
-    </a>
+    <div class="form-actions">
+        <a class="button secondary" href="<?= url('/admin/news/categories') ?>">
+            <span class="mdi mdi-shape-outline" aria-hidden="true"></span>
+            <span>Категорії</span>
+        </a>
+        <a class="button" href="<?= url('/admin/news/edit') ?>">
+            <span class="mdi mdi-plus" aria-hidden="true"></span>
+            <span>Додати новину</span>
+        </a>
+    </div>
 </div>
 
 <div class="metrics">
