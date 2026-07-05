@@ -40,11 +40,23 @@ create table if not exists news (
 
 create table if not exists news_categories (
     id bigint unsigned primary key auto_increment,
+    parent_id bigint unsigned null,
     title varchar(160) not null unique,
     slug varchar(180) not null unique,
     sort_order int not null default 100,
     created_at varchar(32) not null,
-    updated_at varchar(32) not null
+    updated_at varchar(32) not null,
+    index news_categories_parent_id_index (parent_id),
+    constraint news_categories_parent_id_foreign foreign key(parent_id) references news_categories(id) on delete set null
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
+create table if not exists news_category_links (
+    news_id bigint unsigned not null,
+    category_id bigint unsigned not null,
+    primary key (news_id, category_id),
+    index news_category_links_category_id_index (category_id),
+    constraint news_category_links_news_id_foreign foreign key(news_id) references news(id) on delete cascade,
+    constraint news_category_links_category_id_foreign foreign key(category_id) references news_categories(id) on delete cascade
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
 create table if not exists public_info_sections (

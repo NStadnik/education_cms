@@ -78,7 +78,7 @@
         <div class="form-section-head">
             <div>
                 <h2>WordPress база</h2>
-                <p class="meta">Підключення читає таблицю <code>wp_posts</code>: дописи імпортуються як новини, сторінки як сторінки.</p>
+                <p class="meta">Підключення читає WordPress дописи, сторінки, рубрики та прив'язки до них.</p>
             </div>
         </div>
         <div class="wp-import-layout">

@@ -118,11 +118,31 @@ abstract class AdminBaseController extends BaseController
 
         $config = $map[$resource];
         [$where, $params] = $this->searchWhere($query, $config['columns']);
-        $items = $this->db()->fetchAll(
-            'select * from ' . $config['table'] . ' ' . $where . ' order by ' . $config['order'] . ' limit ' . $pagination['limit'] . ' offset 0',
-            $params
-        );
-        $total = (int) ($this->db()->fetch('select count(*) as c from ' . $config['table'] . ' ' . $where, $params)['c'] ?? 0);
+        if ($resource === 'news') {
+            $newsWhere = $where === '' ? '' : str_replace(
+                ['title like ?', 'category like ?', 'body like ?', 'status like ?', 'published_at like ?'],
+                ['n.title like ?', 'n.category like ?', 'n.body like ?', 'n.status like ?', 'n.published_at like ?'],
+                $where
+            );
+            $items = $this->db()->fetchAll(
+                'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
+                 from news n
+                 left join news_category_links l on l.news_id = n.id
+                 left join news_categories c on c.id = l.category_id
+                 ' . $newsWhere . '
+                 group by n.id, n.title, n.slug, n.category, n.body, n.status, n.published_at, n.created_at, n.updated_at
+                 order by n.id desc
+                 limit ' . $pagination['limit'] . ' offset 0',
+                $params
+            );
+            $total = (int) ($this->db()->fetch('select count(*) as c from news n ' . $newsWhere, $params)['c'] ?? 0);
+        } else {
+            $items = $this->db()->fetchAll(
+                'select * from ' . $config['table'] . ' ' . $where . ' order by ' . $config['order'] . ' limit ' . $pagination['limit'] . ' offset 0',
+                $params
+            );
+            $total = (int) ($this->db()->fetch('select count(*) as c from ' . $config['table'] . ' ' . $where, $params)['c'] ?? 0);
+        }
         $loaded = count($items);
 
         return [
@@ -380,8 +400,8 @@ abstract class AdminBaseController extends BaseController
             ],
             'wordpress' => [
                 'name' => 'WordPress',
-                'description' => 'Імпортує записи з таблиці wp_posts: дописи як новини, сторінки як сторінки.',
-                'columns' => 'post_title, post_content, post_name, post_type, post_status, post_date',
+                'description' => 'Імпортує WordPress дописи, сторінки, рубрики та привʼязки до рубрик.',
+                'columns' => 'post_title, post_content, post_name, post_type, post_status, post_date, categories',
             ],
         ];
     }
@@ -488,22 +508,29 @@ abstract class AdminBaseController extends BaseController
         );
         $stmt->execute($params);
 
+        $posts = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $wpCategories = $this->wordPressCategoriesForPosts($pdo, $prefix, array_map(static fn (array $row): int => (int) $row['ID'], $posts));
+
         $rows = [];
-        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+        foreach ($posts as $row) {
             $status = (($row['post_status'] ?? '') === 'publish') ? 'published' : 'draft';
             $body = (string) ($row['post_content'] ?? '');
             if ($mediaMap) {
                 $body = str_replace(array_keys($mediaMap), array_values($mediaMap), $body);
             }
+            $categories = $wpCategories[(int) ($row['ID'] ?? 0)] ?? [];
+            $categoryNames = array_map(static fn (array $category): string => (string) $category['title'], $categories);
 
             $rows[] = [
                 '_import_target' => (($row['post_type'] ?? '') === 'page') ? 'pages' : 'news',
+                '_wp_categories' => $categories,
                 'title' => (string) ($row['post_title'] ?? ''),
                 'slug' => (string) ($row['post_name'] ?? ''),
                 'body' => $body,
                 'excerpt' => (string) ($row['post_excerpt'] ?? ''),
                 'status' => $status,
                 'published_at' => (string) ($row['post_date'] ?? ''),
+                'category' => implode(', ', $categoryNames),
                 'sort_order' => '0',
             ];
         }
@@ -518,6 +545,93 @@ abstract class AdminBaseController extends BaseController
         ]);
 
         return $rows;
+    }
+
+    protected function wordPressCategoriesForPosts(\PDO $pdo, string $prefix, array $postIds): array
+    {
+        $postIds = array_values(array_unique(array_filter($postIds)));
+        if (!$postIds) {
+            return [];
+        }
+
+        $termsTable = $prefix . 'terms';
+        $taxonomyTable = $prefix . 'term_taxonomy';
+        $relationshipsTable = $prefix . 'term_relationships';
+
+        $allStmt = $pdo->query(
+            "select tt.term_taxonomy_id, tt.term_id, tt.parent, t.name, t.slug
+             from {$taxonomyTable} tt
+             inner join {$termsTable} t on t.term_id = tt.term_id
+             where tt.taxonomy = 'category'"
+        );
+        $categoriesByTermId = [];
+        $taxonomyToTermId = [];
+        foreach ($allStmt->fetchAll(\PDO::FETCH_ASSOC) as $category) {
+            $termId = (int) ($category['term_id'] ?? 0);
+            $taxonomyId = (int) ($category['term_taxonomy_id'] ?? 0);
+            if (!$termId || !$taxonomyId) {
+                continue;
+            }
+            $categoriesByTermId[$termId] = [
+                'term_id' => $termId,
+                'taxonomy_id' => $taxonomyId,
+                'title' => (string) ($category['name'] ?? ''),
+                'slug' => (string) ($category['slug'] ?? ''),
+                'parent_term_id' => (int) ($category['parent'] ?? 0),
+            ];
+            $taxonomyToTermId[$taxonomyId] = $termId;
+        }
+
+        if (!$categoriesByTermId) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($postIds), '?'));
+        $stmt = $pdo->prepare(
+            "select tr.object_id, tr.term_taxonomy_id
+             from {$relationshipsTable} tr
+             inner join {$taxonomyTable} tt on tt.term_taxonomy_id = tr.term_taxonomy_id and tt.taxonomy = 'category'
+             where tr.object_id in ({$placeholders})
+             order by tr.object_id asc, tt.parent asc, tt.term_id asc"
+        );
+        $stmt->execute($postIds);
+
+        $result = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $postId = (int) ($row['object_id'] ?? 0);
+            $termId = $taxonomyToTermId[(int) ($row['term_taxonomy_id'] ?? 0)] ?? 0;
+            if (!$postId || !$termId || empty($categoriesByTermId[$termId])) {
+                continue;
+            }
+
+            $chain = $this->wordPressCategoryChain($categoriesByTermId, $termId);
+            $category = end($chain);
+            if ($category) {
+                $category['ancestors'] = array_slice($chain, 0, -1);
+                $result[$postId][$category['term_id']] = $category;
+            }
+        }
+
+        return array_map(static fn (array $categories): array => array_values($categories), $result);
+    }
+
+    protected function wordPressCategoryChain(array $categoriesByTermId, int $termId): array
+    {
+        $chain = [];
+        $seen = [];
+        while ($termId && isset($categoriesByTermId[$termId]) && !isset($seen[$termId])) {
+            $seen[$termId] = true;
+            $category = $categoriesByTermId[$termId];
+            array_unshift($chain, [
+                'term_id' => (int) $category['term_id'],
+                'title' => (string) $category['title'],
+                'slug' => (string) $category['slug'],
+                'parent_term_id' => (int) $category['parent_term_id'],
+            ]);
+            $termId = (int) $category['parent_term_id'];
+        }
+
+        return $chain;
     }
 
     protected function wordPressPostsWhere(Request $request): array
@@ -950,8 +1064,9 @@ abstract class AdminBaseController extends BaseController
             if ($status === 'published' && $publishedAt === '') {
                 $publishedAt = $now;
             }
-            $category = $this->importValue($row, ['category', 'категорія', 'rubric', 'рубрика']) ?: 'Загальні';
-            $this->ensureImportedNewsCategory($category, $now);
+            $categoryPayloads = $this->importNewsCategoryPayloads($row);
+            $category = (string) ($categoryPayloads[0]['title'] ?? 'Загальні');
+            $categoryIds = $this->ensureImportedNewsCategories($categoryPayloads, $now);
 
             $this->db()->execute(
                 'insert into news (title, slug, category, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -966,23 +1081,105 @@ abstract class AdminBaseController extends BaseController
                     $now,
                 ]
             );
+            $newsId = (int) $this->db()->lastInsertId();
+            foreach ($categoryIds as $categoryId) {
+                $this->db()->execute('insert into news_category_links (news_id, category_id) values (?, ?)', [$newsId, $categoryId]);
+            }
             $created++;
         }
 
         return $created;
     }
 
-    protected function ensureImportedNewsCategory(string $title, string $now): void
+    protected function importNewsCategoryPayloads(array $row): array
+    {
+        if (!empty($row['_wp_categories']) && is_array($row['_wp_categories'])) {
+            $payloads = [];
+            foreach ($row['_wp_categories'] as $category) {
+                if (!is_array($category)) {
+                    continue;
+                }
+                $title = trim((string) ($category['title'] ?? ''));
+                if ($title === '') {
+                    continue;
+                }
+                $payloads[] = [
+                    'title' => $title,
+                    'slug' => trim((string) ($category['slug'] ?? '')),
+                    'ancestors' => is_array($category['ancestors'] ?? null) ? $category['ancestors'] : [],
+                ];
+            }
+            if ($payloads) {
+                return $payloads;
+            }
+        }
+
+        $categoryValue = $this->importValue($row, ['category', 'категорія', 'rubric', 'рубрика']) ?: 'Загальні';
+        $parts = preg_split('/\s*[,;|]\s*/u', $categoryValue) ?: [];
+        $payloads = [];
+        foreach ($parts as $part) {
+            $title = trim((string) $part);
+            if ($title !== '') {
+                $payloads[] = ['title' => $title, 'slug' => '', 'ancestors' => []];
+            }
+        }
+
+        return $payloads ?: [['title' => 'Загальні', 'slug' => '', 'ancestors' => []]];
+    }
+
+    protected function ensureImportedNewsCategories(array $categories, string $now): array
+    {
+        $idsByTitle = [];
+        $ids = [];
+        foreach ($categories as $category) {
+            $title = trim((string) ($category['title'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+
+            $parentId = null;
+            foreach (($category['ancestors'] ?? []) as $ancestor) {
+                if (!is_array($ancestor)) {
+                    continue;
+                }
+                $ancestorTitle = trim((string) ($ancestor['title'] ?? ''));
+                if ($ancestorTitle === '') {
+                    continue;
+                }
+                $parentId = $this->ensureImportedNewsCategory($ancestorTitle, $now, $parentId, (string) ($ancestor['slug'] ?? ''));
+                $idsByTitle[$ancestorTitle] = $parentId;
+            }
+
+            $id = $this->ensureImportedNewsCategory($title, $now, $parentId ?: null, (string) ($category['slug'] ?? ''));
+            $idsByTitle[$title] = $id;
+            if ($id && !in_array($id, $ids, true)) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids ?: [$this->ensureImportedNewsCategory('Загальні', $now)];
+    }
+
+    protected function ensureImportedNewsCategory(string $title, string $now, ?int $parentId = null, string $slug = ''): int
     {
         $title = trim($title);
-        if ($title === '' || $this->db()->fetch('select id from news_categories where title = ?', [$title])) {
-            return;
+        if ($title === '') {
+            return 0;
+        }
+
+        $existing = $this->db()->fetch('select id from news_categories where title = ?', [$title]);
+        if ($existing) {
+            if ($parentId) {
+                $this->db()->execute('update news_categories set parent_id = ? where id = ? and parent_id is null', [$parentId, $existing['id']]);
+            }
+            return (int) $existing['id'];
         }
 
         $this->db()->execute(
-            'insert into news_categories (title, slug, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?)',
-            [$title, $this->uniqueSlug('news_categories', $title), 100, $now, $now]
+            'insert into news_categories (parent_id, title, slug, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?)',
+            [$parentId, $title, $this->uniqueSlug('news_categories', $slug !== '' ? $slug : $title), 100, $now, $now]
         );
+        return (int) $this->db()->lastInsertId();
     }
 
     protected function importPageRows(array $rows): int

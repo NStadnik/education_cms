@@ -80,6 +80,7 @@ final class Installer
             'audit_logs',
             'documents',
             'public_info_sections',
+            'news_category_links',
             'news_categories',
             'news',
             'pages',

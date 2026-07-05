@@ -1,6 +1,20 @@
 <?php
     $isEdit = !empty($item['id']);
     $body = (string) ($item['body'] ?? '');
+    $currentCategory = (string) ($item['category'] ?? 'Загальні');
+    $selectedCategoryIds = $selectedCategoryIds ?? [];
+    $selectedCategoryTitles = [];
+    foreach (($categories ?? []) as $category) {
+        if (in_array((int) ($category['id'] ?? 0), $selectedCategoryIds, true)) {
+            $selectedCategoryTitles[] = (string) ($category['label'] ?? $category['category']);
+        }
+    }
+    if (!$selectedCategoryTitles) {
+        $selectedCategoryTitles[] = $currentCategory;
+    }
+    $categorySummary = implode(', ', $selectedCategoryTitles);
+    $currentStatus = (string) ($item['status'] ?? 'draft');
+    $statusLabel = $currentStatus === 'published' ? 'Опубліковано' : 'Чернетка';
     preg_match_all('/[\p{L}\p{N}]+/u', strip_tags($body), $wordMatches);
     $words = count($wordMatches[0] ?? []);
 ?>
@@ -19,9 +33,9 @@
 </div>
 
 <div class="metrics">
-    <div class="metric"><div><span>Статус</span><strong><?= e($item['status'] ?? 'draft') ?></strong></div><span class="mdi mdi-circle-edit-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric"><div><span>Статус</span><strong><?= e($statusLabel) ?></strong></div><span class="mdi mdi-circle-edit-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric"><div><span>Категорії</span><strong><?= e($categorySummary) ?></strong></div><span class="mdi mdi-shape-outline metric-icon" aria-hidden="true"></span></div>
     <div class="metric"><div><span>Слів</span><strong><?= e((string) $words) ?></strong></div><span class="mdi mdi-format-text metric-icon" aria-hidden="true"></span></div>
-    <div class="metric"><div><span>Дата</span><strong><?= e($item['published_at'] ?? 'не задано') ?></strong></div><span class="mdi mdi-calendar-outline metric-icon" aria-hidden="true"></span></div>
 </div>
 
 <form method="post" action="<?= url('/admin/news/save') ?>">
@@ -39,45 +53,54 @@
 
             <div class="form-grid wide">
                 <label>Назва<input name="title" value="<?= e($item['title'] ?? '') ?>" required></label>
-                <label>Категорія
-                    <input name="category" value="<?= e($item['category'] ?? 'Загальні') ?>" list="newsCategories" required>
-                    <datalist id="newsCategories">
-                        <?php foreach (($categories ?? []) as $category): ?>
-                            <option value="<?= e($category['category']) ?>"></option>
-                        <?php endforeach; ?>
-                    </datalist>
-                </label>
                 <label>Текст<textarea class="textarea-large" name="body" data-rich-editor required><?= e($item['body'] ?? '') ?></textarea></label>
             </div>
         </section>
 
         <aside class="card admin-form-card editor-sidebar">
-            <div class="form-section-head">
-                <div>
-                    <h2>Публікація</h2>
-                    <p class="meta">Для опублікованої новини дата заповниться автоматично, якщо її не вказати.</p>
+            <div class="sidebar-section">
+                <div class="form-section-head">
+                    <div>
+                        <h2>Публікація</h2>
+                        <p class="meta">Дата заповниться автоматично для опублікованої новини.</p>
+                    </div>
                 </div>
-                <a class="button secondary compact" href="<?= url('/admin/news/categories') ?>"><span class="mdi mdi-shape-outline" aria-hidden="true"></span><span>Категорії</span></a>
+
+                <div class="form-grid">
+                    <label>Статус
+                        <select name="status">
+                            <option value="draft" <?= selected($currentStatus, 'draft') ?>>Чернетка</option>
+                            <option value="published" <?= selected($currentStatus, 'published') ?>>Опубліковано</option>
+                        </select>
+                    </label>
+                    <label>Категорії
+                        <span class="field-with-action category-picker-row">
+                            <span class="checkbox-list">
+                                <?php foreach (($categories ?? []) as $category): ?>
+                                    <?php $isSelectedCategory = in_array((int) ($category['id'] ?? 0), $selectedCategoryIds, true) || (!$selectedCategoryIds && ($category['category'] ?? '') === $currentCategory); ?>
+                                    <label class="check-row category-check">
+                                        <input type="checkbox" name="category_ids[]" value="<?= e((string) $category['id']) ?>" <?= checked($isSelectedCategory) ?>>
+                                        <span><?= e($category['label'] ?? $category['category']) ?></span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </span>
+                            <a class="button secondary icon-button" href="<?= url('/admin/news/categories') ?>" title="Редагувати категорії" aria-label="Редагувати категорії"><span class="mdi mdi-shape-outline" aria-hidden="true"></span></a>
+                        </span>
+                    </label>
+                    <label>Дата публікації<input name="published_at" value="<?= e($item['published_at'] ?? '') ?>" placeholder="2026-07-05"></label>
+                </div>
             </div>
 
-            <div class="form-grid">
-                <label>Статус
-                    <select name="status">
-                        <option value="draft" <?= selected($item['status'] ?? '', 'draft') ?>>draft</option>
-                        <option value="published" <?= selected($item['status'] ?? '', 'published') ?>>published</option>
-                    </select>
-                </label>
-                <label>Дата публікації<input name="published_at" value="<?= e($item['published_at'] ?? '') ?>" placeholder="2026-07-05"></label>
-            </div>
-
-            <div class="form-section-head mt-4">
-                <div>
-                    <h2>SEO</h2>
-                    <p class="meta">Адреса новини формується автоматично, але її можна змінити вручну.</p>
+            <div class="sidebar-section">
+                <div class="form-section-head">
+                    <div>
+                        <h2>SEO</h2>
+                        <p class="meta">Адреса формується автоматично, але її можна змінити.</p>
+                    </div>
                 </div>
-            </div>
-            <div class="form-grid">
-                <label>Slug<input name="slug" value="<?= e($item['slug'] ?? '') ?>" placeholder="nazva-novyny"></label>
+                <div class="form-grid">
+                    <label>Slug<input name="slug" value="<?= e($item['slug'] ?? '') ?>" placeholder="nazva-novyny"></label>
+                </div>
             </div>
 
             <div class="form-actions stacked">

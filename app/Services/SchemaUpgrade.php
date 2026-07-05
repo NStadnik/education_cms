@@ -42,6 +42,21 @@ final class SchemaUpgrade
                 $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_categories_table', '1']);
             }
 
+            $newsCategoryParentDone = $db->fetch('select value from settings where name = ?', ['schema_news_category_parent']);
+            if (($newsCategoryParentDone['value'] ?? '') !== '1') {
+                self::addNewsCategoryParentColumn($db);
+                $db->execute('delete from settings where name = ?', ['schema_news_category_parent']);
+                $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_category_parent', '1']);
+            }
+
+            $newsCategoryLinksDone = $db->fetch('select value from settings where name = ?', ['schema_news_category_links']);
+            if (($newsCategoryLinksDone['value'] ?? '') !== '1') {
+                self::createNewsCategoryLinksTable($db);
+                self::seedNewsCategoryLinks($db);
+                $db->execute('delete from settings where name = ?', ['schema_news_category_links']);
+                $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_category_links', '1']);
+            }
+
             self::ensureSetting($db, 'site_template', 'official');
             self::migrateGlobalFields($db);
         } catch (Throwable) {
@@ -88,11 +103,37 @@ final class SchemaUpgrade
         $db->pdo()->exec(
             "create table if not exists news_categories (
                 id bigint unsigned primary key auto_increment,
+                parent_id bigint unsigned null,
                 title varchar(160) not null unique,
                 slug varchar(180) not null unique,
                 sort_order int not null default 100,
                 created_at varchar(32) not null,
-                updated_at varchar(32) not null
+                updated_at varchar(32) not null,
+                index news_categories_parent_id_index (parent_id),
+                constraint news_categories_parent_id_foreign foreign key(parent_id) references news_categories(id) on delete set null
+            ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci"
+        );
+    }
+
+    private static function addNewsCategoryParentColumn(Database $db): void
+    {
+        if (self::hasColumn($db, 'news_categories', 'parent_id')) {
+            return;
+        }
+
+        $db->pdo()->exec('alter table news_categories add column parent_id bigint unsigned null after id');
+    }
+
+    private static function createNewsCategoryLinksTable(Database $db): void
+    {
+        $db->pdo()->exec(
+            "create table if not exists news_category_links (
+                news_id bigint unsigned not null,
+                category_id bigint unsigned not null,
+                primary key (news_id, category_id),
+                index news_category_links_category_id_index (category_id),
+                constraint news_category_links_news_id_foreign foreign key(news_id) references news(id) on delete cascade,
+                constraint news_category_links_category_id_foreign foreign key(category_id) references news_categories(id) on delete cascade
             ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci"
         );
     }
@@ -117,6 +158,24 @@ final class SchemaUpgrade
                 [$title, self::uniqueCategorySlug($db, self::categorySlug($title)), $sortOrder, $now, $now]
             );
             $sortOrder += 10;
+        }
+    }
+
+    private static function seedNewsCategoryLinks(Database $db): void
+    {
+        $rows = $db->fetchAll(
+            "select n.id as news_id, c.id as category_id
+             from news n
+             inner join news_categories c on c.title = n.category
+             left join news_category_links l on l.news_id = n.id and l.category_id = c.id
+             where l.news_id is null"
+        );
+
+        foreach ($rows as $row) {
+            $db->execute(
+                'insert into news_category_links (news_id, category_id) values (?, ?)',
+                [$row['news_id'], $row['category_id']]
+            );
         }
     }
 

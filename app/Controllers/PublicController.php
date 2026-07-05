@@ -33,17 +33,31 @@ final class PublicController extends BaseController
     public function news(Request $request): Response
     {
         $category = trim((string) $request->input('category', ''));
-        $where = 'where status = ?';
+        $where = 'where n.status = ?';
         $params = ['published'];
         if ($category !== '') {
-            $where .= ' and category = ?';
+            $where .= ' and exists (
+                select 1
+                from news_category_links fl
+                inner join news_categories fc on fc.id = fl.category_id
+                where fl.news_id = n.id and fc.title = ?
+            )';
             $params[] = $category;
         }
 
         return $this->render('public/news', [
             'title' => 'Новини',
             'settings' => $this->siteSettings(),
-            'items' => $this->db()->fetchAll('select * from news ' . $where . ' order by published_at desc, id desc', $params),
+            'items' => $this->db()->fetchAll(
+                'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
+                 from news n
+                 left join news_category_links l on l.news_id = n.id
+                 left join news_categories c on c.id = l.category_id
+                 ' . $where . '
+                 group by n.id, n.title, n.slug, n.category, n.body, n.status, n.published_at, n.created_at, n.updated_at
+                 order by n.published_at desc, n.id desc',
+                $params
+            ),
             'categories' => $this->newsCategories(),
             'activeCategory' => $category,
             'menu' => $this->menu(),
@@ -52,7 +66,15 @@ final class PublicController extends BaseController
 
     public function newsShow(Request $request, array $params): Response
     {
-        $item = $this->db()->fetch('select * from news where slug = ? and status = ?', [$params['slug'], 'published']);
+        $item = $this->db()->fetch(
+            'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
+             from news n
+             left join news_category_links l on l.news_id = n.id
+             left join news_categories c on c.id = l.category_id
+             where n.slug = ? and n.status = ?
+             group by n.id, n.title, n.slug, n.category, n.body, n.status, n.published_at, n.created_at, n.updated_at',
+            [$params['slug'], 'published']
+        );
         if (!$item) {
             return new Response('Not found', 404);
         }
@@ -70,7 +92,8 @@ final class PublicController extends BaseController
         return $this->db()->fetchAll(
             "select c.title as category, count(n.id) as items_count
              from news_categories c
-             inner join news n on n.category = c.title and n.status = ?
+             inner join news_category_links l on l.category_id = c.id
+             inner join news n on n.id = l.news_id and n.status = ?
              group by c.id, c.title, c.sort_order
              order by c.sort_order asc, c.title asc",
             ['published']

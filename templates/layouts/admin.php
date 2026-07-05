@@ -365,6 +365,18 @@
             if (data.reset) {
                 form.reset();
             }
+            if (form.dataset.replaceTarget && typeof data.html === 'string') {
+                const replaceTarget = document.querySelector(form.dataset.replaceTarget);
+                if (replaceTarget) {
+                    replaceTarget.innerHTML = data.html;
+                }
+            }
+            if (form.dataset.optionsTarget && typeof data.options_html === 'string') {
+                const optionsTarget = document.querySelector(form.dataset.optionsTarget);
+                if (optionsTarget) {
+                    optionsTarget.innerHTML = data.options_html;
+                }
+            }
             if (form.dataset.afterSuccessUrl) {
                 window.location.href = form.dataset.afterSuccessUrl;
                 return;

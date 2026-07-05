@@ -2,7 +2,7 @@
     <tr data-list-row>
         <td><input type="checkbox" name="ids[]" value="<?= e((string) $item['id']) ?>" data-bulk-check aria-label="Вибрати"></td>
         <td><strong><?= e($item['title']) ?></strong><br><span class="meta"><?= e(excerpt($item['body'] ?? '', 100)) ?></span></td>
-        <td><?= e($item['category'] ?? 'Загальні') ?></td>
+        <td><?= e($item['category_titles'] ?: ($item['category'] ?? 'Загальні')) ?></td>
         <td><span class="status <?= ($item['status'] ?? '') === 'published' ? 'ok' : 'warn' ?>"><?= e($item['status']) ?></span></td>
         <td><?= e($item['published_at'] ?? '') ?></td>
         <td><?= e($item['updated_at'] ?? '') ?></td>

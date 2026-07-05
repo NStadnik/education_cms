@@ -21,7 +21,7 @@
         <div class="grid grid-3 news-grid">
             <?php foreach ($items as $item): ?>
                 <article class="card content-card">
-                    <p class="meta"><?= e($item['category'] ?? 'Загальні') ?> · <?= e($item['published_at'] ?? '') ?></p>
+                    <p class="meta"><?= e($item['category_titles'] ?: ($item['category'] ?? 'Загальні')) ?> · <?= e($item['published_at'] ?? '') ?></p>
                     <h2><a href="<?= url('/news/' . $item['slug']) ?>"><?= e($item['title']) ?></a></h2>
                     <p><?= e(excerpt($item['body'], 180)) ?></p>
                     <a class="read-more" href="<?= url('/news/' . $item['slug']) ?>">Читати</a>

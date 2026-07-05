@@ -70,6 +70,12 @@ img { max-width: 100%; height: auto; }
 .form-section-head h2 { margin: 0 0 4px; font-size: 22px; }
 .form-section-head p { margin: 0; }
 .form-grid.wide { max-width: none; }
+.sidebar-section { padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+.sidebar-section:last-of-type { padding-bottom: 0; border-bottom: 0; }
+.field-with-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.icon-button { width: 40px; min-height: 40px; padding-left: 0; padding-right: 0; }
+.checkbox-list { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.category-check { min-height: 28px; padding: 3px 0; font-weight: 550 !important; }
 .global-fields-list { display: grid; gap: 12px; }
 .global-field-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(240px, 2fr) auto; gap: 12px; align-items: end; }
 .global-field-row button { width: 40px; padding-left: 0; padding-right: 0; }

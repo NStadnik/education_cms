@@ -21,34 +21,9 @@
 
         <div class="table-scroll">
             <table>
-                <thead><tr><th>Назва</th><th>Порядок</th><th>Новин</th><th></th></tr></thead>
-                <tbody>
-                    <?php foreach ($categories as $category): ?>
-                        <tr>
-                            <td>
-                                <form id="categoryForm<?= e((string) $category['id']) ?>" method="post" action="<?= url('/admin/news/categories/save') ?>" data-after-success-url="<?= url('/admin/news/categories') ?>">
-                                    <?= \App\Core\Csrf::field() ?>
-                                    <input type="hidden" name="id" value="<?= e((string) $category['id']) ?>">
-                                    <input name="title" value="<?= e($category['title']) ?>" required aria-label="Назва категорії">
-                                </form>
-                            </td>
-                            <td><input form="categoryForm<?= e((string) $category['id']) ?>" type="number" name="sort_order" value="<?= e((string) $category['sort_order']) ?>" aria-label="Порядок"></td>
-                            <td><span class="status"><?= e((string) $category['news_count']) ?></span></td>
-                            <td>
-                                <div class="form-actions">
-                                    <button class="button secondary compact" type="submit" form="categoryForm<?= e((string) $category['id']) ?>"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти</span></button>
-                                    <?php if ((int) $category['news_count'] === 0): ?>
-                                        <form method="post" action="<?= url('/admin/news/categories/delete') ?>" data-after-success-url="<?= url('/admin/news/categories') ?>" onsubmit="return confirm('Видалити цю категорію?')">
-                                            <?= \App\Core\Csrf::field() ?>
-                                            <input type="hidden" name="id" value="<?= e((string) $category['id']) ?>">
-                                            <button class="button danger compact" type="submit"><span class="mdi mdi-delete-outline" aria-hidden="true"></span><span>Видалити</span></button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    <?php if (!$categories): ?><tr><td colspan="4" class="empty-state">Категорії ще не додані.</td></tr><?php endif; ?>
+                <thead><tr><th>Назва</th><th>Батьківська</th><th>Порядок</th><th>Новин</th><th></th></tr></thead>
+                <tbody id="newsCategoryRows">
+                    <?= $this->partial('admin/news/category-rows', ['categories' => $categories, 'parentOptions' => $parentOptions]) ?>
                 </tbody>
             </table>
         </div>
@@ -61,10 +36,15 @@
                 <p class="meta">Після збереження вона з'явиться у формі новини.</p>
             </div>
         </div>
-        <form method="post" action="<?= url('/admin/news/categories/save') ?>" data-after-success-url="<?= url('/admin/news/categories') ?>">
+        <form method="post" action="<?= url('/admin/news/categories/save') ?>" data-replace-target="#newsCategoryRows" data-options-target="#newCategoryParent">
             <?= \App\Core\Csrf::field() ?>
             <div class="form-grid">
                 <label>Назва<input name="title" required></label>
+                <label>Батьківська категорія
+                    <select id="newCategoryParent" name="parent_id">
+                        <?= $this->partial('admin/news/category-parent-options', ['parentOptions' => $parentOptions]) ?>
+                    </select>
+                </label>
                 <label>Порядок<input type="number" name="sort_order" value="100"></label>
             </div>
             <div class="form-actions stacked">
