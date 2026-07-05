@@ -169,6 +169,11 @@
             if (input && input.value.trim() !== '') {
                 url.searchParams.set('q', input.value.trim());
             }
+            panel.querySelectorAll('[data-list-filter]').forEach(function (field) {
+                if (field.name && field.value !== '') {
+                    url.searchParams.set(field.name, field.value);
+                }
+            });
 
             try {
                 const response = await fetch(url.toString(), {
@@ -215,6 +220,14 @@
                 }, 300);
             });
         }
+
+        panel.querySelectorAll('[data-list-filter]').forEach(function (field) {
+            field.addEventListener('change', function () {
+                panel.setAttribute('data-list-offset', '0');
+                panel.setAttribute('data-list-has-more', '1');
+                loadList(true);
+            });
+        });
 
         const observer = new IntersectionObserver(function (entries) {
             if (entries.some(function (entry) { return entry.isIntersecting; })) {
@@ -312,6 +325,13 @@
             if (input && input.value.trim() !== '') {
                 body.set('q', input.value.trim());
             }
+            panel.querySelectorAll('[data-list-filter]').forEach(function (field) {
+                if (field.name && field.value !== '') {
+                    body.set(field.name, field.value);
+                } else if (field.name) {
+                    body.delete(field.name);
+                }
+            });
             body.set('limit', panel.getAttribute('data-list-limit') || '20');
             body.set('offset', '0');
         }
@@ -597,6 +617,9 @@
                 }
             }
 
+            picker.categoryPickerApplyFilter = applyFilter;
+            picker.categoryPickerUpdateSummary = updateSummary;
+
             picker.addEventListener('change', function (event) {
                 if (event.target.matches('input[type="checkbox"]')) {
                     updateSummary();
@@ -604,12 +627,46 @@
             });
             if (filter) {
                 filter.addEventListener('input', applyFilter);
+                filter.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                    }
+                });
             }
 
             updateSummary();
             applyFilter();
         });
     }
+
+    document.addEventListener('input', function (event) {
+        const filter = event.target.closest('[data-category-filter]');
+        const picker = filter ? filter.closest('[data-category-picker]') : null;
+        if (picker && typeof picker.categoryPickerApplyFilter === 'function') {
+            picker.categoryPickerApplyFilter();
+        } else if (picker) {
+            const needle = filter.value.trim().toLowerCase();
+            let visible = 0;
+            picker.querySelectorAll('[data-category-item]').forEach(function (item) {
+                const title = (item.getAttribute('data-category-title') || item.textContent || '').toLowerCase();
+                const matches = needle === '' || title.indexOf(needle) !== -1;
+                item.hidden = !matches;
+                if (matches) {
+                    visible++;
+                }
+            });
+            const empty = picker.querySelector('[data-category-empty]');
+            if (empty) {
+                empty.hidden = visible !== 0;
+            }
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' && event.target.closest('[data-category-filter]')) {
+            event.preventDefault();
+        }
+    });
 
     function initRichEditors() {
         document.querySelectorAll('textarea[data-rich-editor]').forEach(function (textarea) {

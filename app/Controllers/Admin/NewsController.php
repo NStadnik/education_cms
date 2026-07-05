@@ -17,20 +17,28 @@ final class NewsController extends \App\Controllers\AdminBaseController
     {
         $this->guard();
         $query = trim((string) $request->input('q', ''));
+        [$where, $params] = $this->newsListFilters($request, $query);
+        $sort = $this->newsListOrder((string) $request->input('sort', 'newest'));
         $pagination = $this->pagination($request);
-        [$where, $params] = $this->searchWhere($query, ['title', 'slug', 'category', 'body', 'status']);
         $items = $this->db()->fetchAll(
             'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
              from news n
              left join news_category_links l on l.news_id = n.id
              left join news_categories c on c.id = l.category_id
-             ' . $this->newsListWhere($where) . '
+             ' . $where . '
              group by n.id, n.title, n.slug, n.category, n.body, n.status, n.published_at, n.created_at, n.updated_at
-             order by n.id desc
+             order by ' . $sort . '
              limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
             $params
         );
-        $total = (int) ($this->db()->fetch('select count(*) as c from news n ' . $this->newsListWhere($where), $params)['c'] ?? 0);
+        $total = (int) ($this->db()->fetch(
+            'select count(distinct n.id) as c
+             from news n
+             left join news_category_links l on l.news_id = n.id
+             left join news_categories c on c.id = l.category_id
+             ' . $where,
+            $params
+        )['c'] ?? 0);
 
         if ($this->isAjaxRequest()) {
             return $this->listJson('admin/news/rows', ['items' => $items], $pagination, $total);
@@ -43,6 +51,13 @@ final class NewsController extends \App\Controllers\AdminBaseController
             'total' => $total,
             'limit' => $pagination['limit'],
             'stats' => $stats,
+            'filters' => [
+                'q' => $query,
+                'status' => (string) $request->input('status', ''),
+                'category_id' => (string) $request->input('category_id', ''),
+                'sort' => (string) $request->input('sort', 'newest'),
+            ],
+            'categories' => $this->newsCategoryOptions(),
         ]);
     }
 
@@ -403,17 +418,51 @@ final class NewsController extends \App\Controllers\AdminBaseController
         }
     }
 
-    private function newsListWhere(string $where): string
+    private function newsListFilters(Request $request, string $query): array
     {
-        if ($where === '') {
-            return '';
+        $clauses = [];
+        $params = [];
+
+        if ($query !== '') {
+            $like = '%' . $query . '%';
+            $clauses[] = '(n.title like ? or n.slug like ? or n.category like ? or n.body like ? or n.status like ? or exists (
+                select 1
+                from news_category_links sl
+                join news_categories sc on sc.id = sl.category_id
+                where sl.news_id = n.id and sc.title like ?
+            ))';
+            array_push($params, $like, $like, $like, $like, $like, $like);
         }
 
-        return str_replace(
-            ['title like ?', 'slug like ?', 'category like ?', 'body like ?', 'status like ?'],
-            ['n.title like ?', 'n.slug like ?', 'n.category like ?', 'n.body like ?', 'n.status like ?'],
-            $where
-        );
+        $status = (string) $request->input('status', '');
+        if (in_array($status, ['published', 'draft'], true)) {
+            $clauses[] = 'n.status = ?';
+            $params[] = $status;
+        }
+
+        $categoryId = (int) $request->input('category_id', 0);
+        if ($categoryId > 0) {
+            $clauses[] = 'exists (
+                select 1
+                from news_category_links fl
+                where fl.news_id = n.id and fl.category_id = ?
+            )';
+            $params[] = $categoryId;
+        }
+
+        return [$clauses ? 'where ' . implode(' and ', $clauses) : '', $params];
+    }
+
+    private function newsListOrder(string $sort): string
+    {
+        return [
+            'newest' => 'coalesce(n.published_at, n.created_at) desc, n.id desc',
+            'oldest' => 'coalesce(n.published_at, n.created_at) asc, n.id asc',
+            'title_asc' => 'n.title asc, n.id desc',
+            'title_desc' => 'n.title desc, n.id desc',
+            'updated_desc' => 'n.updated_at desc, n.id desc',
+            'created_desc' => 'n.created_at desc, n.id desc',
+        ][$sort] ?? 'coalesce(n.published_at, n.created_at) desc, n.id desc';
     }
 
     private function uniqueNewsCategorySlug(string $slug, int $ignoreId = 0): string

@@ -118,12 +118,70 @@ abstract class AdminBaseController extends BaseController
 
         $config = $map[$resource];
         [$where, $params] = $this->searchWhere($query, $config['columns']);
+        $order = $config['order'];
+        if ($resource === 'pages') {
+            $clauses = [];
+            $params = [];
+            if ($query !== '') {
+                $clauses[] = '(title like ? or slug like ? or excerpt like ? or status like ?)';
+                array_push($params, '%' . $query . '%', '%' . $query . '%', '%' . $query . '%', '%' . $query . '%');
+            }
+            $status = (string) $request->input('status', '');
+            if (in_array($status, ['published', 'draft'], true)) {
+                $clauses[] = 'status = ?';
+                $params[] = $status;
+            }
+            $template = (string) $request->input('template', '');
+            if ($template !== '' && array_key_exists($template, $this->pageTemplates())) {
+                $clauses[] = 'template = ?';
+                $params[] = $template;
+            }
+            $where = $clauses ? 'where ' . implode(' and ', $clauses) : '';
+            $order = [
+                'order_asc' => 'sort_order asc, id desc',
+                'order_desc' => 'sort_order desc, id desc',
+                'title_asc' => 'title asc, id desc',
+                'title_desc' => 'title desc, id desc',
+                'updated_desc' => 'updated_at desc, id desc',
+                'created_desc' => 'created_at desc, id desc',
+            ][(string) $request->input('sort', 'order_asc')] ?? $config['order'];
+        }
         if ($resource === 'news') {
-            $newsWhere = $where === '' ? '' : str_replace(
-                ['title like ?', 'category like ?', 'body like ?', 'status like ?', 'published_at like ?'],
-                ['n.title like ?', 'n.category like ?', 'n.body like ?', 'n.status like ?', 'n.published_at like ?'],
-                $where
-            );
+            $clauses = [];
+            $params = [];
+            if ($query !== '') {
+                $like = '%' . $query . '%';
+                $clauses[] = '(n.title like ? or n.slug like ? or n.category like ? or n.body like ? or n.status like ? or exists (
+                    select 1
+                    from news_category_links sl
+                    join news_categories sc on sc.id = sl.category_id
+                    where sl.news_id = n.id and sc.title like ?
+                ))';
+                array_push($params, $like, $like, $like, $like, $like, $like);
+            }
+            $status = (string) $request->input('status', '');
+            if (in_array($status, ['published', 'draft'], true)) {
+                $clauses[] = 'n.status = ?';
+                $params[] = $status;
+            }
+            $categoryId = (int) $request->input('category_id', 0);
+            if ($categoryId > 0) {
+                $clauses[] = 'exists (
+                    select 1
+                    from news_category_links fl
+                    where fl.news_id = n.id and fl.category_id = ?
+                )';
+                $params[] = $categoryId;
+            }
+            $newsWhere = $clauses ? 'where ' . implode(' and ', $clauses) : '';
+            $newsOrder = [
+                'newest' => 'coalesce(n.published_at, n.created_at) desc, n.id desc',
+                'oldest' => 'coalesce(n.published_at, n.created_at) asc, n.id asc',
+                'title_asc' => 'n.title asc, n.id desc',
+                'title_desc' => 'n.title desc, n.id desc',
+                'updated_desc' => 'n.updated_at desc, n.id desc',
+                'created_desc' => 'n.created_at desc, n.id desc',
+            ][(string) $request->input('sort', 'newest')] ?? $config['order'];
             $items = $this->db()->fetchAll(
                 'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
                  from news n
@@ -131,14 +189,21 @@ abstract class AdminBaseController extends BaseController
                  left join news_categories c on c.id = l.category_id
                  ' . $newsWhere . '
                  group by n.id, n.title, n.slug, n.category, n.body, n.status, n.published_at, n.created_at, n.updated_at
-                 order by n.id desc
+                 order by ' . $newsOrder . '
                  limit ' . $pagination['limit'] . ' offset 0',
                 $params
             );
-            $total = (int) ($this->db()->fetch('select count(*) as c from news n ' . $newsWhere, $params)['c'] ?? 0);
+            $total = (int) ($this->db()->fetch(
+                'select count(distinct n.id) as c
+                 from news n
+                 left join news_category_links l on l.news_id = n.id
+                 left join news_categories c on c.id = l.category_id
+                 ' . $newsWhere,
+                $params
+            )['c'] ?? 0);
         } else {
             $items = $this->db()->fetchAll(
-                'select * from ' . $config['table'] . ' ' . $where . ' order by ' . $config['order'] . ' limit ' . $pagination['limit'] . ' offset 0',
+                'select * from ' . $config['table'] . ' ' . $where . ' order by ' . $order . ' limit ' . $pagination['limit'] . ' offset 0',
                 $params
             );
             $total = (int) ($this->db()->fetch('select count(*) as c from ' . $config['table'] . ' ' . $where, $params)['c'] ?? 0);

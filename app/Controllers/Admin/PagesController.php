@@ -17,10 +17,11 @@ final class PagesController extends \App\Controllers\AdminBaseController
     {
         $this->guard();
         $query = trim((string) $request->input('q', ''));
+        [$where, $params] = $this->pageListWhere($request, $query);
+        $sort = $this->pageListOrder((string) $request->input('sort', 'order_asc'));
         $pagination = $this->pagination($request);
-        [$where, $params] = $this->searchWhere($query, ['title', 'slug', 'excerpt', 'status']);
         $items = $this->db()->fetchAll(
-            'select * from pages ' . $where . ' order by sort_order asc, id desc limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
+            'select * from pages ' . $where . ' order by ' . $sort . ' limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
             $params
         );
         $total = (int) ($this->db()->fetch('select count(*) as c from pages ' . $where, $params)['c'] ?? 0);
@@ -36,6 +37,13 @@ final class PagesController extends \App\Controllers\AdminBaseController
             'total' => $total,
             'limit' => $pagination['limit'],
             'stats' => $stats,
+            'filters' => [
+                'q' => $query,
+                'status' => (string) $request->input('status', ''),
+                'template' => (string) $request->input('template', ''),
+                'sort' => (string) $request->input('sort', 'order_asc'),
+            ],
+            'templates' => $this->pageTemplates(),
         ]);
     }
 
@@ -115,5 +123,42 @@ final class PagesController extends \App\Controllers\AdminBaseController
         }
 
         redirect('/admin/pages');
+    }
+
+    private function pageListWhere(Request $request, string $query): array
+    {
+        $clauses = [];
+        $params = [];
+
+        if ($query !== '') {
+            $clauses[] = '(title like ? or slug like ? or excerpt like ? or status like ?)';
+            array_push($params, '%' . $query . '%', '%' . $query . '%', '%' . $query . '%', '%' . $query . '%');
+        }
+
+        $status = (string) $request->input('status', '');
+        if (in_array($status, ['published', 'draft'], true)) {
+            $clauses[] = 'status = ?';
+            $params[] = $status;
+        }
+
+        $template = (string) $request->input('template', '');
+        if ($template !== '' && array_key_exists($template, $this->pageTemplates())) {
+            $clauses[] = 'template = ?';
+            $params[] = $template;
+        }
+
+        return [$clauses ? 'where ' . implode(' and ', $clauses) : '', $params];
+    }
+
+    private function pageListOrder(string $sort): string
+    {
+        return [
+            'order_asc' => 'sort_order asc, id desc',
+            'order_desc' => 'sort_order desc, id desc',
+            'title_asc' => 'title asc, id desc',
+            'title_desc' => 'title desc, id desc',
+            'updated_desc' => 'updated_at desc, id desc',
+            'created_desc' => 'created_at desc, id desc',
+        ][$sort] ?? 'sort_order asc, id desc';
     }
 }
