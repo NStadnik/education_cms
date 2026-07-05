@@ -101,6 +101,7 @@ final class Installer
             'address' => '',
             'phone' => '',
             'email' => '',
+            'site_template' => 'official',
         ];
 
         foreach ($settings as $name => $value) {
@@ -131,13 +132,13 @@ final class Installer
         ], JSON_UNESCAPED_UNICODE);
 
         $db->execute(
-            'insert into pages (title, slug, excerpt, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, 0, ?, ?)',
-            ['Головна', 'home', 'Головна сторінка', $blocks, 'published', $now, $now]
+            'insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, 0, ?, ?)',
+            ['Головна', 'home', 'Головна сторінка', 'default', $blocks, 'published', $now, $now]
         );
 
         $db->execute(
-            'insert into pages (title, slug, excerpt, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, 10, ?, ?)',
-            ['Про заклад', 'about', 'Коротка інформація про заклад', json_encode([['type' => 'text', 'title' => 'Про заклад', 'text' => 'Додайте опис, історію та пріоритети закладу освіти.']], JSON_UNESCAPED_UNICODE), 'published', $now, $now]
+            'insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, 10, ?, ?)',
+            ['Про заклад', 'about', 'Коротка інформація про заклад', 'default', json_encode([['type' => 'text', 'title' => 'Про заклад', 'text' => 'Додайте опис, історію та пріоритети закладу освіти.']], JSON_UNESCAPED_UNICODE), 'published', $now, $now]
         );
     }
 

@@ -18,6 +18,7 @@ create table if not exists pages (
     title varchar(220) not null,
     slug varchar(180) not null unique,
     excerpt text null,
+    template varchar(80) not null default 'default',
     blocks_json text not null,
     status varchar(40) not null default 'draft',
     sort_order integer not null default 0,

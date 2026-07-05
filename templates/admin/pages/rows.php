@@ -2,6 +2,7 @@
     <tr data-list-row>
         <td><strong><?= e($item['title']) ?></strong><br><span class="meta"><?= e($item['excerpt'] ?? '') ?></span></td>
         <td><code><?= e($item['slug']) ?></code></td>
+        <td><?= e($item['template'] ?? 'default') ?></td>
         <td><span class="status <?= ($item['status'] ?? '') === 'published' ? 'ok' : 'warn' ?>"><?= e($item['status']) ?></span></td>
         <td><?= e((string) ($item['sort_order'] ?? 0)) ?></td>
         <td><a class="button secondary compact" href="<?= url('/admin/pages/edit?id=' . $item['id']) ?>"><span class="mdi mdi-pencil-outline" aria-hidden="true"></span><span>Редагувати</span></a></td>

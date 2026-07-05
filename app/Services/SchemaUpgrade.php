@@ -13,14 +13,21 @@ final class SchemaUpgrade
     {
         try {
             $done = $db->fetch('select value from settings where name = ?', ['schema_documents_public_info']);
-            if (($done['value'] ?? '') === '1') {
-                return;
+            if (($done['value'] ?? '') !== '1') {
+                self::addDocumentColumns($db);
+                self::migratePublicInfoItems($db);
+                $db->execute('delete from settings where name = ?', ['schema_documents_public_info']);
+                $db->execute('insert into settings (name, value) values (?, ?)', ['schema_documents_public_info', '1']);
             }
 
-            self::addDocumentColumns($db);
-            self::migratePublicInfoItems($db);
-            $db->execute('delete from settings where name = ?', ['schema_documents_public_info']);
-            $db->execute('insert into settings (name, value) values (?, ?)', ['schema_documents_public_info', '1']);
+            $pagesTemplateDone = $db->fetch('select value from settings where name = ?', ['schema_pages_template']);
+            if (($pagesTemplateDone['value'] ?? '') !== '1') {
+                self::addPageTemplateColumn($db);
+                $db->execute('delete from settings where name = ?', ['schema_pages_template']);
+                $db->execute('insert into settings (name, value) values (?, ?)', ['schema_pages_template', '1']);
+            }
+
+            self::ensureSetting($db, 'site_template', 'official');
         } catch (Throwable) {
             // Keep the site bootable; debug.log will still capture hard failures elsewhere.
         }
@@ -40,6 +47,25 @@ final class SchemaUpgrade
             }
             $db->pdo()->exec("alter table documents add column {$column} {$definition}");
         }
+    }
+
+    private static function addPageTemplateColumn(Database $db): void
+    {
+        if (self::hasColumn($db, 'pages', 'template')) {
+            return;
+        }
+
+        $db->pdo()->exec("alter table pages add column template varchar(80) not null default 'default'");
+    }
+
+    private static function ensureSetting(Database $db, string $name, string $value): void
+    {
+        $existing = $db->fetch('select value from settings where name = ?', [$name]);
+        if ($existing) {
+            return;
+        }
+
+        $db->execute('insert into settings (name, value) values (?, ?)', [$name, $value]);
     }
 
     private static function migratePublicInfoItems(Database $db): void

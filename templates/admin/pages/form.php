@@ -61,6 +61,13 @@
                         <option value="published" <?= selected($item['status'] ?? '', 'published') ?>>published</option>
                     </select>
                 </label>
+                <label>Шаблон
+                    <select name="template">
+                        <?php foreach ($templates as $value => $label): ?>
+                            <option value="<?= e($value) ?>" <?= selected($item['template'] ?? 'default', $value) ?>><?= e($label) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
                 <label>Сортування<input type="number" name="sort_order" value="<?= e((string) ($item['sort_order'] ?? 0)) ?>"></label>
                 <div class="hint-box">Залиште slug порожнім, щоб система сформувала його з назви.</div>
             </div>

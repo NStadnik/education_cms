@@ -82,7 +82,7 @@ final class AdminController extends BaseController
         $this->guard();
         $id = (int) $request->input('id', 0);
         $item = $id ? $this->db()->fetch('select * from pages where id = ?', [$id]) : null;
-        return $this->admin('admin/pages/form', ['title' => 'Сторінка', 'item' => $item]);
+        return $this->admin('admin/pages/form', ['title' => 'Сторінка', 'item' => $item, 'templates' => $this->pageTemplates()]);
     }
 
     public function pageSave(Request $request): Response
@@ -94,10 +94,15 @@ final class AdminController extends BaseController
             $id = (int) $request->input('id', 0);
             $blocks = $this->blocksFromText((string) $request->input('blocks_text'));
             $slug = $this->slug((string) $request->input('slug', $request->input('title')));
+            $template = (string) $request->input('template', 'default');
+            if (!array_key_exists($template, $this->pageTemplates())) {
+                $template = 'default';
+            }
             $data = [
                 $request->input('title'),
                 $slug,
                 $request->input('excerpt'),
+                $template,
                 json_encode($blocks, JSON_UNESCAPED_UNICODE),
                 $request->input('status', 'draft'),
                 (int) $request->input('sort_order', 0),
@@ -105,9 +110,9 @@ final class AdminController extends BaseController
             ];
 
             if ($id) {
-                $this->db()->execute('update pages set title=?, slug=?, excerpt=?, blocks_json=?, status=?, sort_order=?, updated_at=? where id=?', [...$data, $id]);
+                $this->db()->execute('update pages set title=?, slug=?, excerpt=?, template=?, blocks_json=?, status=?, sort_order=?, updated_at=? where id=?', [...$data, $id]);
             } else {
-                $this->db()->execute('insert into pages (title, slug, excerpt, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
+                $this->db()->execute('insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
                 $id = (int) $this->db()->lastInsertId();
             }
             $this->audit('save', 'page', $id);
@@ -667,7 +672,10 @@ final class AdminController extends BaseController
     public function settings(): Response
     {
         $this->guard('settings.manage');
-        return $this->admin('admin/settings', ['title' => 'Налаштування', 'settings' => $this->siteSettings()]);
+        return $this->admin('admin/settings', [
+            'title' => 'Налаштування',
+            'settings' => $this->siteSettings(),
+        ]);
     }
 
     public function settingsSave(Request $request): Response
@@ -676,7 +684,7 @@ final class AdminController extends BaseController
         Csrf::verify();
         try {
             foreach (['institution_name', 'institution_type', 'edrpou', 'address', 'phone', 'email'] as $key) {
-                $this->db()->execute('update settings set value = ? where name = ?', [$request->input($key), $key]);
+                $this->saveSetting($key, (string) $request->input($key));
             }
 
             if ($this->isAjax($request)) {
@@ -684,6 +692,37 @@ final class AdminController extends BaseController
             }
 
             redirect('/admin/settings');
+        } catch (Throwable $e) {
+            return $this->ajaxError($request, $e);
+        }
+    }
+
+    public function templates(): Response
+    {
+        $this->guard('settings.manage');
+        return $this->admin('admin/templates/index', [
+            'title' => 'Шаблони сайту',
+            'settings' => $this->siteSettings(),
+            'siteTemplates' => $this->siteTemplates(),
+        ]);
+    }
+
+    public function templatesSave(Request $request): Response
+    {
+        $this->guard('settings.manage');
+        Csrf::verify();
+        try {
+            $siteTemplate = (string) $request->input('site_template', 'official');
+            if (!array_key_exists($siteTemplate, $this->siteTemplates())) {
+                $siteTemplate = 'official';
+            }
+            $this->saveSetting('site_template', $siteTemplate);
+
+            if ($this->isAjax($request)) {
+                return $this->json(['ok' => true, 'message' => 'Шаблон сайту збережено.']);
+            }
+
+            redirect('/admin/templates');
         } catch (Throwable $e) {
             return $this->ajaxError($request, $e);
         }
@@ -793,6 +832,44 @@ final class AdminController extends BaseController
         $total = $this->count($table);
         $published = (int) ($this->db()->fetch("select count(*) as c from {$table} where status = 'published'")['c'] ?? 0);
         return ['total' => $total, 'published' => $published, 'drafts' => $total - $published];
+    }
+
+    private function pageTemplates(): array
+    {
+        return [
+            'default' => 'Стандартний',
+            'wide' => 'Широкий контент',
+            'document' => 'Документ / стаття',
+        ];
+    }
+
+    private function siteTemplates(): array
+    {
+        return [
+            'official' => [
+                'name' => 'Офіційний',
+                'description' => 'Стриманий державний стиль із темною навігацією.',
+                'accent' => '#1f6feb',
+            ],
+            'minimal' => [
+                'name' => 'Світлий',
+                'description' => 'Легкий білий інтерфейс із чітким контентним фокусом.',
+                'accent' => '#0b7a55',
+            ],
+            'contrast' => [
+                'name' => 'Контрастний',
+                'description' => 'Виразний шаблон для кращої помітності навігації.',
+                'accent' => '#9a6700',
+            ],
+        ];
+    }
+
+    private function saveSetting(string $name, string $value): void
+    {
+        $this->db()->execute(
+            'insert into settings (name, value) values (?, ?) on duplicate key update value = values(value)',
+            [$name, $value]
+        );
     }
 
     private function mediaReferences(): array

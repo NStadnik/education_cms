@@ -111,6 +111,8 @@ final class App
         $this->router->get('/admin/users', [$admin, 'users']);
         $this->router->get('/admin/users/edit', [$admin, 'userForm']);
         $this->router->post('/admin/users/save', [$admin, 'userSave']);
+        $this->router->get('/admin/templates', [$admin, 'templates']);
+        $this->router->post('/admin/templates/save', [$admin, 'templatesSave']);
         $this->router->get('/admin/settings', [$admin, 'settings']);
         $this->router->post('/admin/settings/save', [$admin, 'settingsSave']);
     }

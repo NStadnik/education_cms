@@ -23,7 +23,7 @@
     </div>
     <div class="table-scroll">
         <table>
-            <thead><tr><th>Назва</th><th>Slug</th><th>Статус</th><th>Порядок</th><th></th></tr></thead>
+            <thead><tr><th>Назва</th><th>Slug</th><th>Шаблон</th><th>Статус</th><th>Порядок</th><th></th></tr></thead>
             <tbody id="pagesRows"><?= $this->partial('admin/pages/rows', ['items' => $items]) ?></tbody>
         </table>
     </div>

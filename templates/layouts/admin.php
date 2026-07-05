@@ -9,6 +9,7 @@
         ['/admin/media', 'Медіафайли', 'mdi-image-multiple-outline'],
         ['/admin/public-info', 'Публічна інформація', 'mdi-folder-information-outline'],
         ['/admin/users', 'Користувачі', 'mdi-account-group-outline'],
+        ['/admin/templates', 'Шаблони', 'mdi-palette-outline'],
         ['/admin/settings', 'Налаштування', 'mdi-cog-outline'],
     ];
 
