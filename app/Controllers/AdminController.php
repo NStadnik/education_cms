@@ -745,11 +745,14 @@ final class AdminController extends BaseController
         $transactionStarted = false;
         try {
             $type = (string) $request->input('type', 'news');
+            if ((string) $request->input('source', 'file') === 'database') {
+                $type = 'wordpress';
+            }
             if (!array_key_exists($type, $this->importOptions())) {
                 throw new \RuntimeException('Невідомий тип імпорту.');
             }
 
-            $rows = $this->readImportRows($request);
+            $rows = $this->readImportRows($request, false);
             if (!$rows) {
                 throw new \RuntimeException('Файл або текст імпорту не містить записів.');
             }
@@ -791,6 +794,36 @@ final class AdminController extends BaseController
                 'importOptions' => $this->importOptions(),
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    public function importPreview(Request $request): Response
+    {
+        $this->guard('settings.manage');
+        Csrf::verify();
+        try {
+            $type = (string) $request->input('type', 'news');
+            if ((string) $request->input('source', 'file') === 'database') {
+                $type = 'wordpress';
+            }
+            if (!array_key_exists($type, $this->importOptions())) {
+                throw new \RuntimeException('Невідомий тип імпорту.');
+            }
+
+            $rows = $this->readImportRows($request, true);
+            if (!$rows) {
+                throw new \RuntimeException('Джерело імпорту не містить записів для попереднього перегляду.');
+            }
+
+            return $this->json([
+                'ok' => true,
+                'message' => 'Попередній перегляд готовий.',
+                'total' => count($rows),
+                'summary' => $this->importPreviewSummary($type, $rows),
+                'rows' => array_slice($this->importPreviewRows($type, $rows), 0, 10),
+            ]);
+        } catch (Throwable $e) {
+            return $this->json(['ok' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
@@ -958,6 +991,11 @@ final class AdminController extends BaseController
                 'description' => 'Додає універсальні поля для футера та загальних даних сайту.',
                 'columns' => 'label, value',
             ],
+            'wordpress' => [
+                'name' => 'WordPress',
+                'description' => 'Імпортує записи з таблиці wp_posts: дописи як новини, сторінки як сторінки.',
+                'columns' => 'post_title, post_content, post_name, post_type, post_status, post_date',
+            ],
         ];
     }
 
@@ -1001,8 +1039,12 @@ final class AdminController extends BaseController
         return $fields;
     }
 
-    private function readImportRows(Request $request): array
+    private function readImportRows(Request $request, bool $preview = false): array
     {
+        if ((string) $request->input('source', 'file') === 'database') {
+            return $this->readDatabaseImportRows($request, $preview);
+        }
+
         $source = trim((string) $request->input('import_text', ''));
         $file = $request->files['import_file'] ?? null;
         if (is_array($file) && (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && is_file((string) ($file['tmp_name'] ?? ''))) {
@@ -1020,6 +1062,282 @@ final class AdminController extends BaseController
         }
 
         return $this->parseImportCsv($source);
+    }
+
+    private function readDatabaseImportRows(Request $request, bool $preview): array
+    {
+        $profile = (string) $request->input('db_profile', 'wordpress');
+        if ($profile !== 'wordpress') {
+            throw new \RuntimeException('Поки підтримується тільки профіль WordPress.');
+        }
+
+        return $this->readWordPressRows($request, $preview);
+    }
+
+    private function readWordPressRows(Request $request, bool $preview): array
+    {
+        $pdo = $this->externalImportPdo($request);
+        $prefix = $this->sanitizeDbIdentifier((string) $request->input('db_prefix', 'wp_'));
+        $table = $prefix . 'posts';
+        $limit = $preview ? 10 : max(1, min(1000, (int) $request->input('db_limit', 200)));
+        $status = (string) $request->input('wp_status', 'publish');
+        if (!in_array($status, ['publish', 'draft', 'any'], true)) {
+            $status = 'publish';
+        }
+
+        $where = "post_type in ('post', 'page')";
+        $params = [];
+        if ($status !== 'any') {
+            $where .= ' and post_status = ?';
+            $params[] = $status;
+        }
+
+        $mediaMap = [];
+        if (!$preview && $request->input('wp_import_media')) {
+            $mediaMap = $this->importWordPressMedia($pdo, $prefix, $request);
+        }
+
+        $stmt = $pdo->prepare(
+            "select ID, post_title, post_name, post_content, post_excerpt, post_type, post_status, post_date
+             from {$table}
+             where {$where}
+             order by post_date desc, ID desc
+             limit {$limit}"
+        );
+        $stmt->execute($params);
+
+        $rows = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $status = (($row['post_status'] ?? '') === 'publish') ? 'published' : 'draft';
+            $body = (string) ($row['post_content'] ?? '');
+            if ($mediaMap) {
+                $body = str_replace(array_keys($mediaMap), array_values($mediaMap), $body);
+            }
+
+            $rows[] = [
+                '_import_target' => (($row['post_type'] ?? '') === 'page') ? 'pages' : 'news',
+                'title' => (string) ($row['post_title'] ?? ''),
+                'slug' => (string) ($row['post_name'] ?? ''),
+                'body' => $body,
+                'excerpt' => (string) ($row['post_excerpt'] ?? ''),
+                'status' => $status,
+                'published_at' => (string) ($row['post_date'] ?? ''),
+                'sort_order' => '0',
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function importWordPressMedia(\PDO $pdo, string $prefix, Request $request): array
+    {
+        $postsTable = $prefix . 'posts';
+        $metaTable = $prefix . 'postmeta';
+        $siteUrl = rtrim(trim((string) $request->input('wp_site_url', '')), '/');
+        $uploadsPath = rtrim(trim((string) $request->input('wp_uploads_path', '')), '/\\');
+        $limit = max(1, min(5000, (int) $request->input('wp_media_limit', 1000)));
+
+        $stmt = $pdo->prepare(
+            "select p.ID, p.guid, p.post_title, p.post_name, p.post_mime_type, m.meta_value as attached_file, mm.meta_value as attachment_metadata
+             from {$postsTable} p
+             left join {$metaTable} m on m.post_id = p.ID and m.meta_key = '_wp_attached_file'
+             left join {$metaTable} mm on mm.post_id = p.ID and mm.meta_key = '_wp_attachment_metadata'
+             where p.post_type = 'attachment'
+             order by p.ID asc
+             limit {$limit}"
+        );
+        $stmt->execute();
+
+        $map = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $attachment) {
+            $relativeSource = trim((string) ($attachment['attached_file'] ?? ''), '/');
+            $sourceUrl = trim((string) ($attachment['guid'] ?? ''));
+            $source = $this->wordPressMediaSource($relativeSource, $sourceUrl, $siteUrl, $uploadsPath);
+            if ($source === '') {
+                continue;
+            }
+
+            $savedPath = $this->saveImportedMedia($source, $relativeSource, $sourceUrl, (int) ($attachment['ID'] ?? 0));
+            if ($savedPath === '') {
+                continue;
+            }
+
+            $newUrl = url('/uploads/' . $savedPath);
+            foreach ($this->wordPressMediaAliases($relativeSource, $sourceUrl, $siteUrl, (string) ($attachment['attachment_metadata'] ?? ''), (string) ($attachment['post_name'] ?? ''), (int) ($attachment['ID'] ?? 0)) as $alias) {
+                $map[$alias] = $newUrl;
+            }
+        }
+
+        uksort($map, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+        return $map;
+    }
+
+    private function wordPressMediaSource(string $relativeSource, string $sourceUrl, string $siteUrl, string $uploadsPath): string
+    {
+        if ($uploadsPath !== '' && $relativeSource !== '') {
+            $local = $uploadsPath . '/' . $relativeSource;
+            if (is_file($local)) {
+                return $local;
+            }
+        }
+
+        if ($sourceUrl !== '') {
+            return $sourceUrl;
+        }
+
+        if ($siteUrl !== '' && $relativeSource !== '') {
+            return $siteUrl . '/wp-content/uploads/' . $relativeSource;
+        }
+
+        return '';
+    }
+
+    private function saveImportedMedia(string $source, string $relativeSource, string $sourceUrl, int $id): string
+    {
+        $name = basename($relativeSource ?: (parse_url($sourceUrl, PHP_URL_PATH) ?: ''));
+        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if (!in_array($extension, ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'webp'], true)) {
+            return '';
+        }
+
+        $safeName = preg_replace('/[^a-zA-Z0-9._-]+/', '-', pathinfo($name, PATHINFO_FILENAME)) ?: 'file';
+        $targetRelative = date('Y/m/') . 'wp-' . $id . '-' . $safeName . '.' . $extension;
+        $target = base_path('storage/uploads/' . $targetRelative);
+        if (!is_dir(dirname($target))) {
+            mkdir(dirname($target), 0775, true);
+        }
+        if (is_file($target)) {
+            return $targetRelative;
+        }
+
+        $context = stream_context_create(['http' => ['timeout' => 15], 'https' => ['timeout' => 15]]);
+        $contents = is_file($source) ? file_get_contents($source) : @file_get_contents($source, false, $context);
+        if ($contents === false || $contents === '') {
+            return '';
+        }
+
+        file_put_contents($target, $contents);
+        return $targetRelative;
+    }
+
+    private function wordPressMediaAliases(string $relativeSource, string $sourceUrl, string $siteUrl, string $metadata, string $attachmentSlug, int $attachmentId): array
+    {
+        $aliases = [];
+        $relativeFiles = array_merge([$relativeSource], $this->wordPressMetadataFiles($relativeSource, $metadata));
+        $baseUrls = array_filter([$siteUrl, $this->wordPressUploadsBaseUrl($sourceUrl)]);
+
+        foreach ($relativeFiles as $relativeFile) {
+            $relativeFile = trim($relativeFile, '/');
+            if ($relativeFile === '') {
+                continue;
+            }
+
+            $aliases[] = '/wp-content/uploads/' . $relativeFile;
+            foreach ($baseUrls as $baseUrl) {
+                foreach ([$baseUrl, $this->toggleScheme($baseUrl)] as $alternateBaseUrl) {
+                    if ($alternateBaseUrl !== '') {
+                        $aliases[] = rtrim($alternateBaseUrl, '/') . '/wp-content/uploads/' . $relativeFile;
+                    }
+                }
+            }
+            if ($sourceUrl !== '' && basename(parse_url($sourceUrl, PHP_URL_PATH) ?: '') === basename($relativeFile)) {
+                $aliases[] = $sourceUrl;
+                $alternateUrl = $this->toggleScheme($sourceUrl);
+                if ($alternateUrl !== '') {
+                    $aliases[] = $alternateUrl;
+                }
+            }
+        }
+        if ($siteUrl !== '' && $attachmentSlug !== '') {
+            foreach ([$siteUrl, $this->toggleScheme($siteUrl)] as $baseUrl) {
+                if ($baseUrl !== '') {
+                    $aliases[] = rtrim($baseUrl, '/') . '/' . trim($attachmentSlug, '/') . '/';
+                    $aliases[] = rtrim($baseUrl, '/') . '/' . trim($attachmentSlug, '/');
+                }
+            }
+        }
+        if ($attachmentId > 0) {
+            $aliases[] = '/?attachment_id=' . $attachmentId;
+            if ($siteUrl !== '') {
+                foreach ([$siteUrl, $this->toggleScheme($siteUrl)] as $baseUrl) {
+                    if ($baseUrl !== '') {
+                        $aliases[] = rtrim($baseUrl, '/') . '/?attachment_id=' . $attachmentId;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($aliases)));
+    }
+
+    private function wordPressUploadsBaseUrl(string $sourceUrl): string
+    {
+        $marker = '/wp-content/uploads/';
+        $position = strpos($sourceUrl, $marker);
+        if ($position === false) {
+            return '';
+        }
+
+        return substr($sourceUrl, 0, $position);
+    }
+
+    private function wordPressMetadataFiles(string $relativeSource, string $metadata): array
+    {
+        if ($relativeSource === '' || $metadata === '') {
+            return [];
+        }
+
+        $directory = trim(dirname($relativeSource), '.');
+        $directory = $directory === '' ? '' : trim($directory, '/') . '/';
+        preg_match_all('/"file";s:\d+:"([^"]+)"/', $metadata, $matches);
+
+        $files = [];
+        foreach ($matches[1] ?? [] as $file) {
+            $file = trim((string) $file, '/');
+            if ($file === '' || str_contains($file, '/')) {
+                continue;
+            }
+            $files[] = $directory . $file;
+        }
+
+        return array_values(array_unique($files));
+    }
+
+    private function toggleScheme(string $url): string
+    {
+        if (str_starts_with($url, 'http://')) {
+            return 'https://' . substr($url, 7);
+        }
+        if (str_starts_with($url, 'https://')) {
+            return 'http://' . substr($url, 8);
+        }
+
+        return '';
+    }
+
+    private function externalImportPdo(Request $request): \PDO
+    {
+        $host = trim((string) $request->input('db_host', '127.0.0.1'));
+        $port = trim((string) $request->input('db_port', '3306')) ?: '3306';
+        $name = trim((string) $request->input('db_name', ''));
+        $user = trim((string) $request->input('db_user', ''));
+        $password = (string) $request->input('db_password', '');
+        $charset = trim((string) $request->input('db_charset', 'utf8mb4')) ?: 'utf8mb4';
+        if ($host === '' || $name === '' || $user === '') {
+            throw new \RuntimeException('Заповніть host, назву БД і користувача для підключення.');
+        }
+
+        $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $host, $port, $name, $charset);
+        $pdo = new \PDO($dsn, $user, $password);
+        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        $pdo->setAttribute(\PDO::ATTR_DEFAULT_FETCH_MODE, \PDO::FETCH_ASSOC);
+        return $pdo;
+    }
+
+    private function sanitizeDbIdentifier(string $value): string
+    {
+        $value = preg_replace('/[^a-zA-Z0-9_]/', '', $value) ?? '';
+        return $value !== '' ? $value : 'wp_';
     }
 
     private function parseImportJson(string $source, string $type): array
@@ -1115,8 +1433,32 @@ final class AdminController extends BaseController
             'documents' => $this->importDocumentRows($rows),
             'public_info_sections' => $this->importPublicInfoSectionRows($rows),
             'global_fields' => $this->importGlobalFieldRows($rows),
+            'wordpress' => $this->importWordPressRows($rows),
             default => 0,
         };
+    }
+
+    private function importWordPressRows(array $rows): int
+    {
+        $created = 0;
+        $pageRows = [];
+        $newsRows = [];
+        foreach ($rows as $row) {
+            if (($row['_import_target'] ?? '') === 'pages') {
+                $pageRows[] = $row;
+            } else {
+                $newsRows[] = $row;
+            }
+        }
+
+        if ($newsRows) {
+            $created += $this->importNewsRows($newsRows);
+        }
+        if ($pageRows) {
+            $created += $this->importPageRows($pageRows);
+        }
+
+        return $created;
     }
 
     private function importNewsRows(array $rows): int
@@ -1273,6 +1615,56 @@ final class AdminController extends BaseController
         return $created;
     }
 
+    private function importPreviewSummary(string $type, array $rows): array
+    {
+        if ($type !== 'wordpress') {
+            return [
+                ['label' => 'Записів у перегляді', 'value' => (string) count($rows)],
+                ['label' => 'Тип імпорту', 'value' => $this->importOptions()[$type]['name'] ?? $type],
+            ];
+        }
+
+        $pages = 0;
+        $news = 0;
+        foreach ($rows as $row) {
+            if (($row['_import_target'] ?? '') === 'pages') {
+                $pages++;
+            } else {
+                $news++;
+            }
+        }
+
+        return [
+            ['label' => 'Записів у перегляді', 'value' => (string) count($rows)],
+            ['label' => 'Новини', 'value' => (string) $news],
+            ['label' => 'Сторінки', 'value' => (string) $pages],
+        ];
+    }
+
+    private function importPreviewRows(string $type, array $rows): array
+    {
+        $preview = [];
+        foreach ($rows as $row) {
+            $target = $type === 'wordpress'
+                ? (($row['_import_target'] ?? '') === 'pages' ? 'Сторінка' : 'Новина')
+                : ($this->importOptions()[$type]['name'] ?? $type);
+            $title = $this->importValue($row, ['title', 'label', 'name', 'назва', 'заголовок', 'поле']);
+            $status = $this->importValue($row, ['status', 'статус']);
+            $date = $this->importValue($row, ['published_at', 'дата_публікації', 'дата']);
+            $text = $this->importValue($row, ['body', 'description', 'value', 'text', 'контент', 'текст', 'опис', 'значення']);
+
+            $preview[] = [
+                'target' => $target,
+                'title' => $title !== '' ? $title : 'Без назви',
+                'status' => $status !== '' ? $status : '-',
+                'date' => $date !== '' ? $date : '-',
+                'excerpt' => excerpt($text, 120),
+            ];
+        }
+
+        return $preview;
+    }
+
     private function importValue(array $row, array $keys): string
     {
         foreach ($keys as $key) {
@@ -1318,14 +1710,33 @@ final class AdminController extends BaseController
 
     private function uniqueSlug(string $table, string $value): string
     {
-        $base = $this->slug($value);
+        $base = $this->limitSlug($this->slug($value), 170);
+        if ($base === '') {
+            $base = 'item';
+        }
+
         $slug = $base;
         $index = 2;
         while ($this->db()->fetch("select id from {$table} where slug = ? limit 1", [$slug])) {
-            $slug = $base . '-' . $index++;
+            $suffix = '-' . $index++;
+            $slug = $this->limitSlug($base, 180 - $this->textLength($suffix)) . $suffix;
         }
 
         return $slug;
+    }
+
+    private function limitSlug(string $value, int $limit): string
+    {
+        if (function_exists('mb_substr')) {
+            return trim(mb_substr($value, 0, $limit), '-');
+        }
+
+        return trim(substr($value, 0, $limit), '-');
+    }
+
+    private function textLength(string $value): int
+    {
+        return function_exists('mb_strlen') ? mb_strlen($value) : strlen($value);
     }
 
     private function mediaReferences(): array
@@ -1444,9 +1855,9 @@ final class AdminController extends BaseController
         $value = preg_replace('/[^a-z0-9а-яіїєґ]+/u', '-', $value);
         $value = trim($value ?: 'item', '-');
         if (function_exists('mb_substr')) {
-            return mb_substr($value, 0, 180);
+            return trim(mb_substr($value, 0, 170), '-');
         }
-        return substr($value, 0, 180);
+        return trim(substr($value, 0, 170), '-');
     }
 
     private function blocksFromText(string $text): array

@@ -46,7 +46,22 @@ function excerpt(string $value, int $length = 160): string
 
 function safe_html(?string $value): string
 {
-    $html = strip_tags((string) $value, '<p><br><strong><b><em><i><u><ul><ol><li><a><blockquote><h2><h3><h4><div><span><hr>');
+    $value = preg_replace_callback('/<a\b([^>]*)\shref\s*=\s*("|\')([^"\']+)\2([^>]*)>\s*(<img\b[^>]*>)\s*<\/a>/is', static function (array $match): string {
+        $image = $match[5];
+        if (!preg_match('/\ssrc\s*=\s*("|\')([^"\']+)\1/i', $image, $srcMatch)) {
+            return $match[0];
+        }
+
+        $href = trim(html_entity_decode($match[3], ENT_QUOTES, 'UTF-8'));
+        $src = trim(html_entity_decode($srcMatch[2], ENT_QUOTES, 'UTF-8'));
+        if (preg_match('#/uploads/#i', $src) && preg_match('/^https?:\/\//i', $href)) {
+            return '<a href="' . e($src) . '">' . $image . '</a>';
+        }
+
+        return $match[0];
+    }, (string) $value) ?? '';
+
+    $html = strip_tags($value, '<p><br><strong><b><em><i><u><ul><ol><li><a><img><blockquote><h2><h3><h4><div><span><hr>');
     $html = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? '';
     $html = preg_replace('/<(script|style|iframe|object|embed)\b[^>]*>.*?<\/\1>/is', '', $html) ?? '';
 
@@ -59,6 +74,23 @@ function safe_html(?string $value): string
             $href = trim(html_entity_decode($hrefMatch[2], ENT_QUOTES, 'UTF-8'));
             if (preg_match('/^(https?:\/\/|mailto:|\/|#)/i', $href)) {
                 $safeAttributes .= ' href="' . e($href) . '" rel="noopener"';
+            }
+        }
+
+        if ($tag === 'img' && preg_match('/\ssrc\s*=\s*("|\')([^"\']+)\1/i', $attributes, $srcMatch)) {
+            $src = trim(html_entity_decode($srcMatch[2], ENT_QUOTES, 'UTF-8'));
+            if (preg_match('/^(https?:\/\/|\/\/|\/)/i', $src)) {
+                $safeAttributes .= ' src="' . e($src) . '" loading="lazy"';
+                if (preg_match('/\salt\s*=\s*("|\')([^"\']*)\1/i', $attributes, $altMatch)) {
+                    $safeAttributes .= ' alt="' . e(html_entity_decode($altMatch[2], ENT_QUOTES, 'UTF-8')) . '"';
+                } else {
+                    $safeAttributes .= ' alt=""';
+                }
+                foreach (['width', 'height'] as $dimension) {
+                    if (preg_match('/\s' . $dimension . '\s*=\s*("|\')?([0-9]{1,5})\1?/i', $attributes, $dimensionMatch)) {
+                        $safeAttributes .= ' ' . $dimension . '="' . e($dimensionMatch[2]) . '"';
+                    }
+                }
             }
         }
 

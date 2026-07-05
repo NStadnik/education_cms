@@ -7,7 +7,7 @@
     <div>
         <p class="eyebrow">Контент сайту</p>
         <h1><?= $isEdit ? 'Редагувати сторінку' : 'Нова сторінка' ?></h1>
-        <p class="page-subtitle">Налаштуйте назву, адресу, короткий опис і текстові блоки сторінки.</p>
+        <p class="page-subtitle">Налаштуйте назву, короткий опис і текстові блоки сторінки.</p>
     </div>
     <div class="form-actions">
         <a class="button secondary" href="<?= url('/admin/pages') ?>"><span class="mdi mdi-arrow-left" aria-hidden="true"></span><span>До списку</span></a>
@@ -38,7 +38,6 @@
 
             <div class="form-grid wide">
                 <label>Назва<input name="title" value="<?= e($item['title'] ?? '') ?>" required></label>
-                <label>Slug<input name="slug" value="<?= e($item['slug'] ?? '') ?>" placeholder="storinka"></label>
                 <label>Короткий опис<textarea class="textarea-small" name="excerpt"><?= e($item['excerpt'] ?? '') ?></textarea></label>
                 <label>Блоки тексту
                     <textarea class="textarea-large" name="blocks_text" data-rich-editor placeholder="Текст сторінки"><?php foreach (($blocks ?: []) as $block): ?><?= e($block['text'] ?? '') ?><?php endforeach; ?></textarea>
@@ -69,7 +68,16 @@
                     </select>
                 </label>
                 <label>Сортування<input type="number" name="sort_order" value="<?= e((string) ($item['sort_order'] ?? 0)) ?>"></label>
-                <div class="hint-box">Залиште slug порожнім, щоб система сформувала його з назви.</div>
+            </div>
+
+            <div class="form-section-head mt-4">
+                <div>
+                    <h2>SEO</h2>
+                    <p class="meta">Адреса сторінки формується автоматично, але її можна змінити вручну.</p>
+                </div>
+            </div>
+            <div class="form-grid">
+                <label>Slug<input name="slug" value="<?= e($item['slug'] ?? '') ?>" placeholder="storinka"></label>
             </div>
 
             <div class="form-actions stacked">

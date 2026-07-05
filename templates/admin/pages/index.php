@@ -18,12 +18,12 @@
 
 <div class="list-panel" data-infinite-list data-list-url="<?= url('/admin/pages') ?>" data-list-target="#pagesRows" data-list-offset="<?= e((string) count($items)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($items) < $total ? '1' : '0' ?>">
     <div class="list-tools">
-        <input data-filter-input type="search" placeholder="Пошук за назвою або slug" aria-label="Пошук сторінок">
+        <input data-filter-input type="search" placeholder="Пошук за назвою" aria-label="Пошук сторінок">
         <span class="meta"><span data-filter-count><?= e((string) $total) ?></span> записів</span>
     </div>
     <div class="table-scroll">
         <table>
-            <thead><tr><th>Назва</th><th>Slug</th><th>Шаблон</th><th>Статус</th><th>Порядок</th><th></th></tr></thead>
+            <thead><tr><th>Назва</th><th>Шаблон</th><th>Статус</th><th>Порядок</th><th></th></tr></thead>
             <tbody id="pagesRows"><?= $this->partial('admin/pages/rows', ['items' => $items]) ?></tbody>
         </table>
     </div>

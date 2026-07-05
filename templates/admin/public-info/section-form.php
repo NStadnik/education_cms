@@ -3,7 +3,7 @@
     <div>
         <p class="eyebrow">Відкритість</p>
         <h1><?= $isEdit ? 'Редагувати розділ' : 'Новий розділ' ?></h1>
-        <p class="page-subtitle">Налаштуйте назву, адресу, порядок і обов'язковість розділу публічної інформації.</p>
+        <p class="page-subtitle">Налаштуйте назву, порядок і обов'язковість розділу публічної інформації.</p>
     </div>
     <a class="button secondary" href="<?= url('/admin/public-info') ?>"><span class="mdi mdi-arrow-left" aria-hidden="true"></span><span>До списку</span></a>
 </div>
@@ -11,6 +11,7 @@
 <form method="post" action="<?= url('/admin/public-info/sections/save') ?>">
     <?= \App\Core\Csrf::field() ?>
     <input type="hidden" name="id" value="<?= e((string) ($item['id'] ?? '')) ?>">
+    <input type="hidden" name="slug" value="<?= e($item['slug'] ?? '') ?>">
     <div class="editor-layout">
         <section class="card admin-form-card">
             <div class="form-section-head">
@@ -21,7 +22,6 @@
             </div>
             <div class="form-grid wide">
                 <label>Назва<input name="title" value="<?= e($item['title'] ?? '') ?>" required></label>
-                <label>Slug<input name="slug" value="<?= e($item['slug'] ?? '') ?>" placeholder="napryklad-rozdil"></label>
                 <label>Опис<textarea class="textarea-small" name="description"><?= e($item['description'] ?? '') ?></textarea></label>
             </div>
         </section>

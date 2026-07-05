@@ -39,7 +39,6 @@
 
             <div class="form-grid wide">
                 <label>Назва<input name="title" value="<?= e($item['title'] ?? '') ?>" required></label>
-                <label>Slug<input name="slug" value="<?= e($item['slug'] ?? '') ?>" placeholder="nazva-novyny"></label>
                 <label>Текст<textarea class="textarea-large" name="body" data-rich-editor required><?= e($item['body'] ?? '') ?></textarea></label>
             </div>
         </section>
@@ -60,7 +59,16 @@
                     </select>
                 </label>
                 <label>Дата публікації<input name="published_at" value="<?= e($item['published_at'] ?? '') ?>" placeholder="2026-07-05"></label>
-                <div class="hint-box">Залиште slug порожнім, щоб система сформувала його з назви.</div>
+            </div>
+
+            <div class="form-section-head mt-4">
+                <div>
+                    <h2>SEO</h2>
+                    <p class="meta">Адреса новини формується автоматично, але її можна змінити вручну.</p>
+                </div>
+            </div>
+            <div class="form-grid">
+                <label>Slug<input name="slug" value="<?= e($item['slug'] ?? '') ?>" placeholder="nazva-novyny"></label>
             </div>
 
             <div class="form-actions stacked">

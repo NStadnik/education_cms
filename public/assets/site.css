@@ -70,6 +70,7 @@ img { max-width: 100%; height: auto; }
 .global-fields-list { display: grid; gap: 12px; }
 .global-field-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(240px, 2fr) auto; gap: 12px; align-items: end; }
 .global-field-row button { width: 40px; padding-left: 0; padding-right: 0; }
+.source-options { display: flex; flex-wrap: wrap; gap: 12px; }
 .import-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .import-option { position: relative; display: grid !important; grid-template-columns: auto minmax(0, 1fr); gap: 10px !important; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; cursor: pointer; }
 .import-option input { position: absolute; opacity: 0; pointer-events: none; }
@@ -80,6 +81,8 @@ img { max-width: 100%; height: auto; }
 .import-columns { display: grid; gap: 12px; margin-bottom: 14px; }
 .import-columns div { display: grid; gap: 5px; }
 .import-columns code { white-space: normal; color: var(--brand-strong); }
+.import-preview-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.import-preview-metric { min-height: 72px; }
 .textarea-small { min-height: 96px !important; }
 .textarea-large { min-height: 320px !important; }
 .form-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
@@ -95,6 +98,7 @@ img { max-width: 100%; height: auto; }
 .rich-content ul, .rich-content ol { padding-left: 24px; }
 .rich-content blockquote { padding: 10px 14px; border-left: 3px solid var(--brand); background: #f6f8fc; color: #344054; }
 .rich-content h2, .rich-content h3, .rich-content h4 { margin: 18px 0 10px; }
+.rich-content img { display: block; max-width: 100%; height: auto; margin: 14px 0; border-radius: 6px; }
 .wide-content { max-width: 920px; }
 .document-page { max-width: 840px; margin: 0 auto; padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
 .document-page h1 { margin: 0 0 12px; font-size: 34px; line-height: 1.15; }

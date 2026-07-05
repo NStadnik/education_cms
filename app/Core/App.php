@@ -114,6 +114,7 @@ final class App
         $this->router->get('/admin/templates', [$admin, 'templates']);
         $this->router->post('/admin/templates/save', [$admin, 'templatesSave']);
         $this->router->get('/admin/import', [$admin, 'import']);
+        $this->router->post('/admin/import/preview', [$admin, 'importPreview']);
         $this->router->post('/admin/import/run', [$admin, 'importRun']);
         $this->router->get('/admin/settings', [$admin, 'settings']);
         $this->router->post('/admin/settings/save', [$admin, 'settingsSave']);
