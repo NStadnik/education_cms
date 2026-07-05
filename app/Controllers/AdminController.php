@@ -675,6 +675,7 @@ final class AdminController extends BaseController
         return $this->admin('admin/settings', [
             'title' => 'Налаштування',
             'settings' => $this->siteSettings(),
+            'globalFields' => $this->globalFields(),
         ]);
     }
 
@@ -683,9 +684,9 @@ final class AdminController extends BaseController
         $this->guard('settings.manage');
         Csrf::verify();
         try {
-            foreach (['institution_name', 'institution_type', 'edrpou', 'address', 'phone', 'email'] as $key) {
-                $this->saveSetting($key, (string) $request->input($key));
-            }
+            $this->saveSetting('institution_name', (string) $request->input('institution_name'));
+            $globalFields = json_encode($this->normalizeGlobalFields($request), JSON_UNESCAPED_UNICODE);
+            $this->saveSetting('global_fields', $globalFields === false ? '[]' : $globalFields);
 
             if ($this->isAjax($request)) {
                 return $this->json(['ok' => true, 'message' => 'Налаштування збережено.']);
@@ -725,6 +726,71 @@ final class AdminController extends BaseController
             redirect('/admin/templates');
         } catch (Throwable $e) {
             return $this->ajaxError($request, $e);
+        }
+    }
+
+    public function import(): Response
+    {
+        $this->guard('settings.manage');
+        return $this->admin('admin/import', [
+            'title' => 'Імпорт',
+            'importOptions' => $this->importOptions(),
+        ]);
+    }
+
+    public function importRun(Request $request): Response
+    {
+        $this->guard('settings.manage');
+        Csrf::verify();
+        $transactionStarted = false;
+        try {
+            $type = (string) $request->input('type', 'news');
+            if (!array_key_exists($type, $this->importOptions())) {
+                throw new \RuntimeException('Невідомий тип імпорту.');
+            }
+
+            $rows = $this->readImportRows($request);
+            if (!$rows) {
+                throw new \RuntimeException('Файл або текст імпорту не містить записів.');
+            }
+
+            $this->db()->pdo()->beginTransaction();
+            $transactionStarted = true;
+            $created = $this->importRows($type, $rows);
+            $this->db()->pdo()->commit();
+            $transactionStarted = false;
+            $this->audit('import', $type, null, 'created: ' . $created);
+
+            $result = [
+                'ok' => true,
+                'message' => 'Імпорт завершено.',
+                'created' => $created,
+                'total' => count($rows),
+            ];
+
+            if ($this->isAjax($request)) {
+                return $this->json($result);
+            }
+
+            return $this->admin('admin/import', [
+                'title' => 'Імпорт',
+                'importOptions' => $this->importOptions(),
+                'result' => $result,
+            ]);
+        } catch (Throwable $e) {
+            if ($transactionStarted && $this->db()->pdo()->inTransaction()) {
+                $this->db()->pdo()->rollBack();
+            }
+
+            if ($this->isAjax($request)) {
+                return $this->json(['ok' => false, 'message' => $e->getMessage()], 500);
+            }
+
+            return $this->admin('admin/import', [
+                'title' => 'Імпорт',
+                'importOptions' => $this->importOptions(),
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -864,12 +930,402 @@ final class AdminController extends BaseController
         ];
     }
 
+    private function importOptions(): array
+    {
+        return [
+            'news' => [
+                'name' => 'Новини',
+                'description' => 'Створює новини з назвою, текстом, статусом і датою публікації.',
+                'columns' => 'title, body, slug, status, published_at',
+            ],
+            'pages' => [
+                'name' => 'Сторінки',
+                'description' => 'Створює сторінки з текстовим блоком або HTML-контентом.',
+                'columns' => 'title, body, slug, excerpt, template, status, sort_order',
+            ],
+            'documents' => [
+                'name' => 'Документи',
+                'description' => 'Імпортує картки документів без завантаження файлів.',
+                'columns' => 'title, category, description, status, responsible, approved_at, published_at, public_info_section',
+            ],
+            'public_info_sections' => [
+                'name' => 'Розділи публічної інформації',
+                'description' => 'Додає нові розділи до сторінки публічної інформації.',
+                'columns' => 'title, slug, description, is_required, sort_order',
+            ],
+            'global_fields' => [
+                'name' => 'Глобальні поля',
+                'description' => 'Додає універсальні поля для футера та загальних даних сайту.',
+                'columns' => 'label, value',
+            ],
+        ];
+    }
+
     private function saveSetting(string $name, string $value): void
     {
         $this->db()->execute(
             'insert into settings (name, value) values (?, ?) on duplicate key update value = values(value)',
             [$name, $value]
         );
+    }
+
+    private function globalFields(): array
+    {
+        $settings = $this->siteSettings();
+        $fields = json_decode((string) ($settings['global_fields'] ?? '[]'), true);
+        return is_array($fields) ? $fields : [];
+    }
+
+    private function normalizeGlobalFields(Request $request): array
+    {
+        $labels = $request->input('global_field_label', []);
+        $values = $request->input('global_field_value', []);
+        if (!is_array($labels) || !is_array($values)) {
+            return [];
+        }
+
+        $fields = [];
+        foreach ($labels as $index => $label) {
+            $label = trim((string) $label);
+            $value = trim((string) ($values[$index] ?? ''));
+            if ($label === '' && $value === '') {
+                continue;
+            }
+
+            $fields[] = [
+                'label' => $label !== '' ? $label : 'Поле',
+                'value' => $value,
+            ];
+        }
+
+        return $fields;
+    }
+
+    private function readImportRows(Request $request): array
+    {
+        $source = trim((string) $request->input('import_text', ''));
+        $file = $request->files['import_file'] ?? null;
+        if (is_array($file) && (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && is_file((string) ($file['tmp_name'] ?? ''))) {
+            $source = (string) file_get_contents((string) $file['tmp_name']);
+        }
+
+        if ($source === '') {
+            return [];
+        }
+
+        $format = (string) $request->input('format', 'auto');
+        $trimmedSource = ltrim($source);
+        if ($format === 'json' || ($format === 'auto' && (str_starts_with($trimmedSource, '[') || str_starts_with($trimmedSource, '{')))) {
+            return $this->parseImportJson($source, (string) $request->input('type', ''));
+        }
+
+        return $this->parseImportCsv($source);
+    }
+
+    private function parseImportJson(string $source, string $type): array
+    {
+        $data = json_decode($source, true);
+        if (!is_array($data)) {
+            throw new \RuntimeException('JSON має бути масивом записів.');
+        }
+
+        if (isset($data[$type]) && is_array($data[$type])) {
+            $data = $data[$type];
+        }
+
+        $rows = [];
+        foreach ($data as $row) {
+            if (is_array($row)) {
+                $rows[] = $this->normalizeImportRow($row);
+            }
+        }
+
+        return $rows;
+    }
+
+    private function parseImportCsv(string $source): array
+    {
+        $stream = fopen('php://temp', 'r+');
+        if (!$stream) {
+            throw new \RuntimeException('Не вдалося прочитати CSV.');
+        }
+
+        fwrite($stream, $source);
+        rewind($stream);
+
+        $delimiter = $this->detectCsvDelimiter($source);
+        $headers = null;
+        $rows = [];
+        while (($values = fgetcsv($stream, 0, $delimiter)) !== false) {
+            if ($values === [null] || $values === false) {
+                continue;
+            }
+
+            if ($headers === null) {
+                $headers = array_map([$this, 'normalizeImportKey'], $values);
+                continue;
+            }
+
+            $row = [];
+            foreach ($headers as $index => $header) {
+                if ($header === '') {
+                    continue;
+                }
+                $row[$header] = trim((string) ($values[$index] ?? ''));
+            }
+            if (array_filter($row, static fn ($value) => $value !== '')) {
+                $rows[] = $row;
+            }
+        }
+
+        fclose($stream);
+        return $rows;
+    }
+
+    private function detectCsvDelimiter(string $source): string
+    {
+        $firstLine = strtok($source, "\r\n") ?: '';
+        return substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
+    }
+
+    private function normalizeImportRow(array $row): array
+    {
+        $normalized = [];
+        foreach ($row as $key => $value) {
+            $normalized[$this->normalizeImportKey((string) $key)] = is_scalar($value) ? trim((string) $value) : $value;
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeImportKey(string $key): string
+    {
+        $key = trim($key);
+        $key = preg_replace('/^\xEF\xBB\xBF/', '', $key) ?? $key;
+        $key = function_exists('mb_strtolower') ? mb_strtolower($key) : strtolower($key);
+        $key = preg_replace('/[^a-z0-9а-яіїєґ_]+/u', '_', $key) ?? $key;
+        return trim($key, '_');
+    }
+
+    private function importRows(string $type, array $rows): int
+    {
+        return match ($type) {
+            'news' => $this->importNewsRows($rows),
+            'pages' => $this->importPageRows($rows),
+            'documents' => $this->importDocumentRows($rows),
+            'public_info_sections' => $this->importPublicInfoSectionRows($rows),
+            'global_fields' => $this->importGlobalFieldRows($rows),
+            default => 0,
+        };
+    }
+
+    private function importNewsRows(array $rows): int
+    {
+        $created = 0;
+        $now = date('c');
+        foreach ($rows as $row) {
+            $title = $this->importValue($row, ['title', 'назва', 'заголовок']);
+            if ($title === '') {
+                continue;
+            }
+
+            $status = $this->importStatus($this->importValue($row, ['status', 'статус']), 'draft');
+            $publishedAt = $this->importValue($row, ['published_at', 'дата_публікації', 'дата']);
+            if ($status === 'published' && $publishedAt === '') {
+                $publishedAt = $now;
+            }
+
+            $this->db()->execute(
+                'insert into news (title, slug, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)',
+                [
+                    $title,
+                    $this->uniqueSlug('news', $this->importValue($row, ['slug', 'адреса']) ?: $title),
+                    $this->importValue($row, ['body', 'text', 'контент', 'текст', 'опис']),
+                    $status,
+                    $publishedAt ?: null,
+                    $now,
+                    $now,
+                ]
+            );
+            $created++;
+        }
+
+        return $created;
+    }
+
+    private function importPageRows(array $rows): int
+    {
+        $created = 0;
+        $now = date('c');
+        foreach ($rows as $row) {
+            $title = $this->importValue($row, ['title', 'назва', 'заголовок']);
+            if ($title === '') {
+                continue;
+            }
+
+            $template = $this->importValue($row, ['template', 'шаблон']) ?: 'default';
+            if (!array_key_exists($template, $this->pageTemplates())) {
+                $template = 'default';
+            }
+            $body = $this->importValue($row, ['body', 'blocks_text', 'text', 'контент', 'текст', 'опис']);
+            $blocks = json_encode($this->blocksFromText($body), JSON_UNESCAPED_UNICODE);
+
+            $this->db()->execute(
+                'insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    $title,
+                    $this->uniqueSlug('pages', $this->importValue($row, ['slug', 'адреса']) ?: $title),
+                    $this->importValue($row, ['excerpt', 'анонс', 'короткий_опис']),
+                    $template,
+                    $blocks === false ? '[]' : $blocks,
+                    $this->importStatus($this->importValue($row, ['status', 'статус']), 'draft'),
+                    (int) ($this->importValue($row, ['sort_order', 'порядок']) ?: 0),
+                    $now,
+                    $now,
+                ]
+            );
+            $created++;
+        }
+
+        return $created;
+    }
+
+    private function importDocumentRows(array $rows): int
+    {
+        $created = 0;
+        $now = date('c');
+        foreach ($rows as $row) {
+            $title = $this->importValue($row, ['title', 'назва', 'заголовок']);
+            if ($title === '') {
+                continue;
+            }
+
+            $status = $this->importStatus($this->importValue($row, ['status', 'статус']), 'published');
+            $publishedAt = $this->importValue($row, ['published_at', 'дата_публікації', 'дата']);
+            if ($status === 'published' && $publishedAt === '') {
+                $publishedAt = $now;
+            }
+
+            $this->db()->execute(
+                'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    $this->resolvePublicInfoSectionId($this->importValue($row, ['public_info_section_id', 'public_info_section', 'розділ', 'розділ_публічної_інформації'])),
+                    $title,
+                    $this->importValue($row, ['category', 'категорія']) ?: 'Загальні документи',
+                    null,
+                    $this->importValue($row, ['description', 'опис', 'текст']),
+                    $status,
+                    $this->importValue($row, ['responsible', 'відповідальний']),
+                    $this->importValue($row, ['approved_at', 'дата_затвердження']) ?: null,
+                    $publishedAt ?: null,
+                    $now,
+                    $now,
+                ]
+            );
+            $created++;
+        }
+
+        return $created;
+    }
+
+    private function importPublicInfoSectionRows(array $rows): int
+    {
+        $created = 0;
+        foreach ($rows as $row) {
+            $title = $this->importValue($row, ['title', 'назва', 'заголовок']);
+            if ($title === '') {
+                continue;
+            }
+
+            $this->db()->execute(
+                'insert into public_info_sections (title, slug, description, is_required, sort_order) values (?, ?, ?, ?, ?)',
+                [
+                    $title,
+                    $this->uniqueSlug('public_info_sections', $this->importValue($row, ['slug', 'адреса']) ?: $title),
+                    $this->importValue($row, ['description', 'опис']),
+                    $this->importBool($this->importValue($row, ['is_required', 'обовязковий', 'обов_язковий']), true) ? 1 : 0,
+                    (int) ($this->importValue($row, ['sort_order', 'порядок']) ?: 0),
+                ]
+            );
+            $created++;
+        }
+
+        return $created;
+    }
+
+    private function importGlobalFieldRows(array $rows): int
+    {
+        $fields = $this->globalFields();
+        $created = 0;
+        foreach ($rows as $row) {
+            $label = $this->importValue($row, ['label', 'name', 'title', 'назва', 'поле']);
+            $value = $this->importValue($row, ['value', 'значення']);
+            if ($label === '' && $value === '') {
+                continue;
+            }
+
+            $fields[] = ['label' => $label !== '' ? $label : 'Поле', 'value' => $value];
+            $created++;
+        }
+
+        $encodedFields = json_encode($fields, JSON_UNESCAPED_UNICODE);
+        $this->saveSetting('global_fields', $encodedFields === false ? '[]' : $encodedFields);
+        return $created;
+    }
+
+    private function importValue(array $row, array $keys): string
+    {
+        foreach ($keys as $key) {
+            $key = $this->normalizeImportKey($key);
+            if (array_key_exists($key, $row) && is_scalar($row[$key])) {
+                return trim((string) $row[$key]);
+            }
+        }
+
+        return '';
+    }
+
+    private function importStatus(string $status, string $default): string
+    {
+        $status = strtolower(trim($status));
+        return in_array($status, ['draft', 'published'], true) ? $status : $default;
+    }
+
+    private function importBool(string $value, bool $default): bool
+    {
+        $value = strtolower(trim($value));
+        if ($value === '') {
+            return $default;
+        }
+
+        return in_array($value, ['1', 'yes', 'true', 'так', 'да'], true);
+    }
+
+    private function resolvePublicInfoSectionId(string $value): ?int
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (ctype_digit($value)) {
+            return (int) $value;
+        }
+
+        $section = $this->db()->fetch('select id from public_info_sections where title = ? or slug = ? limit 1', [$value, $this->slug($value)]);
+        return $section ? (int) $section['id'] : null;
+    }
+
+    private function uniqueSlug(string $table, string $value): string
+    {
+        $base = $this->slug($value);
+        $slug = $base;
+        $index = 2;
+        while ($this->db()->fetch("select id from {$table} where slug = ? limit 1", [$slug])) {
+            $slug = $base . '-' . $index++;
+        }
+
+        return $slug;
     }
 
     private function mediaReferences(): array

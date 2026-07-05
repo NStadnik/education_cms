@@ -96,11 +96,7 @@ final class Installer
         $now = date('c');
         $settings = [
             'institution_name' => $data['institution_name'] ?: 'Заклад освіти',
-            'institution_type' => 'Заклад освіти',
-            'edrpou' => '',
-            'address' => '',
-            'phone' => '',
-            'email' => '',
+            'global_fields' => '[]',
             'site_template' => 'official',
         ];
 

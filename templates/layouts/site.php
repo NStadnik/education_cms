@@ -9,6 +9,8 @@
 </head>
 <?php
     $siteTemplate = preg_replace('/[^a-z0-9_-]/i', '', (string) ($settings['site_template'] ?? 'official')) ?: 'official';
+    $globalFields = json_decode((string) ($settings['global_fields'] ?? '[]'), true);
+    $globalFields = is_array($globalFields) ? $globalFields : [];
 ?>
 <body class="site-template-<?= e($siteTemplate) ?>">
     <header class="topbar">
@@ -31,7 +33,16 @@
     <footer class="footer">
         <div class="container">
             <strong><?= e($settings['institution_name'] ?? 'Заклад освіти') ?></strong><br>
-            <?= e($settings['address'] ?? '') ?> <?= e($settings['phone'] ?? '') ?>
+            <?php foreach ($globalFields as $field): ?>
+                <?php
+                    $field = is_array($field) ? $field : [];
+                    $fieldLabel = (string) ($field['label'] ?? 'Поле');
+                    $fieldValue = trim((string) ($field['value'] ?? ''));
+                ?>
+                <?php if ($fieldValue !== ''): ?>
+                    <span><?= e($fieldLabel) ?>: <?= e($fieldValue) ?></span><br>
+                <?php endif; ?>
+            <?php endforeach; ?>
         </div>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

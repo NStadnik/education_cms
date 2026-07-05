@@ -28,6 +28,7 @@ final class SchemaUpgrade
             }
 
             self::ensureSetting($db, 'site_template', 'official');
+            self::migrateGlobalFields($db);
         } catch (Throwable) {
             // Keep the site bootable; debug.log will still capture hard failures elsewhere.
         }
@@ -66,6 +67,44 @@ final class SchemaUpgrade
         }
 
         $db->execute('insert into settings (name, value) values (?, ?)', [$name, $value]);
+    }
+
+    private static function migrateGlobalFields(Database $db): void
+    {
+        $done = $db->fetch('select value from settings where name = ?', ['schema_global_fields']);
+        if (($done['value'] ?? '') === '1') {
+            return;
+        }
+
+        $current = $db->fetch('select value from settings where name = ?', ['global_fields']);
+        $fields = json_decode((string) ($current['value'] ?? '[]'), true);
+        if (!is_array($fields)) {
+            $fields = [];
+        }
+
+        $legacy = [
+            'institution_type' => 'Тип',
+            'edrpou' => 'ЄДРПОУ',
+            'address' => 'Адреса',
+            'phone' => 'Телефон',
+            'email' => 'Email',
+        ];
+
+        foreach ($legacy as $name => $label) {
+            $row = $db->fetch('select value from settings where name = ?', [$name]);
+            $value = trim((string) ($row['value'] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+
+            $fields[] = ['label' => $label, 'value' => $value];
+        }
+
+        $encodedFields = json_encode($fields, JSON_UNESCAPED_UNICODE);
+        $db->execute('delete from settings where name = ?', ['global_fields']);
+        $db->execute('insert into settings (name, value) values (?, ?)', ['global_fields', $encodedFields === false ? '[]' : $encodedFields]);
+        $db->execute('delete from settings where name = ?', ['schema_global_fields']);
+        $db->execute('insert into settings (name, value) values (?, ?)', ['schema_global_fields', '1']);
     }
 
     private static function migratePublicInfoItems(Database $db): void

@@ -67,6 +67,19 @@ img { max-width: 100%; height: auto; }
 .form-section-head h2 { margin: 0 0 4px; font-size: 22px; }
 .form-section-head p { margin: 0; }
 .form-grid.wide { max-width: none; }
+.global-fields-list { display: grid; gap: 12px; }
+.global-field-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(240px, 2fr) auto; gap: 12px; align-items: end; }
+.global-field-row button { width: 40px; padding-left: 0; padding-right: 0; }
+.import-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.import-option { position: relative; display: grid !important; grid-template-columns: auto minmax(0, 1fr); gap: 10px !important; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; cursor: pointer; }
+.import-option input { position: absolute; opacity: 0; pointer-events: none; }
+.import-option:has(input:checked) { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(31,111,235,.14); }
+.import-option-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; background: #eef4ff; color: var(--brand); font-size: 20px; line-height: 1; }
+.import-option strong, .import-option small { display: block; }
+.import-option small { margin-top: 4px; color: var(--muted); font-weight: 400; }
+.import-columns { display: grid; gap: 12px; margin-bottom: 14px; }
+.import-columns div { display: grid; gap: 5px; }
+.import-columns code { white-space: normal; color: var(--brand-strong); }
 .textarea-small { min-height: 96px !important; }
 .textarea-large { min-height: 320px !important; }
 .form-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
@@ -206,6 +219,9 @@ tr[hidden], .accordion-item[hidden] { display: none !important; }
     .list-tools input { max-width: none; }
     .editor-layout { grid-template-columns: 1fr; }
     .editor-sidebar { position: static; }
+    .global-field-row { grid-template-columns: 1fr; align-items: stretch; }
+    .global-field-row button { width: 100%; }
+    .import-options { grid-template-columns: 1fr; }
     .layout, .admin-shell { grid-template-columns: 1fr; }
     .template-options { grid-template-columns: 1fr; }
     .template-option { grid-template-columns: 1fr; }

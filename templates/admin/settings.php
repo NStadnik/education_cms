@@ -14,14 +14,73 @@
             </div>
         </div>
         <label>Назва<input name="institution_name" value="<?= e($settings['institution_name'] ?? '') ?>"></label>
-        <div class="grid grid-3">
-            <label>Тип<input name="institution_type" value="<?= e($settings['institution_type'] ?? '') ?>"></label>
-            <label>ЄДРПОУ<input name="edrpou" value="<?= e($settings['edrpou'] ?? '') ?>"></label>
-            <label>Email<input name="email" value="<?= e($settings['email'] ?? '') ?>"></label>
+    </section>
+
+    <section class="card admin-form-card" data-global-fields>
+        <div class="form-section-head">
+            <div>
+                <h2>Глобальні поля</h2>
+                <p class="meta">Додайте будь-які потрібні дані: адресу, телефон, email, ЄДРПОУ або інші реквізити.</p>
+            </div>
+            <button class="button secondary compact" type="button" data-add-global-field>
+                <span class="mdi mdi-plus" aria-hidden="true"></span>
+                <span>Додати поле</span>
+            </button>
         </div>
-        <label>Адреса<input name="address" value="<?= e($settings['address'] ?? '') ?>"></label>
-        <label>Телефон<input name="phone" value="<?= e($settings['phone'] ?? '') ?>"></label>
+        <div class="global-fields-list" data-global-fields-list>
+            <?php foreach (($globalFields ?? []) as $field): ?>
+                <?php $field = is_array($field) ? $field : []; ?>
+                <div class="global-field-row" data-global-field-row>
+                    <label>Назва поля<input name="global_field_label[]" value="<?= e($field['label'] ?? '') ?>"></label>
+                    <label>Значення<input name="global_field_value[]" value="<?= e($field['value'] ?? '') ?>"></label>
+                    <button class="button secondary compact" type="button" data-remove-global-field title="Видалити поле">
+                        <span class="mdi mdi-delete-outline" aria-hidden="true"></span>
+                    </button>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <template data-global-field-template>
+            <div class="global-field-row" data-global-field-row>
+                <label>Назва поля<input name="global_field_label[]" value=""></label>
+                <label>Значення<input name="global_field_value[]" value=""></label>
+                <button class="button secondary compact" type="button" data-remove-global-field title="Видалити поле">
+                    <span class="mdi mdi-delete-outline" aria-hidden="true"></span>
+                </button>
+            </div>
+        </template>
     </section>
 
     <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти</span></button>
 </form>
+
+<script>
+document.querySelectorAll('[data-global-fields]').forEach(function (panel) {
+    const list = panel.querySelector('[data-global-fields-list]');
+    const template = panel.querySelector('[data-global-field-template]');
+    const addButton = panel.querySelector('[data-add-global-field]');
+    if (!list || !template || !addButton) {
+        return;
+    }
+
+    function addRow() {
+        const fragment = template.content.cloneNode(true);
+        list.appendChild(fragment);
+        const input = list.lastElementChild ? list.lastElementChild.querySelector('input') : null;
+        if (input) {
+            input.focus();
+        }
+    }
+
+    addButton.addEventListener('click', addRow);
+    panel.addEventListener('click', function (event) {
+        const button = event.target.closest('[data-remove-global-field]');
+        if (button) {
+            button.closest('[data-global-field-row]').remove();
+        }
+    });
+
+    if (!list.querySelector('[data-global-field-row]')) {
+        addRow();
+    }
+});
+</script>
