@@ -99,6 +99,9 @@ final class App
         $this->router->get('/admin/documents', [$admin, 'documents']);
         $this->router->get('/admin/documents/edit', [$admin, 'documentForm']);
         $this->router->post('/admin/documents/save', [$admin, 'documentSave']);
+        $this->router->get('/admin/media', [$admin, 'media']);
+        $this->router->post('/admin/media/upload', [$admin, 'mediaUpload']);
+        $this->router->post('/admin/media/delete', [$admin, 'mediaDelete']);
         $this->router->get('/admin/public-info', [$admin, 'publicInfo']);
         $this->router->get('/admin/public-info/sections/edit', [$admin, 'publicInfoSectionForm']);
         $this->router->get('/admin/public-info/documents/edit', [$admin, 'publicInfoDocumentForm']);

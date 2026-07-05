@@ -81,6 +81,9 @@ img { max-width: 100%; height: auto; }
 .document-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: #fbfcff; }
 .document-row p { margin: 4px 0 0; }
 .document-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.media-file { display: flex; align-items: center; gap: 10px; min-width: 260px; }
+.media-thumb { flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 6px; object-fit: cover; background: #f1f4f9; }
+.media-thumb-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--brand); font-size: 24px; line-height: 1; }
 .empty-state { padding: 18px; border: 1px dashed var(--line); border-radius: var(--radius); background: #fff; color: var(--muted); }
 .empty-state.small { padding: 12px; }
 .compact { min-height: 32px; padding: 5px 10px; font-size: 14px; }

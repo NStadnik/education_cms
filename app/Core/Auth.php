@@ -58,9 +58,9 @@ final class Auth
 
         $map = [
             'admin' => ['*'],
-            'editor' => ['pages.manage', 'news.manage', 'documents.manage', 'public_info.manage'],
-            'publisher' => ['pages.manage', 'news.manage', 'documents.manage', 'public_info.manage'],
-            'finance_editor' => ['documents.manage', 'public_info.manage', 'finance.manage'],
+            'editor' => ['pages.manage', 'news.manage', 'documents.manage', 'media.manage', 'public_info.manage'],
+            'publisher' => ['pages.manage', 'news.manage', 'documents.manage', 'media.manage', 'public_info.manage'],
+            'finance_editor' => ['documents.manage', 'media.manage', 'public_info.manage', 'finance.manage'],
             'viewer' => [],
         ];
 

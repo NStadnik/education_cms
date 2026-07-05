@@ -44,6 +44,7 @@ final class AdminController extends BaseController
             'pages' => $this->count('pages'),
             'news' => $this->count('news'),
             'documents' => $this->count('documents'),
+            'media' => count(Files::all()),
             'publicFilled' => $this->db()->fetch("select count(distinct public_info_section_id) as c from documents where status = 'published' and public_info_section_id is not null")['c'] ?? 0,
             'publicTotal' => $this->count('public_info_sections'),
         ];
@@ -301,6 +302,73 @@ final class AdminController extends BaseController
         } catch (Throwable $e) {
             return $this->ajaxError($request, $e);
         }
+    }
+
+    public function media(Request $request): Response
+    {
+        $this->guard('media.manage');
+        $query = trim((string) $request->input('q', ''));
+        $pagination = $this->pagination($request);
+        $allItems = Files::all($this->mediaReferences());
+        $filteredItems = $this->filterMedia($allItems, $query);
+        $total = count($filteredItems);
+        $items = array_slice($filteredItems, $pagination['offset'], $pagination['limit']);
+
+        if ($this->isAjaxRequest()) {
+            return $this->listJson('admin/media/rows', ['items' => $items], $pagination, $total);
+        }
+
+        return $this->admin('admin/media/index', [
+            'title' => 'Медіафайли',
+            'items' => $items,
+            'total' => $total,
+            'limit' => $pagination['limit'],
+            'stats' => $this->mediaStats($allItems),
+            'query' => $query,
+        ]);
+    }
+
+    public function mediaUpload(Request $request): Response
+    {
+        $this->guard('media.manage');
+        Csrf::verify();
+
+        try {
+            $filePath = Files::upload($request->files['file'] ?? []);
+            if (!$filePath) {
+                throw new \RuntimeException('Оберіть файл для завантаження.');
+            }
+
+            $this->audit('upload', 'media', null, $filePath);
+            redirect('/admin/media');
+        } catch (Throwable $e) {
+            $allItems = Files::all($this->mediaReferences());
+            return $this->admin('admin/media/index', [
+                'title' => 'Медіафайли',
+                'items' => array_slice($allItems, 0, self::LIST_LIMIT),
+                'total' => count($allItems),
+                'limit' => self::LIST_LIMIT,
+                'stats' => $this->mediaStats($allItems),
+                'query' => '',
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function mediaDelete(Request $request): Response
+    {
+        $this->guard('media.manage');
+        Csrf::verify();
+
+        $path = Files::normalize((string) $request->input('path', ''));
+        $references = $this->mediaReferences();
+        if ($path === '' || isset($references[$path])) {
+            return new Response('Cannot delete file', 422);
+        }
+
+        Files::delete($path);
+        $this->audit('delete', 'media', null, $path);
+        redirect('/admin/media');
     }
 
     public function publicInfo(Request $request): Response
@@ -696,6 +764,77 @@ final class AdminController extends BaseController
         $total = $this->count($table);
         $published = (int) ($this->db()->fetch("select count(*) as c from {$table} where status = 'published'")['c'] ?? 0);
         return ['total' => $total, 'published' => $published, 'drafts' => $total - $published];
+    }
+
+    private function mediaReferences(): array
+    {
+        $references = [];
+        $documents = $this->db()->fetchAll('select id, title, file_path from documents where file_path is not null and file_path != ? order by id desc', ['']);
+        foreach ($documents as $document) {
+            $path = Files::normalize((string) ($document['file_path'] ?? ''));
+            if ($path === '') {
+                continue;
+            }
+
+            $references[$path] = [
+                'label' => (string) ($document['title'] ?? 'Документ'),
+                'url' => url('/admin/documents/edit?id=' . $document['id']),
+            ];
+        }
+
+        return $references;
+    }
+
+    private function filterMedia(array $items, string $query): array
+    {
+        if ($query === '') {
+            return $items;
+        }
+
+        $needle = function_exists('mb_strtolower') ? mb_strtolower($query) : strtolower($query);
+        return array_values(array_filter($items, static function (array $item) use ($needle): bool {
+            $text = implode(' ', [
+                $item['path'] ?? '',
+                $item['name'] ?? '',
+                $item['extension'] ?? '',
+                $item['type'] ?? '',
+                $item['reference']['label'] ?? '',
+            ]);
+            $text = function_exists('mb_strtolower') ? mb_strtolower($text) : strtolower($text);
+            return strpos($text, $needle) !== false;
+        }));
+    }
+
+    private function mediaStats(array $items): array
+    {
+        $size = 0;
+        $images = 0;
+        $used = 0;
+        foreach ($items as $item) {
+            $size += (int) ($item['size'] ?? 0);
+            $images += !empty($item['is_image']) ? 1 : 0;
+            $used += !empty($item['is_used']) ? 1 : 0;
+        }
+
+        return [
+            'total' => count($items),
+            'images' => $images,
+            'unused' => count($items) - $used,
+            'size' => $this->formatBytes($size),
+        ];
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        $units = ['Б', 'КБ', 'МБ', 'ГБ'];
+        $value = (float) $bytes;
+        $unit = 0;
+        while ($value >= 1024 && $unit < count($units) - 1) {
+            $value /= 1024;
+            $unit++;
+        }
+
+        return ($unit === 0 ? (string) $bytes : number_format($value, 1, '.', '')) . ' ' . $units[$unit];
     }
 
     private function isAjaxRequest(): bool

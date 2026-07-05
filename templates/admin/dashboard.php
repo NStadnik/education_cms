@@ -12,6 +12,10 @@
         <div><span>Документи</span><strong><?= e((string) $stats['documents']) ?></strong></div>
         <span class="mdi mdi-file-cabinet metric-icon" aria-hidden="true"></span>
     </div>
+    <div class="card metric">
+        <div><span>Медіафайли</span><strong><?= e((string) $stats['media']) ?></strong></div>
+        <span class="mdi mdi-image-multiple-outline metric-icon" aria-hidden="true"></span>
+    </div>
 </div>
 <div class="card" style="margin-top:16px">
     <h2>Публічна інформація</h2>

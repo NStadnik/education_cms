@@ -6,6 +6,7 @@
         ['/admin/pages', 'Сторінки', 'mdi-file-document-edit-outline'],
         ['/admin/news', 'Новини', 'mdi-newspaper-variant-outline'],
         ['/admin/documents', 'Документи', 'mdi-file-cabinet'],
+        ['/admin/media', 'Медіафайли', 'mdi-image-multiple-outline'],
         ['/admin/public-info', 'Публічна інформація', 'mdi-folder-information-outline'],
         ['/admin/users', 'Користувачі', 'mdi-account-group-outline'],
         ['/admin/settings', 'Налаштування', 'mdi-cog-outline'],
