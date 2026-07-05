@@ -71,6 +71,8 @@ img { max-width: 100%; height: auto; }
 .form-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
 .form-actions.stacked { align-items: stretch; flex-direction: column; margin-top: 16px; }
 .hint-box { padding: 12px; border: 1px dashed var(--line); border-radius: 6px; background: #fbfcff; color: var(--muted); font-size: 14px; }
+.check-row { display: flex !important; grid-template-columns: none !important; align-items: center; gap: 8px !important; font-weight: 650; }
+.check-row input { width: auto !important; min-height: 0 !important; }
 .content-card { display: flex; flex-direction: column; gap: 8px; }
 .content-card h2 { margin: 0; }
 .read-more { margin-top: auto; font-weight: 650; }

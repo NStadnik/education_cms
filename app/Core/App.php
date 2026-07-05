@@ -97,12 +97,16 @@ final class App
         $this->router->get('/admin/news/edit', [$admin, 'newsForm']);
         $this->router->post('/admin/news/save', [$admin, 'newsSave']);
         $this->router->get('/admin/documents', [$admin, 'documents']);
+        $this->router->get('/admin/documents/edit', [$admin, 'documentForm']);
         $this->router->post('/admin/documents/save', [$admin, 'documentSave']);
         $this->router->get('/admin/public-info', [$admin, 'publicInfo']);
+        $this->router->get('/admin/public-info/sections/edit', [$admin, 'publicInfoSectionForm']);
+        $this->router->get('/admin/public-info/documents/edit', [$admin, 'publicInfoDocumentForm']);
         $this->router->post('/admin/public-info/save', [$admin, 'publicInfoSave']);
         $this->router->post('/admin/public-info/sections/save', [$admin, 'publicInfoSectionSave']);
         $this->router->post('/admin/public-info/sections/delete', [$admin, 'publicInfoSectionDelete']);
         $this->router->get('/admin/users', [$admin, 'users']);
+        $this->router->get('/admin/users/edit', [$admin, 'userForm']);
         $this->router->post('/admin/users/save', [$admin, 'userSave']);
         $this->router->get('/admin/settings', [$admin, 'settings']);
         $this->router->post('/admin/settings/save', [$admin, 'settingsSave']);

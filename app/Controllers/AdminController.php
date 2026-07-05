@@ -235,40 +235,65 @@ final class AdminController extends BaseController
         ]);
     }
 
+    public function documentForm(Request $request): Response
+    {
+        $this->guard();
+        $id = (int) $request->input('id', 0);
+        $item = $id ? $this->db()->fetch('select * from documents where id = ?', [$id]) : null;
+        return $this->admin('admin/documents/form', [
+            'title' => 'Документ',
+            'item' => $item,
+            'sections' => $this->db()->fetchAll('select id, title from public_info_sections order by sort_order asc'),
+        ]);
+    }
+
     public function documentSave(Request $request): Response
     {
         $this->guard('documents.manage');
         Csrf::verify();
         try {
+            $id = (int) $request->input('id', 0);
+            $existing = $id ? $this->db()->fetch('select * from documents where id = ?', [$id]) : null;
             $filePath = Files::upload($request->files['file'] ?? []);
+            if (!$filePath && $existing) {
+                $filePath = $existing['file_path'] ?? null;
+            }
             $now = date('c');
             $publishedAt = $request->input('published_at') ?: ($request->input('status') === 'published' ? $now : null);
-            $this->db()->execute(
-                'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [
-                    $request->input('public_info_section_id') ?: null,
-                    $request->input('title'),
-                    $request->input('category'),
-                    $filePath,
-                    $request->input('description'),
-                    $request->input('status', 'published'),
-                    $request->input('responsible'),
-                    $request->input('approved_at'),
-                    $publishedAt,
-                    $now,
-                    $now,
-                ]
-            );
-            $id = (int) $this->db()->lastInsertId();
-            $this->audit('create', 'document', $id);
+            $data = [
+                $request->input('public_info_section_id') ?: null,
+                $request->input('title'),
+                $request->input('category'),
+                $filePath,
+                $request->input('description'),
+                $request->input('status', 'published'),
+                $request->input('responsible'),
+                $request->input('approved_at'),
+                $publishedAt,
+                $now,
+            ];
+
+            if ($id && $existing) {
+                $this->db()->execute(
+                    'update documents set public_info_section_id=?, title=?, category=?, file_path=?, description=?, status=?, responsible=?, approved_at=?, published_at=?, updated_at=? where id=?',
+                    [...$data, $id]
+                );
+            } else {
+                $this->db()->execute(
+                    'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [...$data, $now]
+                );
+                $id = (int) $this->db()->lastInsertId();
+            }
+            $this->audit('save', 'document', $id);
 
             if ($this->isAjax($request)) {
                 return $this->json([
                     'ok' => true,
-                    'message' => 'Документ додано.',
+                    'message' => 'Документ збережено.',
                     'id' => $id,
+                    'edit_url' => url('/admin/documents/edit?id=' . $id),
                     'file_url' => $filePath ? url('/uploads/' . $filePath) : null,
-                    'reset' => true,
                 ]);
             }
 
@@ -316,40 +341,78 @@ final class AdminController extends BaseController
         ]);
     }
 
+    public function publicInfoSectionForm(Request $request): Response
+    {
+        $this->guard();
+        $id = (int) $request->input('id', 0);
+        $item = $id ? $this->db()->fetch('select * from public_info_sections where id = ?', [$id]) : null;
+        return $this->admin('admin/public-info/section-form', ['title' => 'Розділ публічної інформації', 'item' => $item]);
+    }
+
+    public function publicInfoDocumentForm(Request $request): Response
+    {
+        $this->guard();
+        $id = (int) $request->input('id', 0);
+        $sectionId = (int) $request->input('section_id', 0);
+        $item = $id ? $this->db()->fetch('select * from documents where id = ?', [$id]) : null;
+        if (!$item && $sectionId) {
+            $item = ['public_info_section_id' => $sectionId, 'status' => 'published'];
+        }
+
+        return $this->admin('admin/public-info/document-form', [
+            'title' => 'Документ публічної інформації',
+            'item' => $item,
+            'sections' => $this->db()->fetchAll('select id, title from public_info_sections order by sort_order asc'),
+        ]);
+    }
+
     public function publicInfoSave(Request $request): Response
     {
         $this->guard('public_info.manage');
         Csrf::verify();
         try {
+            $id = (int) $request->input('id', 0);
+            $existing = $id ? $this->db()->fetch('select * from documents where id = ?', [$id]) : null;
             $filePath = Files::upload($request->files['file'] ?? []);
+            if (!$filePath && $existing) {
+                $filePath = $existing['file_path'] ?? null;
+            }
             $now = date('c');
             $publishedAt = $request->input('published_at') ?: ($request->input('status') === 'published' ? $now : null);
-            $this->db()->execute(
-                'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [
-                    $request->input('public_info_section_id'),
-                    $request->input('title'),
-                    'Публічна інформація',
-                    $filePath,
-                    $request->input('description'),
-                    $request->input('status', 'published'),
-                    $request->input('responsible'),
-                    $request->input('approved_at'),
-                    $publishedAt,
-                    $now,
-                    $now,
-                ]
-            );
-            $id = (int) $this->db()->lastInsertId();
-            $this->audit('create', 'public_info_document', $id);
+            $data = [
+                $request->input('public_info_section_id'),
+                $request->input('title'),
+                'Публічна інформація',
+                $filePath,
+                $request->input('description'),
+                $request->input('status', 'published'),
+                $request->input('responsible'),
+                $request->input('approved_at'),
+                $publishedAt,
+                $now,
+            ];
+
+            if ($id && $existing) {
+                $this->db()->execute(
+                    'update documents set public_info_section_id=?, title=?, category=?, file_path=?, description=?, status=?, responsible=?, approved_at=?, published_at=?, updated_at=? where id=?',
+                    [...$data, $id]
+                );
+            } else {
+                $this->db()->execute(
+                    'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [...$data, $now]
+                );
+                $id = (int) $this->db()->lastInsertId();
+            }
+            $this->audit('save', 'public_info_document', $id);
 
             if ($this->isAjax($request)) {
                 return $this->json([
                     'ok' => true,
-                    'message' => 'Документ публічної інформації додано.',
+                    'message' => 'Документ публічної інформації збережено.',
                     'id' => $id,
+                    'edit_url' => url('/admin/public-info/documents/edit?id=' . $id),
                     'file_url' => $filePath ? url('/uploads/' . $filePath) : null,
-                    'reset' => true,
                 ]);
             }
 
@@ -390,9 +453,11 @@ final class AdminController extends BaseController
             }
 
             $this->audit('save', 'public_info_section', $id);
-            return $this->json([
+            $payload = [
                 'ok' => true,
                 'message' => 'Розділ збережено.',
+                'id' => $id,
+                'edit_url' => url('/admin/public-info/sections/edit?id=' . $id),
                 'section' => [
                     'id' => $id,
                     'title' => $title,
@@ -402,9 +467,15 @@ final class AdminController extends BaseController
                     'sort_order' => $sortOrder,
                 ],
                 'created' => !$request->input('id'),
-            ]);
+            ];
+
+            if ($this->isAjax($request)) {
+                return $this->json($payload);
+            }
+
+            redirect('/admin/public-info');
         } catch (Throwable $e) {
-            return $this->json(['ok' => false, 'message' => $e->getMessage()], 500);
+            return $this->ajaxError($request, $e);
         }
     }
 
@@ -455,19 +526,39 @@ final class AdminController extends BaseController
         ]);
     }
 
+    public function userForm(Request $request): Response
+    {
+        $this->guard('users.manage');
+        $id = (int) $request->input('id', 0);
+        $item = $id ? $this->db()->fetch('select * from users where id = ?', [$id]) : null;
+        return $this->admin('admin/users/form', ['title' => 'Користувач', 'item' => $item]);
+    }
+
     public function userSave(Request $request): Response
     {
         $this->guard('users.manage');
         Csrf::verify();
         try {
-            $this->db()->execute(
-                'insert into users (name, email, password_hash, role, is_active, created_at) values (?, ?, ?, ?, 1, ?)',
-                [$request->input('name'), $request->input('email'), password_hash((string) $request->input('password'), PASSWORD_DEFAULT), $request->input('role'), date('c')]
-            );
-            $id = (int) $this->db()->lastInsertId();
+            $id = (int) $request->input('id', 0);
+            $password = (string) $request->input('password', '');
+            if ($id) {
+                $this->db()->execute(
+                    'update users set name=?, email=?, role=?, is_active=? where id=?',
+                    [$request->input('name'), $request->input('email'), $request->input('role'), $request->input('is_active') ? 1 : 0, $id]
+                );
+                if ($password !== '') {
+                    $this->db()->execute('update users set password_hash=? where id=?', [password_hash($password, PASSWORD_DEFAULT), $id]);
+                }
+            } else {
+                $this->db()->execute(
+                    'insert into users (name, email, password_hash, role, is_active, created_at) values (?, ?, ?, ?, 1, ?)',
+                    [$request->input('name'), $request->input('email'), password_hash($password, PASSWORD_DEFAULT), $request->input('role'), date('c')]
+                );
+                $id = (int) $this->db()->lastInsertId();
+            }
 
             if ($this->isAjax($request)) {
-                return $this->json(['ok' => true, 'message' => 'Користувача додано.', 'id' => $id, 'reset' => true]);
+                return $this->json(['ok' => true, 'message' => 'Користувача збережено.', 'id' => $id, 'edit_url' => url('/admin/users/edit?id=' . $id)]);
             }
 
             redirect('/admin/users');
