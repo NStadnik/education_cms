@@ -1,10 +1,27 @@
 <!doctype html>
+<?php
+    $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/admin', PHP_URL_PATH) ?: '/admin';
+    $adminNav = [
+        ['/admin', 'Огляд', 'mdi-view-dashboard-outline'],
+        ['/admin/pages', 'Сторінки', 'mdi-file-document-edit-outline'],
+        ['/admin/news', 'Новини', 'mdi-newspaper-variant-outline'],
+        ['/admin/documents', 'Документи', 'mdi-file-cabinet'],
+        ['/admin/public-info', 'Публічна інформація', 'mdi-folder-information-outline'],
+        ['/admin/users', 'Користувачі', 'mdi-account-group-outline'],
+        ['/admin/settings', 'Налаштування', 'mdi-cog-outline'],
+    ];
+
+    $isActiveAdminNav = static function (string $path) use ($currentPath): bool {
+        return $path === '/admin' ? $currentPath === '/admin' : strpos($currentPath, $path) === 0;
+    };
+?>
 <html lang="uk">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($title ?? 'Адмінка') ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css') ?>">
 </head>
 <body>
@@ -15,18 +32,23 @@
                 <p class="small text-white-50 mb-0"><?= e($user['name'] ?? '') ?></p>
             </div>
             <nav class="nav nav-pills flex-column gap-1">
-                <a class="nav-link" href="<?= url('/admin') ?>">Огляд</a>
-                <a class="nav-link" href="<?= url('/admin/pages') ?>">Сторінки</a>
-                <a class="nav-link" href="<?= url('/admin/news') ?>">Новини</a>
-                <a class="nav-link" href="<?= url('/admin/documents') ?>">Документи</a>
-                <a class="nav-link" href="<?= url('/admin/public-info') ?>">Публічна інформація</a>
-                <a class="nav-link" href="<?= url('/admin/users') ?>">Користувачі</a>
-                <a class="nav-link" href="<?= url('/admin/settings') ?>">Налаштування</a>
-                <a class="nav-link" href="<?= url('/') ?>">Переглянути сайт</a>
+                <?php foreach ($adminNav as $navItem): ?>
+                    <a class="nav-link <?= $isActiveAdminNav($navItem[0]) ? 'active' : '' ?>" href="<?= url($navItem[0]) ?>">
+                        <span class="mdi <?= e($navItem[2]) ?>" aria-hidden="true"></span>
+                        <span><?= e($navItem[1]) ?></span>
+                    </a>
+                <?php endforeach; ?>
+                <a class="nav-link" href="<?= url('/') ?>">
+                    <span class="mdi mdi-open-in-new" aria-hidden="true"></span>
+                    <span>Переглянути сайт</span>
+                </a>
             </nav>
             <form method="post" action="<?= url('/admin/logout') ?>" class="mt-4" data-no-ajax>
                 <?= \App\Core\Csrf::field() ?>
-                <button class="btn btn-outline-light btn-sm" type="submit">Вийти</button>
+                <button class="btn btn-outline-light btn-sm admin-icon-button" type="submit">
+                    <span class="mdi mdi-logout" aria-hidden="true"></span>
+                    <span>Вийти</span>
+                </button>
             </form>
         </aside>
         <main class="admin-main">
@@ -177,11 +199,11 @@
 
         event.preventDefault();
         const button = form.querySelector('button[type="submit"]');
-        const originalText = button ? button.textContent : '';
+        const originalHtml = button ? button.innerHTML : '';
         setAjaxFormMessage(form, 'Збереження...', false);
         if (button) {
             button.disabled = true;
-            button.textContent = 'Збереження...';
+            button.innerHTML = '<span class="mdi mdi-loading mdi-spin" aria-hidden="true"></span><span>Збереження...</span>';
         }
 
         try {
@@ -225,7 +247,7 @@
         } finally {
             if (button) {
                 button.disabled = false;
-                button.textContent = originalText;
+                button.innerHTML = originalHtml;
             }
         }
     });

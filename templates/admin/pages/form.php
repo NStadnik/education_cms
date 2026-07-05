@@ -10,17 +10,17 @@
         <p class="page-subtitle">Налаштуйте назву, адресу, короткий опис і текстові блоки сторінки.</p>
     </div>
     <div class="form-actions">
-        <a class="button secondary" href="<?= url('/admin/pages') ?>">До списку</a>
+        <a class="button secondary" href="<?= url('/admin/pages') ?>"><span class="mdi mdi-arrow-left" aria-hidden="true"></span><span>До списку</span></a>
         <?php if (!empty($item['slug']) && ($item['status'] ?? '') === 'published'): ?>
-            <a class="button secondary" href="<?= url($item['slug'] === 'home' ? '/' : '/page/' . $item['slug']) ?>">Переглянути</a>
+            <a class="button secondary" href="<?= url($item['slug'] === 'home' ? '/' : '/page/' . $item['slug']) ?>"><span class="mdi mdi-eye-outline" aria-hidden="true"></span><span>Переглянути</span></a>
         <?php endif; ?>
     </div>
 </div>
 
 <div class="metrics">
-    <div class="metric"><span>Статус</span><strong><?= e($item['status'] ?? 'draft') ?></strong></div>
-    <div class="metric"><span>Блоків</span><strong><?= e((string) $blockCount) ?></strong></div>
-    <div class="metric"><span>Порядок</span><strong><?= e((string) ($item['sort_order'] ?? 0)) ?></strong></div>
+    <div class="metric"><div><span>Статус</span><strong><?= e($item['status'] ?? 'draft') ?></strong></div><span class="mdi mdi-circle-edit-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric"><div><span>Блоків</span><strong><?= e((string) $blockCount) ?></strong></div><span class="mdi mdi-view-grid-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric"><div><span>Порядок</span><strong><?= e((string) ($item['sort_order'] ?? 0)) ?></strong></div><span class="mdi mdi-sort-numeric-ascending metric-icon" aria-hidden="true"></span></div>
 </div>
 
 <form method="post" action="<?= url('/admin/pages/save') ?>">
@@ -66,8 +66,8 @@
             </div>
 
             <div class="form-actions stacked">
-                <button type="submit">Зберегти сторінку</button>
-                <a class="button secondary" href="<?= url('/admin/pages') ?>">Скасувати</a>
+                <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти сторінку</span></button>
+                <a class="button secondary" href="<?= url('/admin/pages') ?>"><span class="mdi mdi-close" aria-hidden="true"></span><span>Скасувати</span></a>
             </div>
         </aside>
     </div>

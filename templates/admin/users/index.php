@@ -4,7 +4,10 @@
         <h1>Користувачі</h1>
         <p class="page-subtitle">Керуйте обліковими записами, ролями та доступом до адмінпанелі.</p>
     </div>
-    <a class="button" href="<?= url('/admin/users/edit') ?>">Додати користувача</a>
+    <a class="button" href="<?= url('/admin/users/edit') ?>">
+        <span class="mdi mdi-account-plus-outline" aria-hidden="true"></span>
+        <span>Додати користувача</span>
+    </a>
 </div>
 <div class="list-panel" data-infinite-list data-list-url="<?= url('/admin/users') ?>" data-list-target="#usersRows" data-list-offset="<?= e((string) count($items)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($items) < $total ? '1' : '0' ?>">
     <div class="list-tools">

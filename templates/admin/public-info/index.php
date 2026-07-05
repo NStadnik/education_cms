@@ -4,13 +4,16 @@
         <h1>Публічна інформація</h1>
         <p class="page-subtitle">Чекліст розділів і документи, які публікуються на сайті.</p>
     </div>
-    <a class="button" href="<?= url('/admin/public-info/sections/edit') ?>">Додати розділ</a>
+    <a class="button" href="<?= url('/admin/public-info/sections/edit') ?>">
+        <span class="mdi mdi-plus" aria-hidden="true"></span>
+        <span>Додати розділ</span>
+    </a>
 </div>
 
 <div class="metrics">
-    <div class="metric"><span>Розділів</span><strong><?= e((string) $stats['total']) ?></strong></div>
-    <div class="metric"><span>Заповнено</span><strong><?= e((string) $stats['filled']) ?></strong></div>
-    <div class="metric"><span>Обов'язкові</span><strong><?= e((string) $stats['required']) ?></strong></div>
+    <div class="metric"><div><span>Розділів</span><strong><?= e((string) $stats['total']) ?></strong></div><span class="mdi mdi-folder-multiple-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric"><div><span>Заповнено</span><strong><?= e((string) $stats['filled']) ?></strong></div><span class="mdi mdi-check-decagram-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric"><div><span>Обов'язкові</span><strong><?= e((string) $stats['required']) ?></strong></div><span class="mdi mdi-alert-circle-outline metric-icon" aria-hidden="true"></span></div>
 </div>
 
 <div class="list-panel" data-infinite-list data-list-url="<?= url('/admin/public-info') ?>" data-list-target="#publicInfoAccordion" data-list-offset="<?= e((string) count($sections)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($sections) < $total ? '1' : '0' ?>">

@@ -6,8 +6,8 @@
         <p class="page-subtitle">Додайте або оновіть документ у вибраному розділі публічної інформації.</p>
     </div>
     <div class="form-actions">
-        <a class="button secondary" href="<?= url('/admin/public-info') ?>">До списку</a>
-        <?php if (!empty($item['file_path'])): ?><a class="button secondary" href="<?= url('/uploads/' . $item['file_path']) ?>">Відкрити файл</a><?php endif; ?>
+        <a class="button secondary" href="<?= url('/admin/public-info') ?>"><span class="mdi mdi-arrow-left" aria-hidden="true"></span><span>До списку</span></a>
+        <?php if (!empty($item['file_path'])): ?><a class="button secondary" href="<?= url('/uploads/' . $item['file_path']) ?>"><span class="mdi mdi-open-in-new" aria-hidden="true"></span><span>Відкрити файл</span></a><?php endif; ?>
     </div>
 </div>
 
@@ -56,8 +56,8 @@
                 <label>Дата публікації<input name="published_at" value="<?= e($item['published_at'] ?? '') ?>" placeholder="2026-07-05"></label>
             </div>
             <div class="form-actions stacked">
-                <button type="submit">Зберегти документ</button>
-                <a class="button secondary" href="<?= url('/admin/public-info') ?>">Скасувати</a>
+                <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти документ</span></button>
+                <a class="button secondary" href="<?= url('/admin/public-info') ?>"><span class="mdi mdi-close" aria-hidden="true"></span><span>Скасувати</span></a>
             </div>
         </aside>
     </div>

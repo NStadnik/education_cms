@@ -11,17 +11,17 @@
         <p class="page-subtitle">Підготуйте заголовок, текст і параметри публікації новини.</p>
     </div>
     <div class="form-actions">
-        <a class="button secondary" href="<?= url('/admin/news') ?>">До списку</a>
+        <a class="button secondary" href="<?= url('/admin/news') ?>"><span class="mdi mdi-arrow-left" aria-hidden="true"></span><span>До списку</span></a>
         <?php if (!empty($item['slug']) && ($item['status'] ?? '') === 'published'): ?>
-            <a class="button secondary" href="<?= url('/news/' . $item['slug']) ?>">Переглянути</a>
+            <a class="button secondary" href="<?= url('/news/' . $item['slug']) ?>"><span class="mdi mdi-eye-outline" aria-hidden="true"></span><span>Переглянути</span></a>
         <?php endif; ?>
     </div>
 </div>
 
 <div class="metrics">
-    <div class="metric"><span>Статус</span><strong><?= e($item['status'] ?? 'draft') ?></strong></div>
-    <div class="metric"><span>Слів</span><strong><?= e((string) $words) ?></strong></div>
-    <div class="metric"><span>Дата</span><strong><?= e($item['published_at'] ?? 'не задано') ?></strong></div>
+    <div class="metric"><div><span>Статус</span><strong><?= e($item['status'] ?? 'draft') ?></strong></div><span class="mdi mdi-circle-edit-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric"><div><span>Слів</span><strong><?= e((string) $words) ?></strong></div><span class="mdi mdi-format-text metric-icon" aria-hidden="true"></span></div>
+    <div class="metric"><div><span>Дата</span><strong><?= e($item['published_at'] ?? 'не задано') ?></strong></div><span class="mdi mdi-calendar-outline metric-icon" aria-hidden="true"></span></div>
 </div>
 
 <form method="post" action="<?= url('/admin/news/save') ?>">
@@ -64,8 +64,8 @@
             </div>
 
             <div class="form-actions stacked">
-                <button type="submit">Зберегти новину</button>
-                <a class="button secondary" href="<?= url('/admin/news') ?>">Скасувати</a>
+                <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти новину</span></button>
+                <a class="button secondary" href="<?= url('/admin/news') ?>"><span class="mdi mdi-close" aria-hidden="true"></span><span>Скасувати</span></a>
             </div>
         </aside>
     </div>

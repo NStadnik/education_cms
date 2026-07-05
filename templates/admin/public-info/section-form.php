@@ -5,7 +5,7 @@
         <h1><?= $isEdit ? 'Редагувати розділ' : 'Новий розділ' ?></h1>
         <p class="page-subtitle">Налаштуйте назву, адресу, порядок і обов'язковість розділу публічної інформації.</p>
     </div>
-    <a class="button secondary" href="<?= url('/admin/public-info') ?>">До списку</a>
+    <a class="button secondary" href="<?= url('/admin/public-info') ?>"><span class="mdi mdi-arrow-left" aria-hidden="true"></span><span>До списку</span></a>
 </div>
 
 <form method="post" action="<?= url('/admin/public-info/sections/save') ?>">
@@ -38,8 +38,8 @@
                 <label class="check-row"><input type="checkbox" name="is_required" value="1" <?= checked($item['is_required'] ?? 1) ?>> Обов'язковий</label>
             </div>
             <div class="form-actions stacked">
-                <button type="submit">Зберегти розділ</button>
-                <a class="button secondary" href="<?= url('/admin/public-info') ?>">Скасувати</a>
+                <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти розділ</span></button>
+                <a class="button secondary" href="<?= url('/admin/public-info') ?>"><span class="mdi mdi-close" aria-hidden="true"></span><span>Скасувати</span></a>
             </div>
         </aside>
     </div>

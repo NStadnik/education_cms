@@ -5,7 +5,7 @@
         <h1><?= $isEdit ? 'Редагувати користувача' : 'Новий користувач' ?></h1>
         <p class="page-subtitle">Налаштуйте обліковий запис, роль і активність користувача.</p>
     </div>
-    <a class="button secondary" href="<?= url('/admin/users') ?>">До списку</a>
+    <a class="button secondary" href="<?= url('/admin/users') ?>"><span class="mdi mdi-arrow-left" aria-hidden="true"></span><span>До списку</span></a>
 </div>
 
 <form method="post" action="<?= url('/admin/users/save') ?>">
@@ -46,8 +46,8 @@
                 <label class="check-row"><input type="checkbox" name="is_active" value="1" <?= checked($item['is_active'] ?? 1) ?>> Активний</label>
             </div>
             <div class="form-actions stacked">
-                <button type="submit">Зберегти користувача</button>
-                <a class="button secondary" href="<?= url('/admin/users') ?>">Скасувати</a>
+                <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти користувача</span></button>
+                <a class="button secondary" href="<?= url('/admin/users') ?>"><span class="mdi mdi-close" aria-hidden="true"></span><span>Скасувати</span></a>
             </div>
         </aside>
     </div>

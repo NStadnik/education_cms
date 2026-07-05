@@ -1,4 +1,9 @@
-<h1>Налаштування закладу</h1>
+<div class="page-head">
+    <div>
+        <p class="eyebrow">Конфігурація</p>
+        <h1>Налаштування закладу</h1>
+    </div>
+</div>
 <form class="form-grid" method="post" action="<?= url('/admin/settings/save') ?>">
     <?= \App\Core\Csrf::field() ?>
     <label>Назва<input name="institution_name" value="<?= e($settings['institution_name'] ?? '') ?>"></label>
@@ -9,5 +14,5 @@
     </div>
     <label>Адреса<input name="address" value="<?= e($settings['address'] ?? '') ?>"></label>
     <label>Телефон<input name="phone" value="<?= e($settings['phone'] ?? '') ?>"></label>
-    <button type="submit">Зберегти</button>
+    <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти</span></button>
 </form>
