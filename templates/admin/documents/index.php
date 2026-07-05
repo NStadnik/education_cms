@@ -1,5 +1,30 @@
-<h1>Документи</h1>
-<div class="card">
+<?php
+    $published = 0;
+    $linked = 0;
+    foreach ($items as $item) {
+        if (($item['status'] ?? '') === 'published') {
+            $published++;
+        }
+        if (!empty($item['public_info_section_id'])) {
+            $linked++;
+        }
+    }
+?>
+<div class="page-head">
+    <div>
+        <p class="eyebrow">Файли та рішення</p>
+        <h1>Документи</h1>
+        <p class="page-subtitle">Завантажуйте документи, прив'язуйте їх до публічної інформації та контролюйте статус.</p>
+    </div>
+</div>
+
+<div class="metrics">
+    <div class="metric"><span>Усього</span><strong><?= e((string) count($items)) ?></strong></div>
+    <div class="metric"><span>Опубліковано</span><strong><?= e((string) $published) ?></strong></div>
+    <div class="metric"><span>У публічній інформації</span><strong><?= e((string) $linked) ?></strong></div>
+</div>
+
+<div class="card admin-form-card">
     <form class="form-grid" method="post" action="<?= url('/admin/documents/save') ?>" enctype="multipart/form-data">
         <?= \App\Core\Csrf::field() ?>
         <label>Назва<input name="title" required></label>
@@ -25,15 +50,30 @@
         <button type="submit">Додати документ</button>
     </form>
 </div>
-<table style="margin-top:16px">
-    <tr><th>Назва</th><th>Категорія</th><th>Публічна інформація</th><th>Статус</th><th>Файл</th></tr>
-    <?php foreach ($items as $item): ?>
-        <tr>
-            <td><?= e($item['title']) ?></td>
-            <td><?= e($item['category']) ?></td>
-            <td><?= $item['public_info_section_id'] ? 'так' : 'ні' ?></td>
-            <td><span class="status"><?= e($item['status']) ?></span></td>
-            <td><?php if ($item['file_path']): ?><a href="<?= url('/uploads/' . $item['file_path']) ?>">відкрити</a><?php endif; ?></td>
-        </tr>
-    <?php endforeach; ?>
-</table>
+
+<div class="list-panel" data-filter-list>
+    <div class="list-tools">
+        <input data-filter-input type="search" placeholder="Пошук документів" aria-label="Пошук документів">
+        <span class="meta"><span data-filter-count><?= e((string) count($items)) ?></span> записів</span>
+    </div>
+    <div class="table-scroll">
+        <table>
+            <tr><th>Назва</th><th>Категорія</th><th>Публічна інформація</th><th>Статус</th><th>Дата</th><th>Файл</th></tr>
+            <?php foreach ($items as $item): ?>
+                <?php
+                    $searchText = ($item['title'] ?? '') . ' ' . ($item['category'] ?? '') . ' ' . ($item['description'] ?? '') . ' ' . ($item['status'] ?? '');
+                    $searchText = function_exists('mb_strtolower') ? mb_strtolower($searchText) : strtolower($searchText);
+                ?>
+                <tr data-filter-row data-filter-text="<?= e($searchText) ?>">
+                    <td><strong><?= e($item['title']) ?></strong><br><span class="meta"><?= e($item['description'] ?? '') ?></span></td>
+                    <td><?= e($item['category']) ?></td>
+                    <td><span class="status <?= $item['public_info_section_id'] ? 'ok' : '' ?>"><?= $item['public_info_section_id'] ? 'так' : 'ні' ?></span></td>
+                    <td><span class="status <?= ($item['status'] ?? '') === 'published' ? 'ok' : 'warn' ?>"><?= e($item['status']) ?></span></td>
+                    <td><?= e($item['approved_at'] ?? $item['published_at'] ?? $item['created_at'] ?? '') ?></td>
+                    <td><?php if ($item['file_path']): ?><a href="<?= url('/uploads/' . $item['file_path']) ?>">відкрити</a><?php else: ?><span class="meta">немає</span><?php endif; ?></td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+    <?php if (!$items): ?><div class="empty-state">Документи ще не додані.</div><?php endif; ?>
+</div>

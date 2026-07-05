@@ -1,3 +1,16 @@
+<?php if (!$blocks): ?>
+    <section class="section">
+        <div class="container">
+            <div class="page-head public-head">
+                <div>
+                    <p class="eyebrow">Сторінка</p>
+                    <h1><?= e($page['title']) ?></h1>
+                    <?php if (!empty($page['excerpt'])): ?><p class="page-subtitle"><?= e($page['excerpt']) ?></p><?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </section>
+<?php endif; ?>
 <?php foreach ($blocks as $block): ?>
     <?php if (($block['type'] ?? '') === 'hero'): ?>
         <section class="hero">
@@ -40,8 +53,11 @@
     <?php else: ?>
         <section class="section">
             <div class="container">
-                <h2><?= e($block['title'] ?? $page['title']) ?></h2>
-                <div><?= nl2br(e($block['text'] ?? '')) ?></div>
+                <article class="card content-card">
+                    <p class="eyebrow">Сторінка</p>
+                    <h2><?= e($block['title'] ?? $page['title']) ?></h2>
+                    <div><?= nl2br(e($block['text'] ?? '')) ?></div>
+                </article>
             </div>
         </section>
     <?php endif; ?>

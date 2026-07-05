@@ -34,5 +34,34 @@
         </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    document.querySelectorAll('[data-filter-list]').forEach(function (panel) {
+        const input = panel.querySelector('[data-filter-input]');
+        const count = panel.querySelector('[data-filter-count]');
+        const root = panel.nextElementSibling && panel.nextElementSibling.id === 'publicInfoAccordion'
+            ? panel.nextElementSibling
+            : panel;
+        const rows = Array.from(root.querySelectorAll('[data-filter-row]'));
+        if (!input || rows.length === 0) {
+            return;
+        }
+
+        input.addEventListener('input', function () {
+            const query = input.value.trim().toLowerCase();
+            let visible = 0;
+            rows.forEach(function (row) {
+                const text = (row.getAttribute('data-filter-text') || '').toLowerCase();
+                const show = query === '' || text.includes(query);
+                row.hidden = !show;
+                if (show) {
+                    visible += 1;
+                }
+            });
+            if (count) {
+                count.textContent = String(visible);
+            }
+        });
+    });
+    </script>
 </body>
 </html>

@@ -1,11 +1,30 @@
-<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+<?php
+    $publishedSections = 0;
+    $requiredSections = 0;
+    foreach ($sections as $section) {
+        if ((int) ($section['published_documents_count'] ?? 0) > 0) {
+            $publishedSections++;
+        }
+        if ((int) ($section['is_required'] ?? 0) === 1) {
+            $requiredSections++;
+        }
+    }
+?>
+<div class="page-head">
     <div>
-        <h1 class="h3 mb-1">Публічна інформація</h1>
-        <p class="text-muted mb-0">Чекліст розділів і документи, які публікуються на сайті.</p>
+        <p class="eyebrow">Відкритість</p>
+        <h1>Публічна інформація</h1>
+        <p class="page-subtitle">Чекліст розділів і документи, які публікуються на сайті.</p>
     </div>
 </div>
 
-<div class="card bootstrap-card mb-4">
+<div class="metrics">
+    <div class="metric"><span>Розділів</span><strong><?= e((string) count($sections)) ?></strong></div>
+    <div class="metric"><span>Заповнено</span><strong><?= e((string) $publishedSections) ?></strong></div>
+    <div class="metric"><span>Обов'язкові</span><strong><?= e((string) $requiredSections) ?></strong></div>
+</div>
+
+<div class="card bootstrap-card mb-4 admin-form-card">
     <div class="card-header bg-white">
         <strong>Додати розділ до переліку</strong>
     </div>
@@ -43,10 +62,28 @@
     </div>
 </div>
 
-<div class="accordion" id="publicInfoAccordion">
+<div class="list-panel" data-filter-list>
+    <div class="list-tools">
+        <input data-filter-input type="search" placeholder="Пошук розділів або документів" aria-label="Пошук публічної інформації">
+        <span class="meta"><span data-filter-count><?= e((string) count($sections)) ?></span> розділів</span>
+    </div>
+</div>
+
+<div class="accordion admin-accordion" id="publicInfoAccordion">
     <?php foreach ($sections as $section): ?>
         <?php $sectionId = (int) $section['id']; ?>
-        <div class="accordion-item mb-2 border rounded" data-section-card="<?= e((string) $sectionId) ?>">
+        <?php
+            $sectionDocuments = array_filter($documents, static function ($document) use ($section) {
+                return (int) $document['public_info_section_id'] === (int) $section['id'];
+            });
+            $documentSearch = [];
+            foreach ($sectionDocuments as $document) {
+                $documentSearch[] = ($document['title'] ?? '') . ' ' . ($document['description'] ?? '');
+            }
+            $searchText = $section['title'] . ' ' . ($section['description'] ?? '') . ' ' . implode(' ', $documentSearch);
+            $searchText = function_exists('mb_strtolower') ? mb_strtolower($searchText) : strtolower($searchText);
+        ?>
+        <div class="accordion-item mb-2 border rounded" data-section-card="<?= e((string) $sectionId) ?>" data-filter-row data-filter-text="<?= e($searchText) ?>">
             <h2 class="accordion-header" id="section-heading-<?= e((string) $sectionId) ?>">
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#section-body-<?= e((string) $sectionId) ?>" aria-expanded="false" aria-controls="section-body-<?= e((string) $sectionId) ?>">
                     <span class="me-2" data-section-title><?= e($section['title']) ?></span>
@@ -151,11 +188,6 @@
                                 </div>
                             </div>
 
-                            <?php
-                                $sectionDocuments = array_filter($documents, static function ($document) use ($section) {
-                                    return (int) $document['public_info_section_id'] === (int) $section['id'];
-                                });
-                            ?>
                             <?php if ($sectionDocuments): ?>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-hover align-middle">
@@ -184,6 +216,7 @@
         </div>
     <?php endforeach; ?>
 </div>
+<?php if (!$sections): ?><div class="empty-state">Розділи публічної інформації ще не додані.</div><?php endif; ?>
 
 <script>
 document.addEventListener('submit', async function (event) {
