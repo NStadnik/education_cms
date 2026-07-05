@@ -13,6 +13,8 @@ use Throwable;
 
 final class AdminController extends BaseController
 {
+    private const LIST_LIMIT = 20;
+
     public function login(): Response
     {
         return $this->render('admin/login', ['title' => 'Вхід'], 'layouts/minimal');
@@ -48,12 +50,29 @@ final class AdminController extends BaseController
         return $this->admin('admin/dashboard', ['title' => 'Панель керування', 'stats' => $stats]);
     }
 
-    public function pages(): Response
+    public function pages(Request $request): Response
     {
         $this->guard();
+        $query = trim((string) $request->input('q', ''));
+        $pagination = $this->pagination($request);
+        [$where, $params] = $this->searchWhere($query, ['title', 'slug', 'excerpt', 'status']);
+        $items = $this->db()->fetchAll(
+            'select * from pages ' . $where . ' order by sort_order asc, id desc limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
+            $params
+        );
+        $total = (int) ($this->db()->fetch('select count(*) as c from pages ' . $where, $params)['c'] ?? 0);
+
+        if ($this->isAjaxRequest()) {
+            return $this->listJson('admin/pages/rows', ['items' => $items], $pagination, $total);
+        }
+
+        $stats = $this->statusStats('pages');
         return $this->admin('admin/pages/index', [
             'title' => 'Сторінки',
-            'items' => $this->db()->fetchAll('select * from pages order by sort_order asc, id desc'),
+            'items' => $items,
+            'total' => $total,
+            'limit' => $pagination['limit'],
+            'stats' => $stats,
         ]);
     }
 
@@ -69,35 +88,68 @@ final class AdminController extends BaseController
     {
         $this->guard('pages.manage');
         Csrf::verify();
-        $now = date('c');
-        $id = (int) $request->input('id', 0);
-        $blocks = $this->blocksFromText((string) $request->input('blocks_text'));
-        $data = [
-            $request->input('title'),
-            $this->slug((string) $request->input('slug', $request->input('title'))),
-            $request->input('excerpt'),
-            json_encode($blocks, JSON_UNESCAPED_UNICODE),
-            $request->input('status', 'draft'),
-            (int) $request->input('sort_order', 0),
-            $now,
-        ];
+        try {
+            $now = date('c');
+            $id = (int) $request->input('id', 0);
+            $blocks = $this->blocksFromText((string) $request->input('blocks_text'));
+            $slug = $this->slug((string) $request->input('slug', $request->input('title')));
+            $data = [
+                $request->input('title'),
+                $slug,
+                $request->input('excerpt'),
+                json_encode($blocks, JSON_UNESCAPED_UNICODE),
+                $request->input('status', 'draft'),
+                (int) $request->input('sort_order', 0),
+                $now,
+            ];
 
-        if ($id) {
-            $this->db()->execute('update pages set title=?, slug=?, excerpt=?, blocks_json=?, status=?, sort_order=?, updated_at=? where id=?', [...$data, $id]);
-        } else {
-            $this->db()->execute('insert into pages (title, slug, excerpt, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
-            $id = (int) $this->db()->lastInsertId();
+            if ($id) {
+                $this->db()->execute('update pages set title=?, slug=?, excerpt=?, blocks_json=?, status=?, sort_order=?, updated_at=? where id=?', [...$data, $id]);
+            } else {
+                $this->db()->execute('insert into pages (title, slug, excerpt, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
+                $id = (int) $this->db()->lastInsertId();
+            }
+            $this->audit('save', 'page', $id);
+
+            if ($this->isAjax($request)) {
+                return $this->json([
+                    'ok' => true,
+                    'message' => 'Сторінку збережено.',
+                    'id' => $id,
+                    'edit_url' => url('/admin/pages/edit?id=' . $id),
+                    'view_url' => $request->input('status') === 'published' ? url($slug === 'home' ? '/' : '/page/' . $slug) : null,
+                ]);
+            }
+
+            redirect('/admin/pages');
+        } catch (Throwable $e) {
+            return $this->ajaxError($request, $e);
         }
-        $this->audit('save', 'page', $id);
-        redirect('/admin/pages');
     }
 
-    public function news(): Response
+    public function news(Request $request): Response
     {
         $this->guard();
+        $query = trim((string) $request->input('q', ''));
+        $pagination = $this->pagination($request);
+        [$where, $params] = $this->searchWhere($query, ['title', 'slug', 'body', 'status']);
+        $items = $this->db()->fetchAll(
+            'select * from news ' . $where . ' order by id desc limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
+            $params
+        );
+        $total = (int) ($this->db()->fetch('select count(*) as c from news ' . $where, $params)['c'] ?? 0);
+
+        if ($this->isAjaxRequest()) {
+            return $this->listJson('admin/news/rows', ['items' => $items], $pagination, $total);
+        }
+
+        $stats = $this->statusStats('news');
         return $this->admin('admin/news/index', [
             'title' => 'Новини',
-            'items' => $this->db()->fetchAll('select * from news order by id desc'),
+            'items' => $items,
+            'total' => $total,
+            'limit' => $pagination['limit'],
+            'stats' => $stats,
         ]);
     }
 
@@ -113,34 +165,73 @@ final class AdminController extends BaseController
     {
         $this->guard('news.manage');
         Csrf::verify();
-        $now = date('c');
-        $id = (int) $request->input('id', 0);
-        $publishedAt = $request->input('status') === 'published' ? ($request->input('published_at') ?: $now) : null;
-        $data = [
-            $request->input('title'),
-            $this->slug((string) $request->input('slug', $request->input('title'))),
-            $request->input('body'),
-            $request->input('status', 'draft'),
-            $publishedAt,
-            $now,
-        ];
-        if ($id) {
-            $this->db()->execute('update news set title=?, slug=?, body=?, status=?, published_at=?, updated_at=? where id=?', [...$data, $id]);
-        } else {
-            $this->db()->execute('insert into news (title, slug, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
-            $id = (int) $this->db()->lastInsertId();
+        try {
+            $now = date('c');
+            $id = (int) $request->input('id', 0);
+            $slug = $this->slug((string) $request->input('slug', $request->input('title')));
+            $publishedAt = $request->input('status') === 'published' ? ($request->input('published_at') ?: $now) : null;
+            $data = [
+                $request->input('title'),
+                $slug,
+                $request->input('body'),
+                $request->input('status', 'draft'),
+                $publishedAt,
+                $now,
+            ];
+            if ($id) {
+                $this->db()->execute('update news set title=?, slug=?, body=?, status=?, published_at=?, updated_at=? where id=?', [...$data, $id]);
+            } else {
+                $this->db()->execute('insert into news (title, slug, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
+                $id = (int) $this->db()->lastInsertId();
+            }
+            $this->audit('save', 'news', $id);
+
+            if ($this->isAjax($request)) {
+                return $this->json([
+                    'ok' => true,
+                    'message' => 'Новину збережено.',
+                    'id' => $id,
+                    'published_at' => $publishedAt,
+                    'edit_url' => url('/admin/news/edit?id=' . $id),
+                    'view_url' => $request->input('status') === 'published' ? url('/news/' . $slug) : null,
+                ]);
+            }
+
+            redirect('/admin/news');
+        } catch (Throwable $e) {
+            return $this->ajaxError($request, $e);
         }
-        $this->audit('save', 'news', $id);
-        redirect('/admin/news');
     }
 
-    public function documents(): Response
+    public function documents(Request $request): Response
     {
         $this->guard();
+        $query = trim((string) $request->input('q', ''));
+        $pagination = $this->pagination($request);
+        [$where, $params] = $this->searchWhere($query, ['title', 'category', 'description', 'status', 'responsible']);
+        $items = $this->db()->fetchAll(
+            'select * from documents ' . $where . ' order by id desc limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
+            $params
+        );
+        $total = (int) ($this->db()->fetch('select count(*) as c from documents ' . $where, $params)['c'] ?? 0);
+        $sections = $this->db()->fetchAll('select id, title from public_info_sections order by sort_order asc');
+
+        if ($this->isAjaxRequest()) {
+            return $this->listJson('admin/documents/rows', ['items' => $items], $pagination, $total);
+        }
+
+        $stats = [
+            'total' => $this->count('documents'),
+            'published' => (int) ($this->db()->fetch("select count(*) as c from documents where status = 'published'")['c'] ?? 0),
+            'linked' => (int) ($this->db()->fetch('select count(*) as c from documents where public_info_section_id is not null')['c'] ?? 0),
+        ];
         return $this->admin('admin/documents/index', [
             'title' => 'Документи',
-            'items' => $this->db()->fetchAll('select * from documents order by id desc'),
-            'sections' => $this->db()->fetchAll('select id, title from public_info_sections order by sort_order asc'),
+            'items' => $items,
+            'sections' => $sections,
+            'total' => $total,
+            'limit' => $pagination['limit'],
+            'stats' => $stats,
         ]);
     }
 
@@ -148,47 +239,80 @@ final class AdminController extends BaseController
     {
         $this->guard('documents.manage');
         Csrf::verify();
-        $filePath = Files::upload($request->files['file'] ?? []);
-        $now = date('c');
-        $this->db()->execute(
-            'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [
-                $request->input('public_info_section_id') ?: null,
-                $request->input('title'),
-                $request->input('category'),
-                $filePath,
-                $request->input('description'),
-                $request->input('status', 'published'),
-                $request->input('responsible'),
-                $request->input('approved_at'),
-                $request->input('published_at') ?: ($request->input('status') === 'published' ? $now : null),
-                $now,
-                $now,
-            ]
-        );
-        $this->audit('create', 'document', (int) $this->db()->lastInsertId());
-        redirect('/admin/documents');
+        try {
+            $filePath = Files::upload($request->files['file'] ?? []);
+            $now = date('c');
+            $publishedAt = $request->input('published_at') ?: ($request->input('status') === 'published' ? $now : null);
+            $this->db()->execute(
+                'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    $request->input('public_info_section_id') ?: null,
+                    $request->input('title'),
+                    $request->input('category'),
+                    $filePath,
+                    $request->input('description'),
+                    $request->input('status', 'published'),
+                    $request->input('responsible'),
+                    $request->input('approved_at'),
+                    $publishedAt,
+                    $now,
+                    $now,
+                ]
+            );
+            $id = (int) $this->db()->lastInsertId();
+            $this->audit('create', 'document', $id);
+
+            if ($this->isAjax($request)) {
+                return $this->json([
+                    'ok' => true,
+                    'message' => 'Документ додано.',
+                    'id' => $id,
+                    'file_url' => $filePath ? url('/uploads/' . $filePath) : null,
+                    'reset' => true,
+                ]);
+            }
+
+            redirect('/admin/documents');
+        } catch (Throwable $e) {
+            return $this->ajaxError($request, $e);
+        }
     }
 
-    public function publicInfo(): Response
+    public function publicInfo(Request $request): Response
     {
         $this->guard();
+        $query = trim((string) $request->input('q', ''));
+        $pagination = $this->pagination($request);
+        [$where, $params] = $this->publicInfoSearchWhere($query);
+        $sections = $this->db()->fetchAll(
+            'select s.*, count(d.id) as documents_count, sum(case when d.status = \'published\' then 1 else 0 end) as published_documents_count, max(d.updated_at) as last_document_at
+             from public_info_sections s
+             left join documents d on d.public_info_section_id = s.id
+             ' . $where . '
+             group by s.id, s.title, s.slug, s.description, s.is_required, s.sort_order
+             order by s.sort_order asc
+             limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
+            $params
+        );
+        $total = (int) ($this->db()->fetch('select count(*) as c from public_info_sections s ' . $where, $params)['c'] ?? 0);
+        $documents = $this->publicInfoDocuments($sections);
+
+        if ($this->isAjaxRequest()) {
+            return $this->listJson('admin/public-info/rows', ['sections' => $sections, 'documents' => $documents], $pagination, $total);
+        }
+
+        $stats = [
+            'total' => $this->count('public_info_sections'),
+            'filled' => (int) ($this->db()->fetch("select count(distinct public_info_section_id) as c from documents where status = 'published' and public_info_section_id is not null")['c'] ?? 0),
+            'required' => (int) ($this->db()->fetch('select count(*) as c from public_info_sections where is_required = 1')['c'] ?? 0),
+        ];
         return $this->admin('admin/public-info/index', [
             'title' => 'Публічна інформація',
-            'sections' => $this->db()->fetchAll(
-                'select s.*, count(d.id) as documents_count, sum(case when d.status = \'published\' then 1 else 0 end) as published_documents_count, max(d.updated_at) as last_document_at
-                 from public_info_sections s
-                 left join documents d on d.public_info_section_id = s.id
-                 group by s.id, s.title, s.slug, s.description, s.is_required, s.sort_order
-                 order by s.sort_order asc'
-            ),
-            'documents' => $this->db()->fetchAll(
-                'select d.*, s.title as section_title
-                 from documents d
-                 left join public_info_sections s on s.id = d.public_info_section_id
-                 where d.public_info_section_id is not null
-                 order by s.sort_order asc, d.updated_at desc'
-            ),
+            'sections' => $sections,
+            'documents' => $documents,
+            'total' => $total,
+            'limit' => $pagination['limit'],
+            'stats' => $stats,
         ]);
     }
 
@@ -196,26 +320,43 @@ final class AdminController extends BaseController
     {
         $this->guard('public_info.manage');
         Csrf::verify();
-        $filePath = Files::upload($request->files['file'] ?? []);
-        $now = date('c');
-        $this->db()->execute(
-            'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [
-                $request->input('public_info_section_id'),
-                $request->input('title'),
-                'Публічна інформація',
-                $filePath,
-                $request->input('description'),
-                $request->input('status', 'published'),
-                $request->input('responsible'),
-                $request->input('approved_at'),
-                $request->input('published_at') ?: ($request->input('status') === 'published' ? $now : null),
-                $now,
-                $now,
-            ]
-        );
-        $this->audit('create', 'public_info_document', (int) $this->db()->lastInsertId());
-        redirect('/admin/public-info');
+        try {
+            $filePath = Files::upload($request->files['file'] ?? []);
+            $now = date('c');
+            $publishedAt = $request->input('published_at') ?: ($request->input('status') === 'published' ? $now : null);
+            $this->db()->execute(
+                'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    $request->input('public_info_section_id'),
+                    $request->input('title'),
+                    'Публічна інформація',
+                    $filePath,
+                    $request->input('description'),
+                    $request->input('status', 'published'),
+                    $request->input('responsible'),
+                    $request->input('approved_at'),
+                    $publishedAt,
+                    $now,
+                    $now,
+                ]
+            );
+            $id = (int) $this->db()->lastInsertId();
+            $this->audit('create', 'public_info_document', $id);
+
+            if ($this->isAjax($request)) {
+                return $this->json([
+                    'ok' => true,
+                    'message' => 'Документ публічної інформації додано.',
+                    'id' => $id,
+                    'file_url' => $filePath ? url('/uploads/' . $filePath) : null,
+                    'reset' => true,
+                ]);
+            }
+
+            redirect('/admin/public-info');
+        } catch (Throwable $e) {
+            return $this->ajaxError($request, $e);
+        }
     }
 
     public function publicInfoSectionSave(Request $request): Response
@@ -290,12 +431,27 @@ final class AdminController extends BaseController
         }
     }
 
-    public function users(): Response
+    public function users(Request $request): Response
     {
         $this->guard('users.manage');
+        $query = trim((string) $request->input('q', ''));
+        $pagination = $this->pagination($request);
+        [$where, $params] = $this->searchWhere($query, ['name', 'email', 'role']);
+        $items = $this->db()->fetchAll(
+            'select * from users ' . $where . ' order by id desc limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
+            $params
+        );
+        $total = (int) ($this->db()->fetch('select count(*) as c from users ' . $where, $params)['c'] ?? 0);
+
+        if ($this->isAjaxRequest()) {
+            return $this->listJson('admin/users/rows', ['items' => $items], $pagination, $total);
+        }
+
         return $this->admin('admin/users/index', [
             'title' => 'Користувачі',
-            'items' => $this->db()->fetchAll('select * from users order by id desc'),
+            'items' => $items,
+            'total' => $total,
+            'limit' => $pagination['limit'],
         ]);
     }
 
@@ -303,11 +459,21 @@ final class AdminController extends BaseController
     {
         $this->guard('users.manage');
         Csrf::verify();
-        $this->db()->execute(
-            'insert into users (name, email, password_hash, role, is_active, created_at) values (?, ?, ?, ?, 1, ?)',
-            [$request->input('name'), $request->input('email'), password_hash((string) $request->input('password'), PASSWORD_DEFAULT), $request->input('role'), date('c')]
-        );
-        redirect('/admin/users');
+        try {
+            $this->db()->execute(
+                'insert into users (name, email, password_hash, role, is_active, created_at) values (?, ?, ?, ?, 1, ?)',
+                [$request->input('name'), $request->input('email'), password_hash((string) $request->input('password'), PASSWORD_DEFAULT), $request->input('role'), date('c')]
+            );
+            $id = (int) $this->db()->lastInsertId();
+
+            if ($this->isAjax($request)) {
+                return $this->json(['ok' => true, 'message' => 'Користувача додано.', 'id' => $id, 'reset' => true]);
+            }
+
+            redirect('/admin/users');
+        } catch (Throwable $e) {
+            return $this->ajaxError($request, $e);
+        }
     }
 
     public function settings(): Response
@@ -320,10 +486,19 @@ final class AdminController extends BaseController
     {
         $this->guard('settings.manage');
         Csrf::verify();
-        foreach (['institution_name', 'institution_type', 'edrpou', 'address', 'phone', 'email'] as $key) {
-            $this->db()->execute('update settings set value = ? where name = ?', [$request->input($key), $key]);
+        try {
+            foreach (['institution_name', 'institution_type', 'edrpou', 'address', 'phone', 'email'] as $key) {
+                $this->db()->execute('update settings set value = ? where name = ?', [$request->input($key), $key]);
+            }
+
+            if ($this->isAjax($request)) {
+                return $this->json(['ok' => true, 'message' => 'Налаштування збережено.']);
+            }
+
+            redirect('/admin/settings');
+        } catch (Throwable $e) {
+            return $this->ajaxError($request, $e);
         }
-        redirect('/admin/settings');
     }
 
     private function guard(?string $permission = null): void
@@ -343,6 +518,113 @@ final class AdminController extends BaseController
     private function count(string $table): int
     {
         return (int) ($this->db()->fetch("select count(*) as c from {$table}")['c'] ?? 0);
+    }
+
+    private function pagination(Request $request): array
+    {
+        $limit = (int) $request->input('limit', self::LIST_LIMIT);
+        if ($limit <= 0 || $limit > 100) {
+            $limit = self::LIST_LIMIT;
+        }
+
+        $offset = max(0, (int) $request->input('offset', 0));
+        return ['limit' => $limit, 'offset' => $offset];
+    }
+
+    private function listJson(string $template, array $data, array $pagination, int $total): Response
+    {
+        $loaded = $pagination['offset'] + count($data['items'] ?? $data['sections'] ?? []);
+        return $this->json([
+            'ok' => true,
+            'html' => $this->view()->partial($template, $data),
+            'total' => $total,
+            'next_offset' => $loaded,
+            'has_more' => $loaded < $total,
+        ]);
+    }
+
+    private function searchWhere(string $query, array $columns): array
+    {
+        if ($query === '') {
+            return ['', []];
+        }
+
+        $parts = [];
+        $params = [];
+        foreach ($columns as $column) {
+            $parts[] = $column . ' like ?';
+            $params[] = '%' . $query . '%';
+        }
+
+        return ['where ' . implode(' or ', $parts), $params];
+    }
+
+    private function publicInfoSearchWhere(string $query): array
+    {
+        if ($query === '') {
+            return ['', []];
+        }
+
+        $like = '%' . $query . '%';
+        return [
+            'where s.title like ? or s.slug like ? or s.description like ? or exists (
+                select 1 from documents sd
+                where sd.public_info_section_id = s.id
+                and (sd.title like ? or sd.description like ? or sd.responsible like ?)
+            )',
+            [$like, $like, $like, $like, $like, $like],
+        ];
+    }
+
+    private function publicInfoDocuments(array $sections): array
+    {
+        $ids = [];
+        foreach ($sections as $section) {
+            $id = (int) ($section['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        if (!$ids) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        return $this->db()->fetchAll(
+            'select d.*, s.title as section_title
+             from documents d
+             left join public_info_sections s on s.id = d.public_info_section_id
+             where d.public_info_section_id in (' . $placeholders . ')
+             order by s.sort_order asc, d.updated_at desc',
+            $ids
+        );
+    }
+
+    private function statusStats(string $table): array
+    {
+        $total = $this->count($table);
+        $published = (int) ($this->db()->fetch("select count(*) as c from {$table} where status = 'published'")['c'] ?? 0);
+        return ['total' => $total, 'published' => $published, 'drafts' => $total - $published];
+    }
+
+    private function isAjaxRequest(): bool
+    {
+        return strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
+    }
+
+    private function isAjax(Request $request): bool
+    {
+        return strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest'
+            || (string) $request->input('_ajax', '') === '1';
+    }
+
+    private function ajaxError(Request $request, Throwable $e): Response
+    {
+        if ($this->isAjax($request)) {
+            return $this->json(['ok' => false, 'message' => $e->getMessage()], 500);
+        }
+
+        throw $e;
     }
 
     private function slug(string $value): string

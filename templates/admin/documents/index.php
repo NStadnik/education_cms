@@ -1,15 +1,3 @@
-<?php
-    $published = 0;
-    $linked = 0;
-    foreach ($items as $item) {
-        if (($item['status'] ?? '') === 'published') {
-            $published++;
-        }
-        if (!empty($item['public_info_section_id'])) {
-            $linked++;
-        }
-    }
-?>
 <div class="page-head">
     <div>
         <p class="eyebrow">Файли та рішення</p>
@@ -19,9 +7,9 @@
 </div>
 
 <div class="metrics">
-    <div class="metric"><span>Усього</span><strong><?= e((string) count($items)) ?></strong></div>
-    <div class="metric"><span>Опубліковано</span><strong><?= e((string) $published) ?></strong></div>
-    <div class="metric"><span>У публічній інформації</span><strong><?= e((string) $linked) ?></strong></div>
+    <div class="metric"><span>Усього</span><strong><?= e((string) $stats['total']) ?></strong></div>
+    <div class="metric"><span>Опубліковано</span><strong><?= e((string) $stats['published']) ?></strong></div>
+    <div class="metric"><span>У публічній інформації</span><strong><?= e((string) $stats['linked']) ?></strong></div>
 </div>
 
 <div class="card admin-form-card">
@@ -51,29 +39,18 @@
     </form>
 </div>
 
-<div class="list-panel" data-filter-list>
+<div class="list-panel" data-infinite-list data-list-url="<?= url('/admin/documents') ?>" data-list-target="#documentsRows" data-list-offset="<?= e((string) count($items)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($items) < $total ? '1' : '0' ?>">
     <div class="list-tools">
         <input data-filter-input type="search" placeholder="Пошук документів" aria-label="Пошук документів">
-        <span class="meta"><span data-filter-count><?= e((string) count($items)) ?></span> записів</span>
+        <span class="meta"><span data-filter-count><?= e((string) $total) ?></span> записів</span>
     </div>
     <div class="table-scroll">
         <table>
-            <tr><th>Назва</th><th>Категорія</th><th>Публічна інформація</th><th>Статус</th><th>Дата</th><th>Файл</th></tr>
-            <?php foreach ($items as $item): ?>
-                <?php
-                    $searchText = ($item['title'] ?? '') . ' ' . ($item['category'] ?? '') . ' ' . ($item['description'] ?? '') . ' ' . ($item['status'] ?? '');
-                    $searchText = function_exists('mb_strtolower') ? mb_strtolower($searchText) : strtolower($searchText);
-                ?>
-                <tr data-filter-row data-filter-text="<?= e($searchText) ?>">
-                    <td><strong><?= e($item['title']) ?></strong><br><span class="meta"><?= e($item['description'] ?? '') ?></span></td>
-                    <td><?= e($item['category']) ?></td>
-                    <td><span class="status <?= $item['public_info_section_id'] ? 'ok' : '' ?>"><?= $item['public_info_section_id'] ? 'так' : 'ні' ?></span></td>
-                    <td><span class="status <?= ($item['status'] ?? '') === 'published' ? 'ok' : 'warn' ?>"><?= e($item['status']) ?></span></td>
-                    <td><?= e($item['approved_at'] ?? $item['published_at'] ?? $item['created_at'] ?? '') ?></td>
-                    <td><?php if ($item['file_path']): ?><a href="<?= url('/uploads/' . $item['file_path']) ?>">відкрити</a><?php else: ?><span class="meta">немає</span><?php endif; ?></td>
-                </tr>
-            <?php endforeach; ?>
+            <thead><tr><th>Назва</th><th>Категорія</th><th>Публічна інформація</th><th>Статус</th><th>Дата</th><th>Файл</th></tr></thead>
+            <tbody id="documentsRows"><?= $this->partial('admin/documents/rows', ['items' => $items]) ?></tbody>
         </table>
     </div>
-    <?php if (!$items): ?><div class="empty-state">Документи ще не додані.</div><?php endif; ?>
+    <div class="empty-state <?= $items ? 'd-none' : '' ?>" data-list-empty>Документи не знайдені.</div>
+    <div class="list-sentinel" data-list-sentinel></div>
+    <p class="meta list-status" data-list-status><?= count($items) < $total ? 'Прокрутіть нижче, щоб завантажити ще.' : 'Усі записи завантажено.' ?></p>
 </div>

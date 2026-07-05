@@ -56,8 +56,21 @@ img { max-width: 100%; height: auto; }
 .list-panel { margin-top: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; overflow: hidden; }
 .list-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-bottom: 1px solid var(--line); background: #fbfcff; }
 .list-tools input { max-width: 380px; }
+.list-sentinel { min-height: 1px; }
+.list-status { margin: 12px 14px 14px; }
 .table-scroll { width: 100%; overflow-x: auto; }
 .admin-form-card { margin-bottom: 18px; }
+.editor-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.editor-sidebar { position: sticky; top: 18px; }
+.form-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.form-section-head h2 { margin: 0 0 4px; font-size: 22px; }
+.form-section-head p { margin: 0; }
+.form-grid.wide { max-width: none; }
+.textarea-small { min-height: 96px !important; }
+.textarea-large { min-height: 320px !important; }
+.form-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
+.form-actions.stacked { align-items: stretch; flex-direction: column; margin-top: 16px; }
+.hint-box { padding: 12px; border: 1px dashed var(--line); border-radius: 6px; background: #fbfcff; color: var(--muted); font-size: 14px; }
 .content-card { display: flex; flex-direction: column; gap: 8px; }
 .content-card h2 { margin: 0; }
 .read-more { margin-top: auto; font-weight: 650; }
@@ -114,10 +127,12 @@ tr[hidden], .accordion-item[hidden] { display: none !important; }
 .footer { padding: 28px 0; border-top: 1px solid var(--line); color: var(--muted); background: #fff; }
 
 @media (max-width: 800px) {
-    .topbar-inner, .toolbar, .page-head, .list-tools, .document-row, .document-actions { align-items: flex-start; flex-direction: column; }
+    .topbar-inner, .toolbar, .page-head, .list-tools, .document-row, .document-actions, .form-actions { align-items: flex-start; flex-direction: column; }
     .grid-3 { grid-template-columns: 1fr; }
     .metrics { grid-template-columns: 1fr; }
     .list-tools input { max-width: none; }
+    .editor-layout { grid-template-columns: 1fr; }
+    .editor-sidebar { position: static; }
     .layout, .admin-shell { grid-template-columns: 1fr; }
     .sidebar { position: static; }
     .main { padding: 16px; }
