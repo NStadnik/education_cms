@@ -9,6 +9,7 @@
         ['/admin/users', 'Користувачі', 'mdi-account-group-outline'],
         ['/admin/templates', 'Шаблони', 'mdi-palette-outline'],
         ['/admin/import', 'Імпорт', 'mdi-database-import-outline'],
+        ['/admin/updates', 'Оновлення', 'mdi-update'],
         ['/admin/settings', 'Налаштування', 'mdi-cog-outline'],
     ];
 

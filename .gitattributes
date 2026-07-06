@@ -1,0 +1,5 @@
+config/local.php export-ignore
+storage/** export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
+.github/ export-ignore

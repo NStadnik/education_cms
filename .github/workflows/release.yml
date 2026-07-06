@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE="education-cms-v${VERSION}"
+          mkdir -p "build/${PACKAGE}"
+          rsync -av \
+            app database public templates index.php .htaccess README.md \
+            "build/${PACKAGE}/"
+          mkdir -p "build/${PACKAGE}/config"
+          cp config/app.php config/database.php "build/${PACKAGE}/config/"
+          echo "${VERSION}" > "build/${PACKAGE}/VERSION"
+          cd build
+          zip -r "${PACKAGE}.zip" "${PACKAGE}"
+          sha256sum "${PACKAGE}.zip" > "${PACKAGE}.sha256"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/education-cms-v*.zip
+            build/education-cms-v*.sha256

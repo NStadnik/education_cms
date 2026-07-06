@@ -10,6 +10,7 @@ use App\Controllers\Admin\MediaController;
 use App\Controllers\Admin\NewsController;
 use App\Controllers\Admin\PagesController;
 use App\Controllers\Admin\SettingsController;
+use App\Controllers\Admin\UpdatesController;
 use App\Controllers\Admin\UsersController;
 use App\Controllers\InstallController;
 use App\Controllers\PublicController;
@@ -83,6 +84,7 @@ final class App
         $adminUsers = UsersController::class;
         $adminSettings = SettingsController::class;
         $adminImport = ImportController::class;
+        $adminUpdates = UpdatesController::class;
         $install = InstallController::class;
 
         $this->router->get('/', [$public, 'home']);
@@ -125,6 +127,8 @@ final class App
         $this->router->get('/admin/import', [$adminImport, 'import']);
         $this->router->post('/admin/import/preview', [$adminImport, 'importPreview']);
         $this->router->post('/admin/import/run', [$adminImport, 'importRun']);
+        $this->router->get('/admin/updates', [$adminUpdates, 'index']);
+        $this->router->post('/admin/updates/install', [$adminUpdates, 'install']);
         $this->router->get('/admin/settings', [$adminSettings, 'settings']);
         $this->router->post('/admin/settings/save', [$adminSettings, 'settingsSave']);
     }
