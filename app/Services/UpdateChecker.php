@@ -8,6 +8,8 @@ use RuntimeException;
 
 final class UpdateChecker
 {
+    private const USER_AGENT = 'EducationCMS-Updater';
+
     public function __construct(
         private readonly string $owner,
         private readonly string $repo,
@@ -28,6 +30,14 @@ final class UpdateChecker
         $package = $this->findAsset($assets, '/education-cms-v?' . preg_quote($version, '/') . '\.zip$/i')
             ?? $this->findAsset($assets, '/\.zip$/i');
         $checksum = $this->findAsset($assets, '/\.sha256$/i');
+        $packageUrl = (string) ($package['browser_download_url'] ?? '');
+        $packageName = (string) ($package['name'] ?? '');
+        $packageSource = 'asset';
+        if ($packageUrl === '' && !empty($release['zipball_url'])) {
+            $packageUrl = (string) $release['zipball_url'];
+            $packageName = 'GitHub source zip';
+            $packageSource = 'zipball';
+        }
 
         return [
             'version' => $version,
@@ -36,8 +46,9 @@ final class UpdateChecker
             'body' => (string) ($release['body'] ?? ''),
             'html_url' => (string) ($release['html_url'] ?? ''),
             'published_at' => (string) ($release['published_at'] ?? ''),
-            'package_url' => $package['browser_download_url'] ?? '',
-            'package_name' => $package['name'] ?? '',
+            'package_url' => $packageUrl,
+            'package_name' => $packageName,
+            'package_source' => $packageSource,
             'checksum_url' => $checksum['browser_download_url'] ?? '',
             'checksum_name' => $checksum['name'] ?? '',
             'current_version' => $this->currentVersion,
@@ -46,6 +57,26 @@ final class UpdateChecker
     }
 
     public function download(string $url): string
+    {
+        if (preg_match('#^https://api\.github\.com/repos/[^/]+/[^/]+/(?:zipball|tarball)(?:/|$)#i', $url)) {
+            return $this->request($url, 'application/vnd.github+json');
+        }
+
+        return $this->request($url, 'application/octet-stream');
+    }
+
+    private function json(string $url): array
+    {
+        $body = $this->request($url, 'application/vnd.github+json');
+        $data = json_decode($body, true);
+        if (!is_array($data)) {
+            throw new RuntimeException('GitHub повернув некоректну JSON-відповідь.');
+        }
+
+        return $data;
+    }
+
+    private function request(string $url, string $accept): string
     {
         if (!preg_match('#^https://(?:api\.)?github\.com/#i', $url)
             && !preg_match('#^https://github\.com/#i', $url)
@@ -61,15 +92,18 @@ final class UpdateChecker
                 CURLOPT_FOLLOWLOCATION => true,
                 CURLOPT_CONNECTTIMEOUT => 15,
                 CURLOPT_TIMEOUT => 120,
-                CURLOPT_USERAGENT => 'EducationCMS-Updater',
-                CURLOPT_HTTPHEADER => ['Accept: application/octet-stream'],
+                CURLOPT_USERAGENT => self::USER_AGENT,
+                CURLOPT_HTTPHEADER => [
+                    'Accept: ' . $accept,
+                    'X-GitHub-Api-Version: 2022-11-28',
+                ],
             ]);
             $body = curl_exec($ch);
             $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
             $error = curl_error($ch);
             curl_close($ch);
             if ($body === false || $status >= 400) {
-                throw new RuntimeException($error ?: 'GitHub повернув помилку завантаження.');
+                throw new RuntimeException($this->errorMessage($url, $status, is_string($body) ? $body : '', $error));
             }
             return (string) $body;
         }
@@ -78,26 +112,59 @@ final class UpdateChecker
             'http' => [
                 'method' => 'GET',
                 'timeout' => 120,
-                'header' => "User-Agent: EducationCMS-Updater\r\nAccept: application/octet-stream\r\n",
+                'ignore_errors' => true,
+                'header' => "User-Agent: " . self::USER_AGENT . "\r\nAccept: {$accept}\r\nX-GitHub-Api-Version: 2022-11-28\r\n",
             ],
         ]);
         $body = @file_get_contents($url, false, $context);
+        $status = $this->statusFromHeaders($http_response_header ?? []);
         if ($body === false) {
-            throw new RuntimeException('Не вдалося завантажити файл із GitHub.');
+            throw new RuntimeException($this->errorMessage($url, $status, '', ''));
+        }
+        if ($status >= 400) {
+            throw new RuntimeException($this->errorMessage($url, $status, (string) $body, ''));
         }
 
         return $body;
     }
 
-    private function json(string $url): array
+    private function errorMessage(string $url, int $status, string $body, string $transportError): string
     {
-        $body = $this->download($url);
         $data = json_decode($body, true);
-        if (!is_array($data)) {
-            throw new RuntimeException('GitHub повернув некоректну JSON-відповідь.');
+        $githubMessage = is_array($data) ? (string) ($data['message'] ?? '') : '';
+
+        if (str_contains($url, '/releases/latest') && $status === 404) {
+            return 'GitHub не знайшов опублікований Release для ' . $this->owner . '/' . $this->repo . '. Створіть release з тегом v' . $this->currentVersion . ' або новішим і додайте zip-архів оновлення.';
+        }
+        if ($status === 403 && stripos($githubMessage, 'rate limit') !== false) {
+            return 'GitHub тимчасово обмежив запити без авторизації (HTTP 403 rate limit). Спробуйте пізніше.';
+        }
+        if ($status === 403) {
+            return 'GitHub відхилив запит (HTTP 403). Перевірте доступність репозиторію або обмеження хостингу.';
+        }
+        if ($status === 404) {
+            return 'GitHub не знайшов потрібний файл або репозиторій (HTTP 404). Перевірте URL релізу та назви asset-файлів.';
+        }
+        if ($status >= 400) {
+            return 'GitHub повернув HTTP ' . $status . ($githubMessage !== '' ? ': ' . $githubMessage : '.');
+        }
+        if ($transportError !== '') {
+            return 'Не вдалося підключитися до GitHub: ' . $transportError;
         }
 
-        return $data;
+        return 'Не вдалося завантажити дані з GitHub. Перевірте, чи хостинг дозволяє вихідні HTTPS-запити.';
+    }
+
+    private function statusFromHeaders(array $headers): int
+    {
+        $status = 0;
+        foreach ($headers as $header) {
+            if (preg_match('/^HTTP\/\S+\s+(\d{3})\b/i', (string) $header, $match)) {
+                $status = (int) $match[1];
+            }
+        }
+
+        return $status;
     }
 
     private function findAsset(array $assets, string $pattern): ?array

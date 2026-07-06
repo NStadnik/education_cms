@@ -128,6 +128,7 @@ final class App
         $this->router->post('/admin/import/preview', [$adminImport, 'importPreview']);
         $this->router->post('/admin/import/run', [$adminImport, 'importRun']);
         $this->router->get('/admin/updates', [$adminUpdates, 'index']);
+        $this->router->post('/admin/updates/check', [$adminUpdates, 'check']);
         $this->router->post('/admin/updates/install', [$adminUpdates, 'install']);
         $this->router->get('/admin/settings', [$adminSettings, 'settings']);
         $this->router->post('/admin/settings/save', [$adminSettings, 'settingsSave']);
