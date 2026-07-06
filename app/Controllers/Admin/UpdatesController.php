@@ -79,7 +79,7 @@ final class UpdatesController extends AdminBaseController
             return $this->finishInstallResponse([
                 'ok' => true,
                 'message' => 'Оновлення до версії ' . $result['version'] . ' встановлено.',
-                'current_version' => $this->currentVersion(),
+                'current_version' => $result['version'],
                 'installed_version' => $result['version'],
                 'backup_path' => $result['backup_path'],
             ]);

@@ -63,6 +63,7 @@ final class UpdateInstaller
 
         try {
             $this->copyPackage($packageRoot);
+            $this->writeInstalledVersion($version);
         } catch (\Throwable $exception) {
             $this->restore($backupPath);
             throw $exception;
@@ -88,6 +89,18 @@ final class UpdateInstaller
         $actual = hash_file('sha256', $downloadPath);
         if (!hash_equals(strtolower($match[1]), strtolower((string) $actual))) {
             throw new RuntimeException('Checksum не збігається. Оновлення зупинено.');
+        }
+    }
+
+    private function writeInstalledVersion(string $version): void
+    {
+        if ($version === '') {
+            return;
+        }
+
+        $versionPath = $this->basePath . '/VERSION';
+        if (file_put_contents($versionPath, $version . "\n") === false) {
+            throw new RuntimeException('Не вдалося записати файл VERSION.');
         }
     }
 
