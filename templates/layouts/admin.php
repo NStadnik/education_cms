@@ -9,8 +9,6 @@
         ['/admin/users', 'Користувачі', 'mdi-account-group-outline'],
         ['/admin/templates', 'Шаблони', 'mdi-palette-outline'],
         ['/admin/import', 'Імпорт', 'mdi-database-import-outline'],
-        ['/admin/updates', 'Оновлення', 'mdi-update'],
-        ['/admin/settings', 'Налаштування', 'mdi-cog-outline'],
     ];
 
     $isActiveAdminNav = static function (string $path) use ($currentPath): bool {
@@ -31,7 +29,7 @@
         <aside class="admin-sidebar">
             <div class="mb-4">
                 <h2 class="h4 mb-1 text-white">Education CMS</h2>
-                <p class="small text-white-50 mb-0"><?= e($user['name'] ?? '') ?></p>
+                <p class="small text-white-50 mb-0">Панель керування</p>
             </div>
             <nav class="nav nav-pills flex-column gap-1">
                 <?php foreach ($adminNav as $navItem): ?>
@@ -40,21 +38,43 @@
                         <span><?= e($navItem[1]) ?></span>
                     </a>
                 <?php endforeach; ?>
-                <a class="nav-link" href="<?= url('/') ?>">
-                    <span class="mdi mdi-open-in-new" aria-hidden="true"></span>
-                    <span>Переглянути сайт</span>
-                </a>
             </nav>
-            <form method="post" action="<?= url('/admin/logout') ?>" class="mt-4" data-no-ajax>
-                <?= \App\Core\Csrf::field() ?>
-                <button class="btn btn-outline-light btn-sm admin-icon-button" type="submit">
-                    <span class="mdi mdi-logout" aria-hidden="true"></span>
-                    <span>Вийти</span>
-                </button>
-            </form>
         </aside>
         <main class="admin-main">
-            <?= $content ?>
+            <header class="admin-header">
+                <div class="admin-header-title">
+                    <span class="admin-header-kicker">Адмінка</span>
+                    <strong><?= e($title ?? 'Панель керування') ?></strong>
+                </div>
+                <div class="admin-header-actions">
+                    <span class="admin-user">
+                        <span class="mdi mdi-account-circle-outline" aria-hidden="true"></span>
+                        <span><?= e($user['name'] ?? 'Адміністратор') ?></span>
+                    </span>
+                    <a class="admin-header-button" href="<?= url('/admin/updates') ?>" title="Оновлення">
+                        <span class="mdi mdi-update" aria-hidden="true"></span>
+                        <span>Оновлення</span>
+                    </a>
+                    <a class="admin-header-button" href="<?= url('/admin/settings') ?>" title="Налаштування">
+                        <span class="mdi mdi-cog-outline" aria-hidden="true"></span>
+                        <span>Налаштування</span>
+                    </a>
+                    <a class="admin-header-button" href="<?= url('/') ?>" target="_blank" rel="noopener" title="Переглянути сайт">
+                        <span class="mdi mdi-open-in-new" aria-hidden="true"></span>
+                        <span>Сайт</span>
+                    </a>
+                    <form method="post" action="<?= url('/admin/logout') ?>" data-no-ajax>
+                        <?= \App\Core\Csrf::field() ?>
+                        <button class="admin-header-button admin-header-button-danger" type="submit" title="Вийти">
+                            <span class="mdi mdi-logout" aria-hidden="true"></span>
+                            <span>Вийти</span>
+                        </button>
+                    </form>
+                </div>
+            </header>
+            <div class="admin-content">
+                <?= $content ?>
+            </div>
         </main>
     </div>
     <div class="modal fade" id="richMediaModal" tabindex="-1" aria-labelledby="richMediaTitle" aria-hidden="true">
