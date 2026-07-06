@@ -8,7 +8,7 @@
         <td>
             <div class="media-file">
                 <?php if (!empty($item['is_image'])): ?>
-                    <img class="media-thumb" src="<?= url('/uploads/' . $item['path']) ?>" alt="">
+                    <img class="media-thumb" src="<?= url('/thumb/' . $item['path'] . '?w=88&h=88&fit=crop') ?>" alt="" loading="lazy">
                 <?php else: ?>
                     <span class="media-thumb media-thumb-icon mdi mdi-file-outline" aria-hidden="true"></span>
                 <?php endif; ?>

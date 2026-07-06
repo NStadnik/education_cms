@@ -8,6 +8,7 @@ use App\Core\Debug;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Installer;
+use App\Services\Thumbnails;
 
 final class PublicController extends BaseController
 {
@@ -118,6 +119,25 @@ final class PublicController extends BaseController
         return new Response((string) file_get_contents($file), 200, [
             'Content-Type' => $type,
             'Content-Disposition' => 'inline; filename="' . basename($file) . '"',
+        ]);
+    }
+
+    public function thumb(Request $request, array $params): Response
+    {
+        try {
+            $thumb = Thumbnails::make(
+                (string) ($params['path'] ?? ''),
+                (int) $request->input('w', 320),
+                (int) $request->input('h', 240),
+                (string) $request->input('fit', 'crop')
+            );
+        } catch (\Throwable $exception) {
+            return new Response($exception->getMessage(), 404);
+        }
+
+        return new Response((string) file_get_contents($thumb['path']), 200, [
+            'Content-Type' => $thumb['mime'],
+            'Cache-Control' => 'public, max-age=604800',
         ]);
     }
 

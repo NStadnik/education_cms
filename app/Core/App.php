@@ -91,6 +91,7 @@ final class App
         $this->router->get('/page/{slug}', [$public, 'page']);
         $this->router->get('/news', [$public, 'news']);
         $this->router->get('/news/{slug}', [$public, 'newsShow']);
+        $this->router->get('/thumb/{path}', [$public, 'thumb']);
         $this->router->get('/assets/{path}', [$public, 'asset']);
         $this->router->get('/uploads/{path}', [$public, 'upload']);
         $this->router->get('/debug', [$public, 'debug']);

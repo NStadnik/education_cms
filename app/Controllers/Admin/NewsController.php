@@ -292,7 +292,12 @@ final class NewsController extends \App\Controllers\AdminBaseController
                         from news n
                         left join news_category_links l on l.news_id = n.id
                         where l.category_id = c.id or n.category = c.title
-                    ) as news_count
+                    ) as news_count,
+                    (
+                        select count(*)
+                        from news_categories child
+                        where child.parent_id = c.id
+                    ) as children_count
              from news_categories c
              order by c.sort_order asc, c.title asc"
         ));
