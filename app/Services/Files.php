@@ -50,6 +50,7 @@ final class Files
         }
 
         $items = [];
+        $metadata = MediaMetadata::all();
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
         );
@@ -66,7 +67,8 @@ final class Files
 
             $extension = strtolower($file->getExtension());
             $reference = $references[$relative] ?? null;
-            $items[] = [
+            $meta = MediaMetadata::normalizeEntry($metadata[$relative] ?? []);
+            $items[] = array_replace([
                 'path' => $relative,
                 'name' => basename($relative),
                 'extension' => $extension,
@@ -77,7 +79,7 @@ final class Files
                 'is_image' => in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true),
                 'is_used' => $reference !== null,
                 'reference' => $reference,
-            ];
+            ], $meta);
         }
 
         usort($items, static fn (array $a, array $b): int => strcmp((string) $b['modified_at'], (string) $a['modified_at']));

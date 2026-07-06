@@ -119,6 +119,7 @@ final class App
         $this->router->get('/admin/media', [$adminMedia, 'media']);
         $this->router->get('/admin/media/picker', [$adminMedia, 'mediaPicker']);
         $this->router->post('/admin/media/upload', [$adminMedia, 'mediaUpload']);
+        $this->router->post('/admin/media/metadata', [$adminMedia, 'mediaMetadataSave']);
         $this->router->post('/admin/media/delete', [$adminMedia, 'mediaDelete']);
         $this->router->post('/admin/media/bulk', [$adminMedia, 'mediaBulk']);
         $this->router->get('/admin/users', [$adminUsers, 'users']);

@@ -15,8 +15,18 @@
                 <div>
                     <strong><?= e($item['name']) ?></strong><br>
                     <code><?= e($item['path']) ?></code>
+                    <?php if ((string) ($item['title'] ?? '') !== ''): ?>
+                        <small class="media-file-title"><?= e((string) $item['title']) ?></small>
+                    <?php endif; ?>
                 </div>
             </div>
+        </td>
+        <td>
+            <?php if ((string) ($item['folder'] ?? '') !== ''): ?>
+                <span class="media-folder-pill"><span class="mdi mdi-folder-outline" aria-hidden="true"></span><?= e((string) $item['folder']) ?></span>
+            <?php else: ?>
+                <span class="meta">Без папки</span>
+            <?php endif; ?>
         </td>
         <td><?= e($item['type']) ?></td>
         <td><?= e($item['size_label']) ?></td>
@@ -31,7 +41,10 @@
         </td>
         <td>
             <div class="form-actions">
-                <button class="button secondary compact" type="button" data-media-preview data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-type="<?= e($item['type']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>">
+                <button class="button secondary compact" type="button" data-media-metadata data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>" data-folder="<?= e((string) ($item['folder'] ?? '')) ?>" data-alt-text="<?= e((string) ($item['alt_text'] ?? '')) ?>" data-title="<?= e((string) ($item['title'] ?? '')) ?>" data-caption="<?= e((string) ($item['caption'] ?? '')) ?>" data-description="<?= e((string) ($item['description'] ?? '')) ?>">
+                    <span class="mdi mdi-pencil-outline" aria-hidden="true"></span><span>Метадані</span>
+                </button>
+                <button class="button secondary compact" type="button" data-media-preview data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-type="<?= e($item['type']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>" data-alt-text="<?= e((string) ($item['alt_text'] ?? '')) ?>" data-title="<?= e((string) ($item['title'] ?? '')) ?>" data-caption="<?= e((string) ($item['caption'] ?? '')) ?>" data-description="<?= e((string) ($item['description'] ?? '')) ?>">
                     <span class="mdi mdi-eye-outline" aria-hidden="true"></span><span>Переглянути</span>
                 </button>
                 <?php if (empty($item['is_used'])): ?>

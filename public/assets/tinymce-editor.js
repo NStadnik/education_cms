@@ -348,13 +348,15 @@
     }
 
     function buildMediaHtml(item, align, caption) {
+        const mediaCaption = caption || item.caption || '';
+        const mediaAlt = item.alt_text || mediaCaption || item.title || item.name;
         if (item.is_image) {
-            return '<figure class="rich-media-block media-align-' + escapeHtml(align) + '"><img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(caption || item.name) + '">' +
-                (caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '') + '</figure>';
+            return '<figure class="rich-media-block media-align-' + escapeHtml(align) + '"><img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(mediaAlt) + '">' +
+                (mediaCaption ? '<figcaption>' + escapeHtml(mediaCaption) + '</figcaption>' : '') + '</figure>';
         }
 
         return '<p class="rich-file-link media-align-' + escapeHtml(align) + '"><a href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener">' +
-            escapeHtml(caption || item.name) + '</a></p>';
+            escapeHtml(mediaCaption || item.title || item.name) + '</a></p>';
     }
 
     function buildGalleryHtml(items, align, columns, caption) {
@@ -363,7 +365,7 @@
         }
 
         const images = items.map(function (item) {
-            return '<figure><img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(item.name) + '"></figure>';
+            return '<figure><img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(item.alt_text || item.title || item.name) + '"></figure>';
         }).join('');
 
         return '<div class="rich-gallery rich-gallery-cols-' + escapeHtml(columns) + ' media-align-' + escapeHtml(align) + '">' + images + '</div>' +

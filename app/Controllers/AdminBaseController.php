@@ -73,7 +73,7 @@ abstract class AdminBaseController extends BaseController
         }
 
         if ($resource === 'media') {
-            return array_replace($this->mediaListPayload($query, $pagination), ['message' => $message]);
+            return array_replace($this->mediaListPayload($query, $pagination, (string) $request->input('folder', '')), ['message' => $message]);
         }
 
         $map = [
@@ -1324,6 +1324,11 @@ abstract class AdminBaseController extends BaseController
                 $item['name'] ?? '',
                 $item['extension'] ?? '',
                 $item['type'] ?? '',
+                $item['folder'] ?? '',
+                $item['alt_text'] ?? '',
+                $item['title'] ?? '',
+                $item['caption'] ?? '',
+                $item['description'] ?? '',
                 $item['reference']['label'] ?? '',
             ]);
             $text = function_exists('mb_strtolower') ? mb_strtolower($text) : strtolower($text);
@@ -1331,10 +1336,17 @@ abstract class AdminBaseController extends BaseController
         }));
     }
 
-    protected function mediaListPayload(string $query, array $pagination): array
+    protected function mediaListPayload(string $query, array $pagination, string $folder = ''): array
     {
         $allItems = Files::all($this->mediaReferences());
+        $folders = \App\Services\MediaMetadata::folders($allItems);
         $filteredItems = $this->filterMedia($allItems, $query);
+        $folder = $folder === '__none' ? '__none' : \App\Services\MediaMetadata::normalizeFolder($folder);
+        if ($folder !== '') {
+            $filteredItems = array_values(array_filter($filteredItems, static fn (array $item): bool => $folder === '__none'
+                ? (string) ($item['folder'] ?? '') === ''
+                : (string) ($item['folder'] ?? '') === $folder));
+        }
         $total = count($filteredItems);
         $items = array_slice($filteredItems, $pagination['offset'], $pagination['limit']);
         $loaded = $pagination['offset'] + count($items);
@@ -1347,6 +1359,7 @@ abstract class AdminBaseController extends BaseController
             'next_offset' => $loaded,
             'has_more' => $loaded < $total,
             'stats' => $this->mediaStats($allItems),
+            'folders' => $folders,
         ];
     }
 

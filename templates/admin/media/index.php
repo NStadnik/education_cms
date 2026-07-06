@@ -28,18 +28,34 @@
         <?= \App\Core\Csrf::field() ?>
         <?php if (!empty($uploadLimitBytes)): ?><input type="hidden" name="MAX_FILE_SIZE" value="<?= e((string) $uploadLimitBytes) ?>"><?php endif; ?>
         <label>Файл<input type="file" name="file" required></label>
+        <label>Віртуальна папка
+            <input name="folder" list="mediaFolderOptions" placeholder="Наприклад: Герої, Документи, Новини">
+        </label>
         <div class="form-actions">
             <button type="submit"><span class="mdi mdi-upload-outline" aria-hidden="true"></span><span>Завантажити</span></button>
         </div>
     </form>
 </section>
 
+<datalist id="mediaFolderOptions">
+    <?php foreach (($folders ?? []) as $folderName): ?>
+        <option value="<?= e((string) $folderName) ?>"></option>
+    <?php endforeach; ?>
+</datalist>
+
 <form id="mediaBulkForm" method="post" action="<?= url('/admin/media/bulk') ?>" data-no-ajax data-list-panel="#mediaListPanel">
     <?= \App\Core\Csrf::field() ?>
 </form>
-<div id="mediaListPanel" class="list-panel" data-infinite-list data-list-url="<?= url('/admin/media') ?>" data-list-target="#mediaRows" data-list-offset="<?= e((string) count($items)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($items) < $total ? '1' : '0' ?>" data-list-empty-label="файли">
+<div id="mediaListPanel" class="list-panel" data-infinite-list data-list-url="<?= url('/admin/media') ?>" data-list-target="#mediaRows" data-list-offset="<?= e((string) count($items)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($items) < $total ? '1' : '0' ?>" data-list-empty-label="файли" data-media-metadata-url="<?= url('/admin/media/metadata') ?>">
     <div class="list-tools">
         <input data-filter-input type="search" value="<?= e($query ?? '') ?>" placeholder="Пошук файлів" aria-label="Пошук медіафайлів">
+        <select name="folder" data-list-filter data-media-folder-filter aria-label="Віртуальна папка">
+            <option value="">Усі папки</option>
+            <option value="__none" <?= ($folder ?? '') === '__none' ? 'selected' : '' ?>>Без папки</option>
+            <?php foreach (($folders ?? []) as $folderName): ?>
+                <option value="<?= e((string) $folderName) ?>" <?= selected($folder ?? '', (string) $folderName) ?>><?= e((string) $folderName) ?></option>
+            <?php endforeach; ?>
+        </select>
         <div class="bulk-actions">
             <select name="bulk_action" form="mediaBulkForm" aria-label="Групова дія">
                 <option value="">Групова дія</option>
@@ -51,13 +67,59 @@
     </div>
     <div class="table-scroll">
         <table>
-            <thead><tr><th><input type="checkbox" data-bulk-check-all form="mediaBulkForm" aria-label="Вибрати всі"></th><th>Файл</th><th>Тип</th><th>Розмір</th><th>Оновлено</th><th>Використання</th><th></th></tr></thead>
+            <thead><tr><th><input type="checkbox" data-bulk-check-all form="mediaBulkForm" aria-label="Вибрати всі"></th><th>Файл</th><th>Папка</th><th>Тип</th><th>Розмір</th><th>Оновлено</th><th>Використання</th><th></th></tr></thead>
             <tbody id="mediaRows"><?= $this->partial('admin/media/rows', ['items' => $items]) ?></tbody>
         </table>
     </div>
     <div class="empty-state <?= $items ? 'd-none' : '' ?>" data-list-empty>Файли не знайдені.</div>
     <div class="list-sentinel" data-list-sentinel></div>
     <p class="meta list-status" data-list-status><?= count($items) < $total ? 'Прокрутіть нижче, щоб завантажити ще.' : 'Усі файли завантажено.' ?></p>
+</div>
+
+<div class="modal fade" id="mediaMetadataModal" tabindex="-1" aria-labelledby="mediaMetadataTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="post" action="<?= url('/admin/media/metadata') ?>" data-media-metadata-form>
+                <div class="modal-header">
+                    <div>
+                        <p class="eyebrow mb-1">Медіафайл</p>
+                        <h2 class="modal-title h5" id="mediaMetadataTitle">Метадані файлу</h2>
+                        <p class="meta mb-0" data-media-metadata-path></p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+                </div>
+                <div class="modal-body">
+                    <?= \App\Core\Csrf::field() ?>
+                    <input type="hidden" name="path" data-media-metadata-field="path">
+                    <input type="hidden" name="current_folder" data-media-current-folder>
+                    <div class="media-metadata-layout">
+                        <div class="media-metadata-preview" data-media-metadata-preview></div>
+                        <div class="form-grid">
+                            <label>Віртуальна папка
+                                <input name="folder" data-media-metadata-field="folder" list="mediaFolderOptions" placeholder="Без папки">
+                            </label>
+                            <label>Альтернативний текст
+                                <input name="alt_text" data-media-metadata-field="alt_text" placeholder="Короткий опис зображення">
+                            </label>
+                            <label>Заголовок
+                                <input name="title" data-media-metadata-field="title" placeholder="Назва для відображення">
+                            </label>
+                            <label>Підпис
+                                <input name="caption" data-media-metadata-field="caption" placeholder="Підпис під файлом або зображенням">
+                            </label>
+                            <label>Опис
+                                <textarea name="description" data-media-metadata-field="description" rows="5" placeholder="Розширений опис або службова примітка"></textarea>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="button secondary" data-bs-dismiss="modal"><span class="mdi mdi-close" aria-hidden="true"></span><span>Скасувати</span></button>
+                    <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="mediaPreviewModal" tabindex="-1" aria-labelledby="mediaPreviewTitle" aria-hidden="true">
