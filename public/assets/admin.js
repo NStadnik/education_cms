@@ -326,6 +326,21 @@
             if (data.reset) {
                 form.reset();
             }
+            if (data.clear_password_fields) {
+                form.querySelectorAll('input[type="password"]').forEach(function (input) {
+                    input.value = '';
+                });
+            }
+            if (data.user_name) {
+                document.querySelectorAll('[data-admin-user-name], [data-profile-summary-name]').forEach(function (node) {
+                    node.textContent = data.user_name;
+                });
+            }
+            if (data.user_email) {
+                document.querySelectorAll('[data-profile-summary-email]').forEach(function (node) {
+                    node.textContent = data.user_email;
+                });
+            }
             if (form.dataset.replaceTarget && typeof data.html === 'string') {
                 const replaceTarget = document.querySelector(form.dataset.replaceTarget);
                 if (replaceTarget) {

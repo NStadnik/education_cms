@@ -133,6 +133,37 @@
         </div>
     </section>
 
+    <section class="template-workbench-summary" aria-label="Поточний стан конструктора">
+        <article class="template-summary-item template-summary-primary">
+            <span class="mdi mdi-palette-outline" aria-hidden="true"></span>
+            <div>
+                <small>Редагується</small>
+                <strong data-summary-template-name><?= e($siteTemplates[$selectedTemplate]['name'] ?? $selectedTemplate) ?></strong>
+            </div>
+        </article>
+        <article class="template-summary-item">
+            <span class="mdi mdi-menu" aria-hidden="true"></span>
+            <div>
+                <small>Пункти меню</small>
+                <strong data-template-stat-menu>0</strong>
+            </div>
+        </article>
+        <article class="template-summary-item">
+            <span class="mdi mdi-page-layout-footer" aria-hidden="true"></span>
+            <div>
+                <small>Футер</small>
+                <strong data-template-stat-footer>0 колонок</strong>
+            </div>
+        </article>
+        <article class="template-summary-item">
+            <span class="mdi mdi-content-save-outline" aria-hidden="true"></span>
+            <div>
+                <small>Стан</small>
+                <strong data-template-save-state>Без змін</strong>
+            </div>
+        </article>
+    </section>
+
     <div class="template-builder-layout">
         <div class="template-builder-controls">
             <section class="card admin-form-card template-layout-editor" data-template-layout-editor>
@@ -231,8 +262,8 @@
 
             <div class="template-save-bar">
                 <div>
-                    <strong>Готово до збереження</strong>
-                    <span>Зміни застосуються до вибраного шаблону після збереження.</span>
+                    <strong data-template-save-title>Готово до збереження</strong>
+                    <span data-template-save-copy>Зміни застосуються до вибраного шаблону після збереження.</span>
                 </div>
                 <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти шаблон</span></button>
             </div>

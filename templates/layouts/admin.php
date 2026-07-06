@@ -57,8 +57,12 @@
                 <div class="admin-header-actions">
                     <span class="admin-user">
                         <span class="mdi mdi-account-circle-outline" aria-hidden="true"></span>
-                        <span><?= e($user['name'] ?? 'Адміністратор') ?></span>
+                        <span data-admin-user-name><?= e($user['name'] ?? 'Адміністратор') ?></span>
                     </span>
+                    <a class="admin-header-button <?= strpos($currentPath, '/admin/profile') === 0 ? 'active' : '' ?>" href="<?= url('/admin/profile') ?>" title="Профіль">
+                        <span class="mdi mdi-account-cog-outline" aria-hidden="true"></span>
+                        <span>Профіль</span>
+                    </a>
                     <a class="admin-header-button" href="<?= url('/admin/updates') ?>" title="Оновлення">
                         <span class="mdi mdi-update" aria-hidden="true"></span>
                         <span>Оновлення</span>

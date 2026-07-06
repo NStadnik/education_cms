@@ -102,6 +102,8 @@ final class App
         $this->router->post('/admin/login', [$admin, 'authenticate']);
         $this->router->post('/admin/logout', [$admin, 'logout']);
         $this->router->get('/admin', [$admin, 'dashboard']);
+        $this->router->get('/admin/profile', [$adminUsers, 'profile']);
+        $this->router->post('/admin/profile/save', [$adminUsers, 'profileSave']);
         $this->router->get('/admin/pages', [$adminPages, 'pages']);
         $this->router->get('/admin/pages/edit', [$adminPages, 'pageForm']);
         $this->router->post('/admin/pages/save', [$adminPages, 'pageSave']);

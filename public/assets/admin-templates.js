@@ -42,6 +42,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const footerInput = document.querySelector('[data-template-footer-json]');
     const templateRadios = document.querySelectorAll('input[name="template_editor_key"]');
     const currentTemplateName = document.querySelector('[data-current-template-name]');
+    const summaryTemplateName = document.querySelector('[data-summary-template-name]');
+    const menuStat = document.querySelector('[data-template-stat-menu]');
+    const footerStat = document.querySelector('[data-template-stat-footer]');
+    const saveState = document.querySelector('[data-template-save-state]');
+    const saveTitle = document.querySelector('[data-template-save-title]');
+    const saveCopy = document.querySelector('[data-template-save-copy]');
+    const saveBar = document.querySelector('.template-save-bar');
     const previewFrame = document.querySelector('[data-template-home-preview]');
     const previewContext = previewFrame ? parseJson(previewFrame.dataset.context, {}) : {};
     const linkPicker = previewContext.linkPicker || {pages: [], categories: [], news: []};
@@ -64,6 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
     ensureTemplateLayout(selectedTemplate);
     let header = cloneLayout(layouts[selectedTemplate].header);
     let footer = cloneLayout(layouts[selectedTemplate].footer);
+    let baselineLayouts = '';
     const menuPickerNode = document.getElementById('templateMenuPickerModal');
     const menuPickerModal = menuPickerNode && window.bootstrap ? new window.bootstrap.Modal(menuPickerNode) : null;
     const menuPickerState = {
@@ -152,15 +160,46 @@ document.addEventListener('DOMContentLoaded', function () {
         parent.children.push(makeMenuItem('', ''));
     }
 
+    function menuListForPath(path) {
+        const parts = String(path || '').split('.').filter(Boolean).map(Number);
+        parts.pop();
+        let items = header.links || [];
+        parts.forEach(function (part) {
+            const item = items[part];
+            item.children = Array.isArray(item.children) ? item.children : [];
+            items = item.children;
+        });
+        return items;
+    }
+
+    function moveMenuItem(path, direction) {
+        const parts = String(path || '').split('.').filter(Boolean).map(Number);
+        const index = parts.pop();
+        const items = menuListForPath(path);
+        const target = Number(index) + direction;
+        if (!Number.isInteger(index) || target < 0 || target >= items.length) {
+            return;
+        }
+        const moved = items.splice(index, 1)[0];
+        items.splice(target, 0, moved);
+    }
+
     function renderMenuLinks(items, parentPath, depth) {
+        if (!items || !items.length) {
+            return '';
+        }
         return (items || []).map(function (link, index) {
             const path = parentPath ? parentPath + '.' + index : String(index);
             const children = Array.isArray(link.children) ? link.children : [];
+            const canMoveUp = index > 0;
+            const canMoveDown = index < items.length - 1;
             return '<div class="template-menu-node template-menu-depth-' + depth + '" data-header-link="' + path + '">' +
                 '<div class="template-editor-row template-menu-row">' +
                     '<label>Назва<input data-header-link-field="label" value="' + escapeHtml(link.label) + '"></label>' +
                     '<label>URL<input data-header-link-field="url" value="' + escapeHtml(link.url) + '"></label>' +
                     '<div class="template-menu-actions">' +
+                        '<button class="button secondary compact" type="button" data-header-move-link="-1" title="Підняти" ' + (canMoveUp ? '' : 'disabled') + '><span class="mdi mdi-arrow-up"></span></button>' +
+                        '<button class="button secondary compact" type="button" data-header-move-link="1" title="Опустити" ' + (canMoveDown ? '' : 'disabled') + '><span class="mdi mdi-arrow-down"></span></button>' +
                         (depth < 2 ? '<button class="button secondary compact" type="button" data-header-add-child title="Додати підпункт"><span class="mdi mdi-subdirectory-arrow-right"></span></button>' : '') +
                         '<button class="button danger compact" type="button" data-header-remove-link title="Видалити"><span class="mdi mdi-delete-outline"></span></button>' +
                     '</div>' +
@@ -168,6 +207,58 @@ document.addEventListener('DOMContentLoaded', function () {
                 (children.length ? '<div class="template-menu-children">' + renderMenuLinks(children, path, depth + 1) + '</div>' : '') +
             '</div>';
         }).join('');
+    }
+
+    function countMenuItems(items) {
+        return (items || []).reduce(function (total, item) {
+            return total + 1 + countMenuItems(Array.isArray(item.children) ? item.children : []);
+        }, 0);
+    }
+
+    function pluralizeUk(count, one, few, many) {
+        const mod10 = count % 10;
+        const mod100 = count % 100;
+        if (mod10 === 1 && mod100 !== 11) {
+            return one;
+        }
+        if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+            return few;
+        }
+        return many;
+    }
+
+    function hasMeaningfulCta() {
+        return Boolean(String(header.cta_label || '').trim() && String(header.cta_url || '').trim());
+    }
+
+    function updateWorkbenchSummary() {
+        const menuCount = countMenuItems(header.links || []);
+        const columnsCount = Array.isArray(footer.columns) ? footer.columns.length : 0;
+        const footerItemsCount = (footer.columns || []).reduce(function (total, column) {
+            return total + (Array.isArray(column.items) ? column.items.length : 0);
+        }, 0);
+        if (menuStat) {
+            menuStat.textContent = menuCount + ' ' + pluralizeUk(menuCount, 'пункт', 'пункти', 'пунктів') + (hasMeaningfulCta() ? ' + CTA' : '');
+        }
+        if (footerStat) {
+            footerStat.textContent = columnsCount + ' ' + pluralizeUk(columnsCount, 'колонка', 'колонки', 'колонок') + ', ' + footerItemsCount + ' ' + pluralizeUk(footerItemsCount, 'пункт', 'пункти', 'пунктів');
+        }
+    }
+
+    function updateSaveStatus() {
+        const changed = baselineLayouts !== '' && JSON.stringify(layouts) !== baselineLayouts;
+        if (saveState) {
+            saveState.textContent = changed ? 'Є зміни' : 'Без змін';
+        }
+        if (saveTitle) {
+            saveTitle.textContent = changed ? 'Є незбережені зміни' : 'Готово до збереження';
+        }
+        if (saveCopy) {
+            saveCopy.textContent = changed ? 'Натисніть збереження, щоб застосувати їх до шаблону.' : 'Зміни застосуються до вибраного шаблону після збереження.';
+        }
+        if (saveBar) {
+            saveBar.classList.toggle('is-dirty', changed);
+        }
     }
 
     function menuTargets(items, parentPath, depth) {
@@ -383,6 +474,8 @@ document.addEventListener('DOMContentLoaded', function () {
         layoutsInput.value = JSON.stringify(layouts);
         headerInput.value = JSON.stringify(header);
         footerInput.value = JSON.stringify(footer);
+        updateWorkbenchSummary();
+        updateSaveStatus();
         renderHomePreview();
     }
 
@@ -485,7 +578,9 @@ document.addEventListener('DOMContentLoaded', function () {
         headerEditor.querySelector('[data-header-field="show_brand"]').checked = header.show_brand !== false;
         headerEditor.querySelector('[data-header-field="show_home"]').checked = header.show_home !== false;
         headerEditor.querySelector('[data-header-field="show_news"]').checked = header.show_news !== false;
-        headerEditor.querySelector('[data-header-links]').innerHTML = renderMenuLinks(header.links || [], '', 0);
+        headerEditor.querySelector('[data-header-links]').innerHTML = (header.links || []).length
+            ? renderMenuLinks(header.links || [], '', 0)
+            : '<div class="template-empty-state"><span class="mdi mdi-menu-open" aria-hidden="true"></span><strong>Меню ще порожнє</strong><p>Додайте власний пункт або оберіть готове посилання зі сторінок, категорій чи новин.</p></div>';
         fillMenuParentSelect();
         syncLayouts();
     }
@@ -493,23 +588,36 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderFooter() {
         footerEditor.querySelector('[data-footer-field="variant"]').value = footer.variant || 'default';
         footerEditor.querySelector('[data-footer-field="bottom_text"]').value = footer.bottom_text || '';
-        footerEditor.querySelector('[data-footer-columns]').innerHTML = (footer.columns || []).map(function (column, columnIndex) {
+        footerEditor.querySelector('[data-footer-columns]').innerHTML = (footer.columns || []).length ? (footer.columns || []).map(function (column, columnIndex) {
+            column.items = Array.isArray(column.items) ? column.items : [];
+            const canMoveUp = columnIndex > 0;
+            const canMoveDown = columnIndex < footer.columns.length - 1;
             return '<section class="template-footer-column" data-footer-column="' + columnIndex + '">' +
                 '<div class="template-editor-list-head">' +
                     '<label>Назва колонки<input data-footer-column-field="title" value="' + escapeHtml(column.title) + '"></label>' +
-                    '<button class="button danger compact" type="button" data-footer-remove-column><span class="mdi mdi-delete-outline"></span></button>' +
+                    '<div class="template-menu-actions">' +
+                        '<button class="button secondary compact" type="button" data-footer-move-column="-1" title="Підняти" ' + (canMoveUp ? '' : 'disabled') + '><span class="mdi mdi-arrow-left"></span></button>' +
+                        '<button class="button secondary compact" type="button" data-footer-move-column="1" title="Опустити" ' + (canMoveDown ? '' : 'disabled') + '><span class="mdi mdi-arrow-right"></span></button>' +
+                        '<button class="button danger compact" type="button" data-footer-remove-column title="Видалити"><span class="mdi mdi-delete-outline"></span></button>' +
+                    '</div>' +
                 '</div>' +
                 '<div class="template-editor-list">' + (column.items || []).map(function (item, itemIndex) {
+                    const canMoveItemUp = itemIndex > 0;
+                    const canMoveItemDown = itemIndex < column.items.length - 1;
                     return '<div class="template-editor-row" data-footer-item="' + itemIndex + '">' +
                         '<label>Назва<input data-footer-item-field="label" value="' + escapeHtml(item.label) + '"></label>' +
                         '<label>Текст<input data-footer-item-field="text" value="' + escapeHtml(item.text) + '"></label>' +
                         '<label>URL<input data-footer-item-field="url" value="' + escapeHtml(item.url) + '"></label>' +
-                        '<button class="button danger compact" type="button" data-footer-remove-item><span class="mdi mdi-delete-outline"></span></button>' +
+                        '<div class="template-menu-actions">' +
+                            '<button class="button secondary compact" type="button" data-footer-move-item="-1" title="Підняти" ' + (canMoveItemUp ? '' : 'disabled') + '><span class="mdi mdi-arrow-up"></span></button>' +
+                            '<button class="button secondary compact" type="button" data-footer-move-item="1" title="Опустити" ' + (canMoveItemDown ? '' : 'disabled') + '><span class="mdi mdi-arrow-down"></span></button>' +
+                            '<button class="button danger compact" type="button" data-footer-remove-item title="Видалити"><span class="mdi mdi-delete-outline"></span></button>' +
+                        '</div>' +
                     '</div>';
                 }).join('') + '</div>' +
                 '<button class="button secondary compact" type="button" data-footer-add-item><span class="mdi mdi-plus"></span><span>Пункт</span></button>' +
             '</section>';
-        }).join('');
+        }).join('') : '<div class="template-empty-state"><span class="mdi mdi-page-layout-footer" aria-hidden="true"></span><strong>Колонок ще немає</strong><p>Додайте колонку для контактів, швидких посилань або службової інформації.</p></div>';
         syncLayouts();
     }
 
@@ -549,6 +657,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const addChild = event.target.closest('[data-header-add-child]');
         if (addChild) {
             addMenuChild(addChild.closest('[data-header-link]').dataset.headerLink);
+            renderHeader();
+        }
+        const move = event.target.closest('[data-header-move-link]');
+        if (move) {
+            moveMenuItem(move.closest('[data-header-link]').dataset.headerLink, Number(move.dataset.headerMoveLink));
             renderHeader();
         }
         const remove = event.target.closest('[data-header-remove-link]');
@@ -639,6 +752,9 @@ document.addEventListener('DOMContentLoaded', function () {
             if (currentTemplateName) {
                 currentTemplateName.textContent = radio.dataset.templateLabel || radio.value;
             }
+            if (summaryTemplateName) {
+                summaryTemplateName.textContent = radio.dataset.templateLabel || radio.value;
+            }
             ensureTemplateLayout(selectedTemplate);
             header = cloneLayout(layouts[selectedTemplate].header);
             footer = cloneLayout(layouts[selectedTemplate].footer);
@@ -661,11 +777,34 @@ document.addEventListener('DOMContentLoaded', function () {
             footer.columns.splice(Number(removeColumn.closest('[data-footer-column]').dataset.footerColumn), 1);
             renderFooter();
         }
+        const moveColumn = event.target.closest('[data-footer-move-column]');
+        if (moveColumn) {
+            const index = Number(moveColumn.closest('[data-footer-column]').dataset.footerColumn);
+            const target = index + Number(moveColumn.dataset.footerMoveColumn);
+            if (target >= 0 && target < footer.columns.length) {
+                const moved = footer.columns.splice(index, 1)[0];
+                footer.columns.splice(target, 0, moved);
+                renderFooter();
+            }
+        }
         const addItem = event.target.closest('[data-footer-add-item]');
         if (addItem) {
             const column = addItem.closest('[data-footer-column]');
             footer.columns[Number(column.dataset.footerColumn)].items.push({label: '', text: '', url: ''});
             renderFooter();
+        }
+        const moveItem = event.target.closest('[data-footer-move-item]');
+        if (moveItem) {
+            const column = moveItem.closest('[data-footer-column]');
+            const item = moveItem.closest('[data-footer-item]');
+            const items = footer.columns[Number(column.dataset.footerColumn)].items;
+            const index = Number(item.dataset.footerItem);
+            const target = index + Number(moveItem.dataset.footerMoveItem);
+            if (target >= 0 && target < items.length) {
+                const moved = items.splice(index, 1)[0];
+                items.splice(target, 0, moved);
+                renderFooter();
+            }
         }
         const removeItem = event.target.closest('[data-footer-remove-item]');
         if (removeItem) {
@@ -678,4 +817,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     renderHeader();
     renderFooter();
+    baselineLayouts = JSON.stringify(layouts);
+    updateSaveStatus();
 });
