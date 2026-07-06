@@ -62,7 +62,10 @@ final class PagesController extends \App\Controllers\AdminBaseController
         try {
             $now = date('c');
             $id = (int) $request->input('id', 0);
-            $blocks = $this->blocksFromText((string) $request->input('blocks_text'));
+            $blocks = $this->blocksFromLayoutJson((string) $request->input('layout_json'));
+            if (!$blocks) {
+                $blocks = $this->blocksFromText((string) $request->input('blocks_text'));
+            }
             $slug = $this->slug((string) $request->input('slug', $request->input('title')));
             $template = (string) $request->input('template', 'default');
             if (!array_key_exists($template, $this->pageTemplates())) {
@@ -101,6 +104,88 @@ final class PagesController extends \App\Controllers\AdminBaseController
         } catch (Throwable $e) {
             return $this->ajaxError($request, $e);
         }
+    }
+
+    private function blocksFromLayoutJson(string $json): array
+    {
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            return [];
+        }
+
+        $sections = [];
+        foreach ($data as $section) {
+            if (!is_array($section)) {
+                continue;
+            }
+
+            $rows = [];
+            foreach (($section['rows'] ?? []) as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+
+                $columns = [];
+                foreach (($row['columns'] ?? []) as $column) {
+                    if (!is_array($column)) {
+                        continue;
+                    }
+
+                    $cards = [];
+                    foreach (($column['cards'] ?? []) as $card) {
+                        if (!is_array($card)) {
+                            continue;
+                        }
+
+                        $title = trim((string) ($card['title'] ?? ''));
+                        $text = trim((string) ($card['text'] ?? ''));
+                        $image = trim((string) ($card['image'] ?? ''));
+                        $buttonText = trim((string) ($card['button_text'] ?? ''));
+                        $buttonUrl = trim((string) ($card['button_url'] ?? ''));
+                        if ($title === '' && $text === '' && $image === '') {
+                            continue;
+                        }
+
+                        $cards[] = [
+                            'type' => 'card',
+                            'style' => $this->layoutChoice((string) ($card['style'] ?? 'default'), ['default', 'accent', 'plain'], 'default'),
+                            'title' => $title,
+                            'text' => $text,
+                            'image' => $image,
+                            'button_text' => $buttonText,
+                            'button_url' => $buttonUrl,
+                        ];
+                    }
+
+                    if ($cards) {
+                        $columns[] = [
+                            'width' => $this->layoutChoice((string) ($column['width'] ?? 'col-md-12'), ['col-md-12', 'col-md-8', 'col-md-6', 'col-md-4'], 'col-md-12'),
+                            'cards' => $cards,
+                        ];
+                    }
+                }
+
+                if ($columns) {
+                    $rows[] = ['columns' => $columns];
+                }
+            }
+
+            if ($rows) {
+                $sections[] = [
+                    'type' => 'layout',
+                    'title' => trim((string) ($section['title'] ?? '')),
+                    'background' => $this->layoutChoice((string) ($section['background'] ?? 'default'), ['default', 'light', 'accent'], 'default'),
+                    'rows' => $rows,
+                ];
+            }
+        }
+
+        return $sections;
+    }
+
+    private function layoutChoice(string $value, array $allowed, string $fallback): string
+    {
+        return in_array($value, $allowed, true) ? $value : $fallback;
     }
 
     public function pagesBulk(Request $request): Response
