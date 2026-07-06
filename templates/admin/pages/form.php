@@ -137,7 +137,7 @@
                         </div>
                     </div>
                     <label>Вміст
-                        <textarea class="textarea-large" name="blocks_text" data-rich-editor placeholder="Введіть текст сторінки. Можна вставляти HTML з базовим форматуванням."><?= e($simpleText) ?></textarea>
+                        <textarea class="textarea-large" name="blocks_text" data-tinymce-editor placeholder="Введіть текст сторінки. Можна вставляти HTML з базовим форматуванням."><?= e($simpleText) ?></textarea>
                     </label>
                 </section>
                 <input type="hidden" name="layout_json" data-layout-json>

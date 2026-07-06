@@ -468,7 +468,6 @@ document.addEventListener('DOMContentLoaded', function () {
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
             '<link rel="stylesheet" href="' + escapeHtml(previewContext.bootstrapCss || '') + '">' +
             '<link rel="stylesheet" href="' + escapeHtml(previewContext.siteCss || '') + '">' +
-            '<link rel="stylesheet" href="' + escapeHtml(previewContext.richEditorCss || '') + '">' +
             (template.css ? '<link rel="stylesheet" href="' + escapeHtml(template.css) + '">' : '') +
             '</head><body class="site-template-' + escapeHtml(selectedTemplate) + '">' +
             '<div class="template-preview-note">Перегляд: ' + escapeHtml(template.name || selectedTemplate) + ' <span>незбережені зміни</span></div>' +

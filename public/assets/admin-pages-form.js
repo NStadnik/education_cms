@@ -448,14 +448,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const html = layoutToSimpleHtml();
         simpleTextarea.value = html;
 
-        const editor = simpleTextarea.nextElementSibling;
-        const area = editor ? editor.querySelector('.rich-editor-area') : null;
-        const code = editor ? editor.querySelector('.rich-editor-code') : null;
-        if (area && (!editor.classList.contains('is-source-mode') || !code)) {
-            area.innerHTML = html;
-        }
-        if (code) {
-            code.value = html;
+        if (window.TinyMceEditor) {
+            window.TinyMceEditor.setContent(simpleTextarea, html);
         }
     }
 

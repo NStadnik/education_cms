@@ -24,7 +24,7 @@
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css') ?>">
     <link rel="stylesheet" href="<?= url('/assets/admin.css') ?>">
-    <link rel="stylesheet" href="<?= url('/assets/rich-editor.css') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/tinymce-editor.css') ?>">
     <?php if (strpos($currentPath, '/admin/pages') === 0): ?>
         <link rel="stylesheet" href="<?= url('/assets/admin-pages-form.css') ?>">
     <?php endif; ?>
@@ -159,7 +159,8 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="<?= url('/assets/rich-editor.js') ?>"></script>
+    <script src="<?= url('/assets/tinymce/tinymce.min.js') ?>"></script>
+    <script src="<?= url('/assets/tinymce-editor.js') ?>"></script>
     <script src="<?= url('/assets/admin.js') ?>"></script>
 </body>
 </html>

@@ -1,0 +1,5 @@
+.tox-tinymce { border: 1px solid var(--line) !important; border-radius: 6px !important; }
+.tox .tox-toolbar__primary { background: #f8fafc !important; }
+.tox .tox-tbtn { border-radius: 5px !important; }
+.tox .tox-statusbar { border-top-color: var(--line) !important; }
+textarea[data-tinymce-editor] { min-height: 320px; }

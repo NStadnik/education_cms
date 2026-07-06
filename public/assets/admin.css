@@ -119,6 +119,37 @@
 .media-preview-empty { width: 100%; min-height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
 .media-preview-empty .mdi { color: var(--brand); font-size: 42px; line-height: 1; }
 .media-preview-empty p { margin: 0; }
+.rich-media-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-bottom: 12px; }
+.rich-media-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+.rich-media-status { min-height: 22px; margin-bottom: 10px; }
+.rich-media-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 34%); gap: 14px; align-items: start; }
+.rich-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.rich-media-card { position: relative; display: grid; gap: 7px; min-height: 188px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--text); text-align: left; cursor: pointer; }
+.rich-media-card:hover { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(31,111,235,.12); }
+.rich-media-card.is-selected { border-color: var(--brand); background: #f7fbff; box-shadow: 0 0 0 3px rgba(31,111,235,.18); }
+.rich-media-card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 5px; background: #f1f4f9; }
+.rich-media-card-check { position: absolute; top: 14px; right: 14px; display: grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border: 2px solid #fff; border-radius: 999px; background: var(--brand); color: #fff; font-size: 12px; font-weight: 800; line-height: 1; box-shadow: 0 8px 18px rgba(15,23,42,.2); }
+.rich-media-file-icon { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 4 / 3; border-radius: 5px; background: #eef4ff; color: var(--brand); font-size: 42px; line-height: 1; }
+.rich-media-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.rich-media-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.rich-media-selection { position: sticky; top: 0; display: grid; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
+.rich-media-selection-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.rich-media-selection-head strong { display: block; color: var(--text); }
+.rich-media-selection-head span { display: block; margin-top: 2px; color: var(--muted); font-size: 13px; line-height: 1.35; }
+.rich-media-selected-list { display: grid; gap: 7px; max-height: 176px; overflow: auto; }
+.rich-media-selected-item { display: grid; grid-template-columns: auto 44px minmax(0, 1fr); gap: 8px; align-items: center; padding: 7px; border: 1px solid #dfe7f3; border-radius: 6px; background: #fff; }
+.rich-media-selected-item img, .rich-media-selected-file { width: 44px; height: 34px; border-radius: 5px; background: #eef4ff; object-fit: cover; }
+.rich-media-selected-file { display: grid; place-items: center; color: var(--brand); font-size: 22px; }
+.rich-media-selected-order { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: #e8f0ff; color: var(--brand); font-size: 12px; font-weight: 800; }
+.rich-media-selected-item strong, .rich-media-selected-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rich-media-selected-item strong { color: var(--text); font-size: 13px; }
+.rich-media-selected-item small { color: var(--muted); font-size: 12px; }
+.rich-media-preview { min-height: 180px; padding: 10px; border: 1px dashed #cbd7ea; border-radius: 8px; background: #fff; overflow: hidden; }
+.rich-media-preview-empty { display: grid; place-items: center; min-height: 156px; color: var(--muted); font-size: 13px; text-align: center; }
+.rich-media-preview-frame { display: flow-root; }
+.rich-media-preview .rich-media-block, .rich-media-preview .rich-gallery, .rich-media-preview .rich-file-link { margin-bottom: 8px; }
+.rich-media-preview .rich-media-block img, .rich-media-preview .rich-gallery img { border-radius: 5px; }
+.rich-media-preview .rich-media-block figcaption, .rich-media-preview .rich-gallery-caption { margin-bottom: 8px; font-size: 12px; }
 
 tr[hidden], .accordion-item[hidden] { display: none !important; }
 .layout, .admin-shell { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
@@ -158,6 +189,9 @@ tr[hidden], .accordion-item[hidden] { display: none !important; }
     .import-progress-head { align-items: stretch; flex-direction: column; }
     .import-progress-steps { grid-template-columns: 1fr; }
     .wp-scope-options { grid-template-columns: 1fr; }
+    .rich-media-workspace { grid-template-columns: 1fr; }
+    .rich-media-selection { position: static; }
+    .rich-media-tools, .rich-media-options { grid-template-columns: 1fr; }
     .layout, .admin-shell { grid-template-columns: 1fr; }
     .admin-header { align-items: stretch; flex-direction: column; padding: 14px 16px; }
     .admin-header-actions { justify-content: flex-start; }
