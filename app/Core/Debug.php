@@ -41,10 +41,12 @@ final class Debug
             }
 
             echo '<!doctype html><meta charset="utf-8"><title>Debug error</title>';
-            echo '<style>body{font-family:system-ui;padding:24px;background:#f7f8fb;color:#162033}pre{white-space:pre-wrap;background:#fff;border:1px solid #d9dee8;padding:16px;border-radius:8px}</style>';
+            echo '<link rel="stylesheet" href="/assets/site.css">';
+            echo '<main class="debug-error-page">';
             echo '<h1>Debug error</h1>';
             echo '<p><strong>' . e($e::class) . ':</strong> ' . e($e->getMessage()) . '</p>';
             echo '<pre>' . e($e->getFile() . ':' . $e->getLine() . "\n\n" . $e->getTraceAsString()) . '</pre>';
+            echo '</main>';
         });
     }
 

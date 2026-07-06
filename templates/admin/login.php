@@ -1,4 +1,4 @@
-<div class="card" style="max-width:460px;margin:40px auto">
+<div class="card admin-login-card">
     <h1>Вхід в адмінку</h1>
     <?php if (!empty($error)): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
     <form class="form-grid" method="post" action="<?= url('/admin/login') ?>">

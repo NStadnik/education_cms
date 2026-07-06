@@ -11,7 +11,7 @@
     </table>
 </div>
 
-<div class="card" style="margin-top:16px">
+<div class="card debug-session-card">
     <h2>Session</h2>
     <pre><?= e(json_encode($session, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) ?></pre>
 </div>

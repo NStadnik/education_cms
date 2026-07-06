@@ -9,7 +9,7 @@
             <span class="status"><?= e((string) count($items)) ?> записів</span>
         </div>
         <?php if (!empty($categories)): ?>
-            <div class="bulk-actions" style="justify-content:flex-start;margin-bottom:18px">
+            <div class="bulk-actions news-category-filter">
                 <a class="status <?= empty($activeCategory) ? 'ok' : '' ?>" href="<?= url('/news') ?>">Усі</a>
                 <?php foreach ($categories as $category): ?>
                     <a class="status <?= ($activeCategory ?? '') === $category['category'] ? 'ok' : '' ?>" href="<?= url('/news?category=' . urlencode($category['category'])) ?>">
