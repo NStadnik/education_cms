@@ -56,7 +56,30 @@
                 <p class="meta">Ці дані використовуються в шапці, підвалі та публічних сторінках сайту.</p>
             </div>
         </div>
+        <?php $siteLogo = (string) ($settings['site_logo'] ?? ''); ?>
         <label>Назва<input name="institution_name" value="<?= e($settings['institution_name'] ?? '') ?>"></label>
+        <div class="settings-logo-picker" data-settings-logo-picker data-thumb-base="<?= url('/thumb/') ?>">
+            <input type="hidden" name="site_logo" value="<?= e($siteLogo) ?>" data-settings-logo-input>
+            <div class="settings-logo-preview" data-settings-logo-preview>
+                <?php if ($siteLogo !== ''): ?>
+                    <img src="<?= url('/thumb/' . $siteLogo . '?w=160&h=160&fit=contain') ?>" alt="">
+                <?php else: ?>
+                    <span class="mdi mdi-image-outline" aria-hidden="true"></span>
+                <?php endif; ?>
+            </div>
+            <div class="settings-logo-body">
+                <strong>Логотип</strong>
+                <span data-settings-logo-name><?= $siteLogo !== '' ? e($siteLogo) : 'Логотип не вибрано' ?></span>
+                <div class="settings-logo-actions">
+                    <button class="button secondary compact" type="button" data-settings-logo-open>
+                        <span class="mdi mdi-image-search-outline" aria-hidden="true"></span><span>Обрати з медіа</span>
+                    </button>
+                    <button class="button secondary compact" type="button" data-settings-logo-clear <?= $siteLogo === '' ? 'hidden' : '' ?>>
+                        <span class="mdi mdi-close" aria-hidden="true"></span><span>Очистити</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </section>
 
     <section class="card admin-form-card" data-global-fields>
@@ -95,5 +118,36 @@
 
     <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти</span></button>
 </form>
+
+<div class="modal fade" id="settingsLogoPickerModal" tabindex="-1" aria-labelledby="settingsLogoPickerTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow mb-1">Медіафайли</p>
+                    <h2 class="modal-title h5" id="settingsLogoPickerTitle">Обрати логотип</h2>
+                    <p class="meta mb-0">Показуються лише зображення з медіатеки.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-logo-modal-tools">
+                    <label class="list-search-field">
+                        <span class="mdi mdi-magnify" aria-hidden="true"></span>
+                        <input type="search" data-settings-logo-search placeholder="Пошук зображення">
+                    </label>
+                    <span class="list-count-pill" data-settings-logo-status>Готово</span>
+                </div>
+                <div class="settings-logo-grid" data-settings-logo-grid></div>
+                <button class="button secondary compact settings-logo-more" type="button" data-settings-logo-more hidden>
+                    <span class="mdi mdi-chevron-down" aria-hidden="true"></span><span>Показати ще</span>
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="button secondary" data-bs-dismiss="modal"><span class="mdi mdi-close" aria-hidden="true"></span><span>Закрити</span></button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="<?= url('/assets/admin-settings.js') ?>"></script>

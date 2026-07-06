@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveBar = document.querySelector('.template-save-bar');
     const previewFrame = document.querySelector('[data-template-home-preview]');
     const previewContext = previewFrame ? parseJson(previewFrame.dataset.context, {}) : {};
-    const linkPicker = previewContext.linkPicker || {pages: [], categories: [], news: []};
+    const linkPicker = previewContext.linkPicker || {pages: [], categories: [], news: [], media: []};
     const defaultHeader = {
         variant: 'default',
         show_brand: true,
@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const scopeFilter = menuPickerNode.querySelector('[data-menu-picker-filter="scope"]');
         const categoryFilter = menuPickerNode.querySelector('[data-menu-picker-filter="category"]');
         if (statusFilter) {
-            statusFilter.hidden = type === 'categories';
+            statusFilter.hidden = type === 'categories' || type === 'media';
         }
         if (scopeFilter) {
             scopeFilter.hidden = type !== 'categories';
@@ -388,7 +388,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (scope && scope.value !== '') {
                 url.searchParams.set('scope', scope.value);
             }
-        } else if (status) {
+        } else if ((menuPickerState.type === 'pages' || menuPickerState.type === 'news') && status) {
             url.searchParams.set('status', status.value);
             if (menuPickerState.type === 'news' && category && category.value !== '') {
                 url.searchParams.set('category_id', category.value);
@@ -463,7 +463,8 @@ document.addEventListener('DOMContentLoaded', function () {
         return {
             pages: 'mdi-file-document-outline',
             categories: 'mdi-shape-outline',
-            news: 'mdi-newspaper-variant-outline'
+            news: 'mdi-newspaper-variant-outline',
+            media: 'mdi-file-image-outline'
         }[type] || 'mdi-link-variant';
     }
 

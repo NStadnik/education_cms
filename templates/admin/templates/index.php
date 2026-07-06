@@ -57,7 +57,7 @@
         'homeTitle' => (string) (($previewHomePage['title'] ?? '') ?: 'Головна'),
         'homeExcerpt' => (string) ($previewHomePage['excerpt'] ?? ''),
         'globalFields' => is_array($previewGlobalFields ?? null) ? $previewGlobalFields : [],
-        'linkPicker' => is_array($templateLinkPicker ?? null) ? $templateLinkPicker : ['pages' => [], 'categories' => [], 'news' => []],
+        'linkPicker' => is_array($templateLinkPicker ?? null) ? $templateLinkPicker : ['pages' => [], 'categories' => [], 'news' => [], 'media' => []],
     ];
     $activeSiteTemplate = (string) ($settings['site_template'] ?? 'official');
 ?>
@@ -307,10 +307,11 @@
                         <button class="button compact" type="button" data-menu-picker-type="pages"><span class="mdi mdi-file-document-outline" aria-hidden="true"></span><span>Сторінки</span></button>
                         <button class="button secondary compact" type="button" data-menu-picker-type="categories"><span class="mdi mdi-shape-outline" aria-hidden="true"></span><span>Категорії</span></button>
                         <button class="button secondary compact" type="button" data-menu-picker-type="news"><span class="mdi mdi-newspaper-variant-outline" aria-hidden="true"></span><span>Новини</span></button>
+                        <button class="button secondary compact" type="button" data-menu-picker-type="media"><span class="mdi mdi-folder-image" aria-hidden="true"></span><span>Медіафайли</span></button>
                     </div>
                     <div class="template-menu-picker-filters">
                         <label class="template-menu-picker-search">Пошук
-                            <input type="search" data-menu-picker-search placeholder="Назва, slug або текст">
+                            <input type="search" data-menu-picker-search placeholder="Назва, slug, файл або текст">
                         </label>
                         <label data-menu-picker-filter="status">Статус
                             <select data-menu-picker-status>

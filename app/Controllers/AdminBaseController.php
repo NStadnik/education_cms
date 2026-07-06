@@ -1299,7 +1299,16 @@ abstract class AdminBaseController extends BaseController
 
     protected function mediaReferences(): array
     {
-        return [];
+        $references = [];
+        $logo = Files::normalize((string) ($this->siteSettings()['site_logo'] ?? ''));
+        if ($logo !== '') {
+            $references[$logo] = [
+                'label' => 'Логотип сайту',
+                'url' => url('/admin/settings'),
+            ];
+        }
+
+        return $references;
     }
 
     protected function filterMedia(array $items, string $query): array

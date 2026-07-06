@@ -31,6 +31,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
         Csrf::verify();
         try {
             $this->saveSetting('institution_name', (string) $request->input('institution_name'));
+            $this->saveSetting('site_logo', $this->normalizeSiteLogo((string) $request->input('site_logo', '')));
             $this->saveSetting('home_page_id', $this->normalizeHomePageId((int) $request->input('home_page_id', 0)));
             $this->saveSetting('site_template', $this->normalizeSiteTemplate((string) $request->input('site_template', 'official')));
             $globalFields = json_encode($this->normalizeGlobalFields($request), JSON_UNESCAPED_UNICODE);
@@ -83,7 +84,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
     {
         $this->guard('settings.manage');
         $type = (string) $request->input('type', 'pages');
-        if (!in_array($type, ['pages', 'categories', 'news'], true)) {
+        if (!in_array($type, ['pages', 'categories', 'news', 'media'], true)) {
             return $this->json(['ok' => false, 'message' => 'Невідомий тип посилання.'], 422);
         }
 
@@ -91,6 +92,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
         $pagination = $this->pagination($request);
         $payload = match ($type) {
             'categories' => $this->templateCategoryPickerPayload($request, $query, $pagination),
+            'media' => $this->templateMediaPickerPayload($query, $pagination),
             'news' => $this->templateNewsPickerPayload($request, $query, $pagination),
             default => $this->templatePagePickerPayload($request, $query, $pagination),
         };
@@ -125,6 +127,25 @@ final class SettingsController extends \App\Controllers\AdminBaseController
         }
 
         return $layouts;
+    }
+
+    private function normalizeSiteLogo(string $path): string
+    {
+        $path = Files::normalize($path);
+        if ($path === '') {
+            return '';
+        }
+
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            throw new \InvalidArgumentException('Логотип має бути зображенням JPG, PNG або WEBP.');
+        }
+
+        if (!is_file(base_path('storage/uploads/' . $path))) {
+            throw new \InvalidArgumentException('Обраний логотип не знайдено у медіафайлах.');
+        }
+
+        return $path;
     }
 
     private function templatePreviewMenu(): array
@@ -401,6 +422,19 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'url' => url('/news/' . (string) ($item['slug'] ?? '')),
             'meta' => trim((string) ($item['status'] ?? '') . (((string) ($item['category_titles'] ?? '') !== '') ? ' · ' . (string) $item['category_titles'] : ''), ' ·'),
         ], $items), $pagination, $total);
+    }
+
+    private function templateMediaPickerPayload(string $query, array $pagination): array
+    {
+        $items = $this->filterMedia(Files::all($this->mediaReferences()), $query);
+        $total = count($items);
+        $slice = array_slice($items, $pagination['offset'], $pagination['limit']);
+
+        return $this->templatePickerResponse(array_map(static fn (array $item): array => [
+            'label' => (string) ($item['name'] ?? $item['path'] ?? ''),
+            'url' => url('/uploads/' . (string) ($item['path'] ?? '')),
+            'meta' => trim((string) ($item['type'] ?? '') . ' · ' . (string) ($item['size_label'] ?? ''), ' ·'),
+        ], $slice), $pagination, $total);
     }
 
     private function templatePickerResponse(array $items, array $pagination, int $total): array

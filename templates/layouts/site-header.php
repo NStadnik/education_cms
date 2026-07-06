@@ -9,6 +9,7 @@
         'cta_url' => '',
     ], is_array($headerLayout ?? null) ? $headerLayout : []);
     $variant = preg_replace('/[^a-z0-9_-]/i', '', (string) $layout['variant']) ?: 'default';
+    $siteLogo = \App\Services\Files::normalize((string) ($settings['site_logo'] ?? ''));
     $renderMenuLinks = static function (array $links) use (&$renderMenuLinks): string {
         $html = '';
         foreach ($links as $link) {
@@ -35,7 +36,12 @@
 <header class="topbar site-header site-header-<?= e($variant) ?>">
     <div class="container topbar-inner site-header-inner">
         <?php if (!empty($layout['show_brand'])): ?>
-            <a class="brand" href="<?= url('/') ?>"><?= e($settings['institution_name'] ?? 'Заклад освіти') ?></a>
+            <a class="brand" href="<?= url('/') ?>">
+                <?php if ($siteLogo !== ''): ?>
+                    <img class="site-logo" src="<?= url('/thumb/' . $siteLogo . '?w=96&h=96&fit=contain') ?>" alt="">
+                <?php endif; ?>
+                <span><?= e($settings['institution_name'] ?? 'Заклад освіти') ?></span>
+            </a>
         <?php endif; ?>
         <nav class="nav site-header-nav" aria-label="Головне меню">
             <?php if (!empty($layout['show_home'])): ?>

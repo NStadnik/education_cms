@@ -94,6 +94,22 @@
 .global-fields-list { display: grid; gap: 12px; }
 .global-field-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(240px, 2fr) auto; gap: 12px; align-items: end; }
 .global-field-row button { width: 40px; padding-left: 0; padding-right: 0; }
+.settings-logo-picker { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcff; }
+.settings-logo-preview { display: grid; place-items: center; width: 82px; height: 82px; border: 1px dashed #cbd7ea; border-radius: 8px; background: #fff; overflow: hidden; }
+.settings-logo-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.settings-logo-preview .mdi { color: var(--brand); font-size: 32px; line-height: 1; }
+.settings-logo-body { display: grid; gap: 5px; min-width: 0; }
+.settings-logo-body strong, .settings-logo-body span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-logo-body span { color: var(--muted); font-size: 13px; }
+.settings-logo-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 3px; }
+.settings-logo-modal-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcff; }
+.settings-logo-modal-tools .list-search-field { flex: 1 1 320px; margin: 0; }
+.settings-logo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.settings-logo-item { display: grid !important; gap: 7px !important; min-height: 174px; padding: 8px !important; border: 1px solid var(--line) !important; border-radius: 8px !important; background: #fff !important; color: var(--text) !important; text-align: left; }
+.settings-logo-item:hover { border-color: var(--brand) !important; box-shadow: 0 0 0 2px rgba(31,111,235,.12); }
+.settings-logo-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 6px; background: #f1f4f9; }
+.settings-logo-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 650; }
+.settings-logo-more { justify-self: center; margin-top: 12px; }
 .source-options { display: flex; flex-wrap: wrap; gap: 12px; }
 .import-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .import-option { position: relative; display: grid !important; grid-template-columns: auto minmax(0, 1fr); gap: 10px !important; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; cursor: pointer; }
