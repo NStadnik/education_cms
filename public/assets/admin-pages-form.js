@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const cardModal = cardModalNode && window.bootstrap ? new window.bootstrap.Modal(cardModalNode) : null;
     const cardModalError = cardModalNode ? cardModalNode.querySelector('[data-card-modal-error]') : null;
     const cardModalPreview = cardModalNode ? cardModalNode.querySelector('[data-card-modal-preview]') : null;
+    const cardImagePreview = cardModalNode ? cardModalNode.querySelector('[data-card-image-preview]') : null;
     const sectionPickerNode = document.getElementById('layoutSectionPickerModal');
     const sectionPickerModal = sectionPickerNode && window.bootstrap ? new window.bootstrap.Modal(sectionPickerNode) : null;
     const imagePickerNode = document.getElementById('layoutCardImagePickerModal');
@@ -682,12 +683,19 @@ document.addEventListener('DOMContentLoaded', function () {
             const field = cardModalField(name);
             if (field) {
                 field.value = card[name] || (name === 'style' ? 'default' : '');
+                if (name === 'text' && window.TinyMceEditor) {
+                    window.TinyMceEditor.setContent(field, field.value);
+                }
             }
         });
     }
 
     function readCardModalValues() {
         const card = emptyCard();
+        const textField = cardModalField('text');
+        if (textField && window.TinyMceEditor) {
+            window.TinyMceEditor.syncOne(textField);
+        }
         ['style', 'title', 'text', 'image', 'button_text', 'button_url'].forEach(function (name) {
             const field = cardModalField(name);
             if (field) {
@@ -705,6 +713,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const templateField = cardModalNode ? cardModalNode.querySelector('[data-card-modal-template]') : null;
         if (templateField) {
             templateField.value = value || '';
+        }
+        if (cardModalNode) {
+            cardModalNode.querySelectorAll('[data-card-template-quick]').forEach(function (button) {
+                button.classList.toggle('is-active', button.dataset.cardTemplateQuick === value);
+            });
         }
     }
 
@@ -734,6 +747,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const style = cardStyles.includes(card.style) ? card.style : 'default';
         const hasContent = title !== '' || text !== '' || image !== '' || buttonText !== '';
 
+        updateCardModalStats(card, style);
+        updateCardImagePreview(image);
         cardModalPreview.className = 'card content-card page-layout-card page-layout-card-' + style;
         if (!hasContent) {
             cardModalPreview.innerHTML = '<div class="layout-card-modal-preview-empty">Заповніть картку</div>';
@@ -745,6 +760,79 @@ document.addEventListener('DOMContentLoaded', function () {
             (title ? '<h3>' + escapeHtml(title) + '</h3>' : '') +
             (text ? '<div class="rich-content">' + cardTextPreview(text) + '</div>' : '') +
             (buttonText && buttonUrl ? '<span class="button read-more layout-card-preview-button">' + escapeHtml(buttonText) + '</span>' : '');
+    }
+
+    function updateCardModalStats(card, style) {
+        if (!cardModalNode) {
+            return;
+        }
+
+        const textLength = String(card.text || '').replace(/<[^>]*>/g, '').trim().length;
+        const styleNode = cardModalNode.querySelector('[data-card-modal-stat-style]');
+        const textNode = cardModalNode.querySelector('[data-card-modal-stat-text]');
+        const imageNode = cardModalNode.querySelector('[data-card-modal-stat-image]');
+        const buttonNode = cardModalNode.querySelector('[data-card-modal-stat-button]');
+        const previewLabel = cardModalNode.querySelector('[data-card-modal-preview-label]');
+        if (styleNode) {
+            styleNode.textContent = cardStyleLabel(style);
+        }
+        if (textNode) {
+            textNode.textContent = textLength + ' ' + plural(textLength, ['символ', 'символи', 'символів']);
+        }
+        if (imageNode) {
+            imageNode.textContent = card.image ? 'Є зображення' : 'Без зображення';
+        }
+        if (buttonNode) {
+            buttonNode.textContent = card.button_text && card.button_url ? 'Є кнопка' : 'Без кнопки';
+        }
+        if (previewLabel) {
+            previewLabel.textContent = cardStyleLabel(style);
+        }
+    }
+
+    function updateCardImagePreview(image) {
+        if (!cardImagePreview) {
+            return;
+        }
+        if (!image) {
+            cardImagePreview.hidden = true;
+            cardImagePreview.innerHTML = '';
+            return;
+        }
+
+        cardImagePreview.hidden = false;
+        cardImagePreview.innerHTML =
+            '<img src="' + escapeHtml(image) + '" alt="">' +
+            '<span>' + escapeHtml(image) + '</span>';
+    }
+
+    function cardStyleLabel(style) {
+        return {
+            default: 'Картка',
+            accent: 'Акцент',
+            plain: 'Без рамки',
+            feature: 'Сучасна інформаційна',
+            media: 'Медіа',
+            cta: 'CTA',
+            stat: 'Показник',
+            quote: 'Цитата',
+            contact: 'Контакти'
+        }[style] || 'Картка';
+    }
+
+    function plural(number, forms) {
+        const n = Math.abs(number) % 100;
+        const n1 = n % 10;
+        if (n > 10 && n < 20) {
+            return forms[2];
+        }
+        if (n1 > 1 && n1 < 5) {
+            return forms[1];
+        }
+        if (n1 === 1) {
+            return forms[0];
+        }
+        return forms[2];
     }
 
     function setCardImage(value) {
@@ -869,6 +957,15 @@ document.addEventListener('DOMContentLoaded', function () {
             saveLabel.textContent = isEdit ? 'Оновити картку' : 'Додати картку';
         }
         updateCardModalPreview();
+        if (window.TinyMceEditor) {
+            cardModalNode.addEventListener('shown.bs.modal', function () {
+                const textField = cardModalField('text');
+                window.TinyMceEditor.init(cardModalNode);
+                if (textField) {
+                    window.TinyMceEditor.setContent(textField, textField.value);
+                }
+            }, {once: true});
+        }
         cardModal.show();
         const titleField = cardModalField('title');
         if (titleField) {
@@ -895,6 +992,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 setCardModalTemplate('');
                 updateCardModalPreview();
             }
+        });
+        cardModalNode.addEventListener('click', function (event) {
+            const templateButton = event.target.closest('[data-card-template-quick]');
+            if (!templateButton) {
+                return;
+            }
+            applyCardTemplate(templateButton.dataset.cardTemplateQuick);
         });
         const saveCardButton = cardModalNode.querySelector('[data-layout-card-save]');
         const openImagePickerButton = cardModalNode.querySelector('[data-card-image-picker-open]');

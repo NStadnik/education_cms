@@ -2,4 +2,5 @@
 .tox .tox-toolbar__primary { background: #f8fafc !important; }
 .tox .tox-tbtn { border-radius: 5px !important; }
 .tox .tox-statusbar { border-top-color: var(--line) !important; }
+.tox-tinymce-aux, .tox-dialog-wrap, .tox .tox-dialog-wrap, .tox .tox-menu { z-index: 2000 !important; }
 textarea[data-tinymce-editor] { min-height: 320px; }

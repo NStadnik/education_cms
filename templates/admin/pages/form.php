@@ -290,17 +290,36 @@
                 <div class="alert alert-danger py-2" data-card-modal-error hidden></div>
                 <div class="layout-card-modal-layout">
                     <div class="layout-card-modal-grid">
-                        <label class="layout-card-modal-wide">Стандартний шаблон
-                            <select data-card-modal-template>
-                                <option value="">Обрати шаблон</option>
-                                <option value="feature">Інформаційна картка</option>
-                                <option value="media">Медіа-картка</option>
-                                <option value="cta">Заклик до дії</option>
-                                <option value="stat">Показник / цифра</option>
-                                <option value="quote">Цитата</option>
-                                <option value="contact">Контакти</option>
-                            </select>
-                        </label>
+                        <div class="layout-card-modal-wide layout-card-preset-panel">
+                            <div class="layout-card-preset-head">
+                                <strong>Швидкий шаблон</strong>
+                            </div>
+                            <div class="layout-card-preset-grid" role="list" aria-label="Шаблони карток">
+                                <button type="button" data-card-template-quick="feature"><span class="mdi mdi-lightbulb-on-outline" aria-hidden="true"></span><strong>Інфо</strong><small>Перевага або послуга</small></button>
+                                <button type="button" data-card-template-quick="media"><span class="mdi mdi-image-text" aria-hidden="true"></span><strong>Медіа</strong><small>Зображення і текст</small></button>
+                                <button type="button" data-card-template-quick="cta"><span class="mdi mdi-bullhorn-outline" aria-hidden="true"></span><strong>CTA</strong><small>Заклик до дії</small></button>
+                                <button type="button" data-card-template-quick="stat"><span class="mdi mdi-chart-box-outline" aria-hidden="true"></span><strong>Цифра</strong><small>Показник</small></button>
+                                <button type="button" data-card-template-quick="quote"><span class="mdi mdi-format-quote-close" aria-hidden="true"></span><strong>Цитата</strong><small>Відгук або думка</small></button>
+                                <button type="button" data-card-template-quick="contact"><span class="mdi mdi-card-account-phone-outline" aria-hidden="true"></span><strong>Контакти</strong><small>Телефон і email</small></button>
+                            </div>
+                            <label class="layout-card-template-select">Стандартний шаблон
+                                <select data-card-modal-template>
+                                    <option value="">Обрати шаблон</option>
+                                    <option value="feature">Інформаційна картка</option>
+                                    <option value="media">Медіа-картка</option>
+                                    <option value="cta">Заклик до дії</option>
+                                    <option value="stat">Показник / цифра</option>
+                                    <option value="quote">Цитата</option>
+                                    <option value="contact">Контакти</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="layout-card-modal-wide layout-card-modal-stats" aria-live="polite">
+                            <span><span class="mdi mdi-palette-outline" aria-hidden="true"></span><strong data-card-modal-stat-style>Картка</strong></span>
+                            <span><span class="mdi mdi-text-box-outline" aria-hidden="true"></span><strong data-card-modal-stat-text>0 символів</strong></span>
+                            <span><span class="mdi mdi-image-outline" aria-hidden="true"></span><strong data-card-modal-stat-image>Без зображення</strong></span>
+                            <span><span class="mdi mdi-gesture-tap-button" aria-hidden="true"></span><strong data-card-modal-stat-button>Без кнопки</strong></span>
+                        </div>
                         <label>Стиль
                             <select data-card-modal-field="style">
                                 <option value="default">Картка</option>
@@ -317,8 +336,8 @@
                         <label>Заголовок
                             <input data-card-modal-field="title" required placeholder="Заголовок картки">
                         </label>
-                        <label class="layout-card-modal-wide">Текст
-                            <textarea data-card-modal-field="text" rows="6" required placeholder="Основний текст картки"></textarea>
+                        <label class="layout-card-modal-wide layout-card-rich-text">Текст
+                            <textarea data-card-modal-field="text" data-tinymce-editor rows="6" required placeholder="Основний текст картки"></textarea>
                         </label>
                         <div class="layout-card-modal-wide layout-card-image-field">
                             <label>Зображення
@@ -339,8 +358,13 @@
                         <label>URL кнопки
                             <input data-card-modal-field="button_url" placeholder="/page/about">
                         </label>
+                        <div class="layout-card-modal-wide layout-card-image-preview" data-card-image-preview hidden></div>
                     </div>
                     <aside class="layout-card-modal-preview" aria-live="polite">
+                        <div class="layout-card-modal-preview-head">
+                            <strong>Попередній вигляд</strong>
+                            <span data-card-modal-preview-label>Картка</span>
+                        </div>
                         <article class="card content-card page-layout-card page-layout-card-default" data-card-modal-preview>
                             <div class="layout-card-modal-preview-empty">Заповніть картку</div>
                         </article>

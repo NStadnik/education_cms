@@ -27,6 +27,9 @@
             if (textarea.dataset.tinymceReady === '1') {
                 return;
             }
+            if (textarea.closest('.modal:not(.show)')) {
+                return;
+            }
             textarea.dataset.tinymceReady = '1';
             if (!textarea.id) {
                 textarea.id = 'tinymce-editor-' + Math.random().toString(36).slice(2);
@@ -41,6 +44,7 @@
                 language_url: tinymceBase + '/langs/uk.js',
                 plugins: 'advlist autolink lists link image media table code preview fullscreen searchreplace wordcount quickbars autoresize',
                 toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright | bullist numlist | link table mediaLibrary | code fullscreen preview',
+                toolbar_mode: 'wrap',
                 quickbars_selection_toolbar: 'bold italic | quicklink h2 h3 blockquote',
                 menubar: false,
                 branding: false,
@@ -54,6 +58,11 @@
                 remove_script_host: false,
                 extended_valid_elements: 'figure[class],figcaption[class],div[class],p[class],a[href|target|rel|class],img[src|alt|class|width|height|style]',
                 setup: function (editor) {
+                    const notifyTextarea = function () {
+                        editor.save();
+                        textarea.dispatchEvent(new Event('input', {bubbles: true}));
+                    };
+                    editor.on('input change keyup undo redo SetContent', notifyTextarea);
                     editor.ui.registry.addButton('mediaLibrary', {
                         icon: 'image',
                         tooltip: 'Медіафайли',
