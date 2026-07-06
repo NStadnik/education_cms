@@ -75,41 +75,9 @@ abstract class AdminBaseController extends BaseController
             return array_replace($this->mediaListPayload($query, $pagination), ['message' => $message]);
         }
 
-        if ($resource === 'public-info') {
-            [$where, $params] = $this->publicInfoSearchWhere($query);
-            $sections = $this->db()->fetchAll(
-                'select s.*, count(d.id) as documents_count, sum(case when d.status = \'published\' then 1 else 0 end) as published_documents_count, max(d.updated_at) as last_document_at
-                 from public_info_sections s
-                 left join documents d on d.public_info_section_id = s.id
-                 ' . $where . '
-                 group by s.id, s.title, s.slug, s.description, s.is_required, s.sort_order
-                 order by s.sort_order asc
-                 limit ' . $pagination['limit'] . ' offset 0',
-                $params
-            );
-            $total = (int) ($this->db()->fetch('select count(*) as c from public_info_sections s ' . $where, $params)['c'] ?? 0);
-            $documents = $this->publicInfoDocuments($sections);
-            $loaded = count($sections);
-
-            return [
-                'ok' => true,
-                'html' => $this->view()->partial('admin/public-info/rows', ['sections' => $sections, 'documents' => $documents]),
-                'total' => $total,
-                'next_offset' => $loaded,
-                'has_more' => $loaded < $total,
-                'message' => $message,
-                'stats' => [
-                    'total' => $this->count('public_info_sections'),
-                    'filled' => (int) ($this->db()->fetch("select count(distinct public_info_section_id) as c from documents where status = 'published' and public_info_section_id is not null")['c'] ?? 0),
-                    'required' => (int) ($this->db()->fetch('select count(*) as c from public_info_sections where is_required = 1')['c'] ?? 0),
-                ],
-            ];
-        }
-
         $map = [
             'pages' => ['table' => 'pages', 'template' => 'admin/pages/rows', 'columns' => ['title', 'slug', 'excerpt', 'status'], 'order' => 'sort_order asc, id desc'],
             'news' => ['table' => 'news', 'template' => 'admin/news/rows', 'columns' => ['title', 'category', 'body', 'status', 'published_at'], 'order' => 'id desc'],
-            'documents' => ['table' => 'documents', 'template' => 'admin/documents/rows', 'columns' => ['title', 'category', 'description', 'status', 'responsible'], 'order' => 'id desc'],
             'users' => ['table' => 'users', 'template' => 'admin/users/rows', 'columns' => ['name', 'email', 'role'], 'order' => 'id desc'],
         ];
         if (!isset($map[$resource])) {
@@ -226,13 +194,6 @@ abstract class AdminBaseController extends BaseController
         if (in_array($resource, ['pages', 'news'], true)) {
             return $this->statusStats($resource);
         }
-        if ($resource === 'documents') {
-            return [
-                'total' => $this->count('documents'),
-                'published' => (int) ($this->db()->fetch("select count(*) as c from documents where status = 'published'")['c'] ?? 0),
-                'linked' => (int) ($this->db()->fetch('select count(*) as c from documents where public_info_section_id is not null')['c'] ?? 0),
-            ];
-        }
         if ($resource === 'users') {
             return ['total' => $this->count('users')];
         }
@@ -256,47 +217,6 @@ abstract class AdminBaseController extends BaseController
         return ['where ' . implode(' or ', $parts), $params];
     }
 
-    protected function publicInfoSearchWhere(string $query): array
-    {
-        if ($query === '') {
-            return ['', []];
-        }
-
-        $like = '%' . $query . '%';
-        return [
-            'where s.title like ? or s.slug like ? or s.description like ? or exists (
-                select 1 from documents sd
-                where sd.public_info_section_id = s.id
-                and (sd.title like ? or sd.description like ? or sd.responsible like ?)
-            )',
-            [$like, $like, $like, $like, $like, $like],
-        ];
-    }
-
-    protected function publicInfoDocuments(array $sections): array
-    {
-        $ids = [];
-        foreach ($sections as $section) {
-            $id = (int) ($section['id'] ?? 0);
-            if ($id > 0) {
-                $ids[] = $id;
-            }
-        }
-        if (!$ids) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        return $this->db()->fetchAll(
-            'select d.*, s.title as section_title
-             from documents d
-             left join public_info_sections s on s.id = d.public_info_section_id
-             where d.public_info_section_id in (' . $placeholders . ')
-             order by s.sort_order asc, d.updated_at desc',
-            $ids
-        );
-    }
-
     protected function statusStats(string $table): array
     {
         $total = $this->count($table);
@@ -309,7 +229,6 @@ abstract class AdminBaseController extends BaseController
         return [
             'default' => 'Стандартний',
             'wide' => 'Широкий контент',
-            'document' => 'Документ / стаття',
         ];
     }
 
@@ -351,41 +270,9 @@ abstract class AdminBaseController extends BaseController
         return array_slice($ids, 0, 200);
     }
 
-    protected function bulkUpdatePublicInfoRequired(array $ids, int $isRequired): void
-    {
-        if (!$ids) {
-            return;
-        }
-
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $this->db()->execute(
-            "update public_info_sections set is_required = ? where id in ({$placeholders})",
-            [$isRequired, ...$ids]
-        );
-    }
-
-    protected function bulkDeletePublicInfoSections(array $ids): int
-    {
-        if (!$ids) {
-            return 0;
-        }
-
-        $deleted = 0;
-        foreach ($ids as $id) {
-            $documents = (int) ($this->db()->fetch('select count(*) as c from documents where public_info_section_id = ?', [$id])['c'] ?? 0);
-            if ($documents > 0) {
-                continue;
-            }
-            $this->db()->execute('delete from public_info_sections where id = ?', [$id]);
-            $deleted++;
-        }
-
-        return $deleted;
-    }
-
     protected function bulkUpdateStatus(string $table, array $ids, string $status): void
     {
-        $allowedTables = ['pages', 'news', 'documents'];
+        $allowedTables = ['pages', 'news'];
         if (!in_array($table, $allowedTables, true) || !$ids) {
             return;
         }
@@ -399,7 +286,7 @@ abstract class AdminBaseController extends BaseController
 
     protected function bulkFillPublishedAt(string $table, array $ids): void
     {
-        $allowedTables = ['news', 'documents'];
+        $allowedTables = ['news'];
         if (!in_array($table, $allowedTables, true) || !$ids) {
             return;
         }
@@ -426,7 +313,7 @@ abstract class AdminBaseController extends BaseController
 
     protected function bulkDelete(string $table, array $ids): void
     {
-        $allowedTables = ['pages', 'news', 'documents', 'users'];
+        $allowedTables = ['pages', 'news', 'users'];
         if (!in_array($table, $allowedTables, true) || !$ids) {
             return;
         }
@@ -447,16 +334,6 @@ abstract class AdminBaseController extends BaseController
                 'name' => 'Сторінки',
                 'description' => 'Створює сторінки з текстовим блоком або HTML-контентом.',
                 'columns' => 'title, body, slug, excerpt, template, status, sort_order',
-            ],
-            'documents' => [
-                'name' => 'Документи',
-                'description' => 'Імпортує картки документів без завантаження файлів.',
-                'columns' => 'title, category, description, status, responsible, approved_at, published_at, public_info_section',
-            ],
-            'public_info_sections' => [
-                'name' => 'Розділи публічної інформації',
-                'description' => 'Додає нові розділи до сторінки публічної інформації.',
-                'columns' => 'title, slug, description, is_required, sort_order',
             ],
             'global_fields' => [
                 'name' => 'Глобальні поля',
@@ -1081,8 +958,6 @@ abstract class AdminBaseController extends BaseController
         return match ($type) {
             'news' => $this->importNewsRows($rows),
             'pages' => $this->importPageRows($rows),
-            'documents' => $this->importDocumentRows($rows),
-            'public_info_sections' => $this->importPublicInfoSectionRows($rows),
             'global_fields' => $this->importGlobalFieldRows($rows),
             'wordpress' => $this->importWordPressRows($rows),
             default => 0,
@@ -1286,72 +1161,6 @@ abstract class AdminBaseController extends BaseController
         return $created;
     }
 
-    protected function importDocumentRows(array $rows): int
-    {
-        $created = 0;
-        $now = date('c');
-        foreach ($rows as $row) {
-            $title = $this->importValue($row, ['title', 'назва', 'заголовок']);
-            if ($title === '') {
-                continue;
-            }
-            $title = $this->importTitle($title);
-
-            $status = $this->importStatus($this->importValue($row, ['status', 'статус']), 'published');
-            $publishedAt = $this->importValue($row, ['published_at', 'дата_публікації', 'дата']);
-            if ($status === 'published' && $publishedAt === '') {
-                $publishedAt = $now;
-            }
-
-            $this->db()->execute(
-                'insert into documents (public_info_section_id, title, category, file_path, description, status, responsible, approved_at, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [
-                    $this->resolvePublicInfoSectionId($this->importValue($row, ['public_info_section_id', 'public_info_section', 'розділ', 'розділ_публічної_інформації'])),
-                    $title,
-                    $this->importValue($row, ['category', 'категорія']) ?: 'Загальні документи',
-                    null,
-                    $this->importValue($row, ['description', 'опис', 'текст']),
-                    $status,
-                    $this->importValue($row, ['responsible', 'відповідальний']),
-                    $this->importValue($row, ['approved_at', 'дата_затвердження']) ?: null,
-                    $publishedAt ?: null,
-                    $now,
-                    $now,
-                ]
-            );
-            $created++;
-        }
-
-        return $created;
-    }
-
-    protected function importPublicInfoSectionRows(array $rows): int
-    {
-        $created = 0;
-        foreach ($rows as $row) {
-            $title = $this->importValue($row, ['title', 'назва', 'заголовок']);
-            if ($title === '') {
-                continue;
-            }
-            $slugSource = $this->importValue($row, ['slug', 'адреса']) ?: $title;
-            $title = $this->importTitle($title);
-
-            $this->db()->execute(
-                'insert into public_info_sections (title, slug, description, is_required, sort_order) values (?, ?, ?, ?, ?)',
-                [
-                    $title,
-                    $this->uniqueSlug('public_info_sections', $slugSource),
-                    $this->importValue($row, ['description', 'опис']),
-                    $this->importBool($this->importValue($row, ['is_required', 'обовязковий', 'обов_язковий']), true) ? 1 : 0,
-                    (int) ($this->importValue($row, ['sort_order', 'порядок']) ?: 0),
-                ]
-            );
-            $created++;
-        }
-
-        return $created;
-    }
-
     protected function importGlobalFieldRows(array $rows): int
     {
         $fields = $this->globalFields();
@@ -1472,21 +1281,6 @@ abstract class AdminBaseController extends BaseController
         return in_array($value, ['1', 'yes', 'true', 'так', 'да'], true);
     }
 
-    protected function resolvePublicInfoSectionId(string $value): ?int
-    {
-        $value = trim($value);
-        if ($value === '') {
-            return null;
-        }
-
-        if (ctype_digit($value)) {
-            return (int) $value;
-        }
-
-        $section = $this->db()->fetch('select id from public_info_sections where title = ? or slug = ? limit 1', [$value, $this->slug($value)]);
-        return $section ? (int) $section['id'] : null;
-    }
-
     protected function uniqueSlug(string $table, string $value): string
     {
         $base = $this->limitSlug($this->slug($value), 170);
@@ -1520,21 +1314,7 @@ abstract class AdminBaseController extends BaseController
 
     protected function mediaReferences(): array
     {
-        $references = [];
-        $documents = $this->db()->fetchAll('select id, title, file_path from documents where file_path is not null and file_path != ? order by id desc', ['']);
-        foreach ($documents as $document) {
-            $path = Files::normalize((string) ($document['file_path'] ?? ''));
-            if ($path === '') {
-                continue;
-            }
-
-            $references[$path] = [
-                'label' => (string) ($document['title'] ?? 'Документ'),
-                'url' => url('/admin/documents/edit?id=' . $document['id']),
-            ];
-        }
-
-        return $references;
+        return [];
     }
 
     protected function filterMedia(array $items, string $query): array

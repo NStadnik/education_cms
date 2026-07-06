@@ -40,16 +40,6 @@
                 </div>
             </div>
         </section>
-    <?php elseif (($block['type'] ?? '') === 'public_info'): ?>
-        <section class="section">
-            <div class="container">
-                <div class="card">
-                    <h2><?= e($block['title'] ?? 'Публічна інформація') ?></h2>
-                    <p>Заповнено <?= e((string) $publicInfoStats['filled']) ?> з <?= e((string) $publicInfoStats['total']) ?> розділів. Готовність: <?= e((string) $publicInfoStats['percent']) ?>%.</p>
-                    <a class="button" href="<?= url('/public-info') ?>">Перейти до відкритих даних</a>
-                </div>
-            </div>
-        </section>
     <?php else: ?>
         <section class="section">
             <div class="container">

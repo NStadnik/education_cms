@@ -1,6 +1,6 @@
 <?php
     $template = (string) ($page['template'] ?? 'default');
-    $allowedTemplates = ['default', 'wide', 'document'];
+    $allowedTemplates = ['default', 'wide'];
     if (!in_array($template, $allowedTemplates, true)) {
         $template = 'default';
     }
@@ -9,5 +9,4 @@
     'page' => $page,
     'blocks' => $blocks,
     'latestNews' => $latestNews,
-    'publicInfoStats' => $publicInfoStats,
 ]) ?>

@@ -41,10 +41,7 @@ final class AdminController extends AdminBaseController
         $stats = [
             'pages' => $this->count('pages'),
             'news' => $this->count('news'),
-            'documents' => $this->count('documents'),
             'media' => count(Files::all()),
-            'publicFilled' => $this->db()->fetch("select count(distinct public_info_section_id) as c from documents where status = 'published' and public_info_section_id is not null")['c'] ?? 0,
-            'publicTotal' => $this->count('public_info_sections'),
         ];
         return $this->admin('admin/dashboard', ['title' => 'Панель керування', 'stats' => $stats]);
     }

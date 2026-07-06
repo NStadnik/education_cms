@@ -24,8 +24,6 @@
                     <?php endif; ?>
                 <?php endforeach; ?>
                 <a href="<?= url('/news') ?>">Новини</a>
-                <a href="<?= url('/documents') ?>">Документи</a>
-                <a href="<?= url('/public-info') ?>">Публічна інформація</a>
             </nav>
         </div>
     </header>

@@ -78,8 +78,6 @@ final class Installer
 
         foreach ([
             'audit_logs',
-            'documents',
-            'public_info_sections',
             'news_category_links',
             'news_categories',
             'news',
@@ -119,15 +117,13 @@ final class Installer
 
         $this->seedPages($db, $now);
         $this->seedNewsCategories($db, $now);
-        $this->seedPublicInfo($db, $now);
     }
 
     private function seedPages(Database $db, string $now): void
     {
         $blocks = json_encode([
-            ['type' => 'hero', 'title' => 'Офіційний сайт закладу освіти', 'text' => 'Новини, документи та відкрита публічна інформація в одному місці.'],
+            ['type' => 'hero', 'title' => 'Офіційний сайт закладу освіти', 'text' => 'Новини та інформація закладу освіти в одному місці.'],
             ['type' => 'news_list', 'title' => 'Останні новини', 'limit' => 3],
-            ['type' => 'public_info', 'title' => 'Прозорість та інформаційна відкритість'],
         ], JSON_UNESCAPED_UNICODE);
 
         $db->execute(
@@ -147,38 +143,5 @@ final class Installer
             'insert into news_categories (title, slug, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?)',
             ['Загальні', 'загальні', 100, $now, $now]
         );
-    }
-
-    private function seedPublicInfo(Database $db, string $now): void
-    {
-        $sections = [
-            'statut' => 'Статут закладу освіти',
-            'licenses' => 'Ліцензії на провадження освітньої діяльності',
-            'management' => 'Структура та органи управління',
-            'staff' => 'Кадровий склад',
-            'programs' => 'Освітні програми',
-            'territory' => 'Територія обслуговування',
-            'students' => 'Кількість здобувачів освіти',
-            'language' => 'Мова освітнього процесу',
-            'vacancies' => 'Вакансії',
-            'resources' => 'Матеріально-технічне забезпечення',
-            'quality' => 'Результати моніторингу якості освіти',
-            'annual-report' => 'Річний звіт',
-            'admission' => 'Правила прийому',
-            'accessibility' => 'Умови доступності для осіб з ООП',
-            'paid-services' => 'Платні послуги',
-            'behavior' => 'Правила поведінки здобувача освіти',
-            'violence-prevention' => 'Запобігання і протидія насильству',
-            'budget' => 'Кошторис та фінансові звіти',
-            'charity' => 'Благодійна допомога',
-        ];
-
-        $sort = 0;
-        foreach ($sections as $slug => $title) {
-            $db->execute(
-                'insert into public_info_sections (title, slug, description, is_required, sort_order) values (?, ?, ?, 1, ?)',
-                [$title, $slug, '', $sort++]
-            );
-        }
     }
 }
