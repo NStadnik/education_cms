@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const list = builder.querySelector('[data-layout-sections]');
     const hidden = document.querySelector('[data-layout-json]');
+    const simpleTextarea = document.querySelector('textarea[name="blocks_text"]');
     const blockCountNode = document.querySelector('[data-page-block-count]');
     const modeInput = document.querySelector('[data-editor-mode]');
     const simplePanel = document.querySelector('[data-simple-editor-panel]');
@@ -14,7 +15,65 @@ document.addEventListener('DOMContentLoaded', function () {
     const cardModalNode = document.getElementById('layoutCardModal');
     const cardModal = cardModalNode && window.bootstrap ? new window.bootstrap.Modal(cardModalNode) : null;
     const cardModalError = cardModalNode ? cardModalNode.querySelector('[data-card-modal-error]') : null;
+    const cardModalPreview = cardModalNode ? cardModalNode.querySelector('[data-card-modal-preview]') : null;
+    const sectionPickerNode = document.getElementById('layoutSectionPickerModal');
+    const sectionPickerModal = sectionPickerNode && window.bootstrap ? new window.bootstrap.Modal(sectionPickerNode) : null;
+    const imagePickerNode = document.getElementById('layoutCardImagePickerModal');
+    const imagePickerModal = imagePickerNode && window.bootstrap ? new window.bootstrap.Modal(imagePickerNode) : null;
+    const cardStyles = ['default', 'accent', 'plain', 'feature', 'media', 'cta', 'stat', 'quote', 'contact'];
+    const cardTemplates = {
+        feature: {
+            style: 'feature',
+            title: 'Ключова перевага',
+            text: '<p>Коротко опишіть важливу перевагу, послугу або напрям роботи.</p>',
+            image: '',
+            button_text: '',
+            button_url: ''
+        },
+        media: {
+            style: 'media',
+            title: 'Історія або подія',
+            text: '<p>Додайте короткий опис матеріалу, новини або важливого розділу.</p>',
+            image: '',
+            button_text: 'Переглянути',
+            button_url: '#'
+        },
+        cta: {
+            style: 'cta',
+            title: 'Готові дізнатися більше?',
+            text: '<p>Додайте короткий заклик, який підводить відвідувача до наступної дії.</p>',
+            image: '',
+            button_text: 'Перейти',
+            button_url: '#'
+        },
+        stat: {
+            style: 'stat',
+            title: '95%',
+            text: '<p>Підпис до показника або коротке пояснення цифри.</p>',
+            image: '',
+            button_text: '',
+            button_url: ''
+        },
+        quote: {
+            style: 'quote',
+            title: 'Цитата',
+            text: '<blockquote>Додайте важливу думку, відгук або коротку цитату.</blockquote>',
+            image: '',
+            button_text: '',
+            button_url: ''
+        },
+        contact: {
+            style: 'contact',
+            title: 'Контакти',
+            text: '<p><strong>Телефон:</strong> +380 XX XXX XX XX<br><strong>Email:</strong> info@example.com</p>',
+            image: '',
+            button_text: 'Написати',
+            button_url: 'mailto:info@example.com'
+        }
+    };
     let cardModalState = null;
+    let imagePickerItems = [];
+    let imagePickerSearchTimer = null;
     let initialBlocks = [];
     try {
         initialBlocks = JSON.parse(builder.dataset.initial || '[]');
@@ -68,6 +127,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function presetSection(type) {
+        if (type === 'blank') {
+            return emptySection();
+        }
         if (type === 'hero') {
             return {
                 type: 'layout',
@@ -77,9 +139,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     columns: [{
                         width: 'col-md-12',
                         cards: [{
-                            style: 'plain',
+                            style: 'cta',
                             title: 'Заголовок сторінки',
-                            text: '<p>Короткий вступний текст для відвідувачів.</p>',
+                            text: '<p>Короткий вступний текст, який пояснює головну пропозицію сторінки.</p>',
                             image: '',
                             button_text: 'Дізнатися більше',
                             button_url: '#'
@@ -88,20 +150,143 @@ document.addEventListener('DOMContentLoaded', function () {
                 }]
             };
         }
-        if (type === 'two-cards') {
+        if (type === 'media-story' || type === 'two-cards') {
             return {
                 type: 'layout',
-                title: 'Інформаційний блок',
+                title: 'Історія або послуга',
                 background: 'default',
-                rows: [rowFromPreset('6-6')]
+                rows: [{
+                    columns: [{
+                        width: 'col-md-8',
+                        cards: [{
+                            style: 'media',
+                            title: 'Назва блоку',
+                            text: '<p>Опишіть важливу подію, напрям роботи або послугу. Додайте зображення через медіафайли.</p>',
+                            image: '',
+                            button_text: 'Переглянути',
+                            button_url: '#'
+                        }]
+                    }, {
+                        width: 'col-md-4',
+                        cards: [{
+                            style: 'feature',
+                            title: 'Ключовий акцент',
+                            text: '<p>Коротке уточнення, яке підсилює основний матеріал.</p>',
+                            image: '',
+                            button_text: '',
+                            button_url: ''
+                        }]
+                    }]
+                }]
             };
         }
-        if (type === 'three-cards') {
+        if (type === 'feature-grid' || type === 'three-cards') {
             return {
                 type: 'layout',
                 title: 'Переваги',
                 background: 'light',
-                rows: [rowFromPreset('4-4-4')]
+                rows: [{
+                    columns: [{
+                        width: 'col-md-4',
+                        cards: [{
+                            style: 'feature',
+                            title: 'Перевага 1',
+                            text: '<p>Коротко опишіть першу перевагу або напрям.</p>',
+                            image: '',
+                            button_text: '',
+                            button_url: ''
+                        }]
+                    }, {
+                        width: 'col-md-4',
+                        cards: [{
+                            style: 'feature',
+                            title: 'Перевага 2',
+                            text: '<p>Коротко опишіть другу перевагу або напрям.</p>',
+                            image: '',
+                            button_text: '',
+                            button_url: ''
+                        }]
+                    }, {
+                        width: 'col-md-4',
+                        cards: [{
+                            style: 'feature',
+                            title: 'Перевага 3',
+                            text: '<p>Коротко опишіть третю перевагу або напрям.</p>',
+                            image: '',
+                            button_text: '',
+                            button_url: ''
+                        }]
+                    }]
+                }]
+            };
+        }
+        if (type === 'stats') {
+            return {
+                type: 'layout',
+                title: 'Показники',
+                background: 'default',
+                rows: [{
+                    columns: [{
+                        width: 'col-md-4',
+                        cards: [{style: 'stat', title: '95%', text: '<p>Короткий підпис до показника.</p>', image: '', button_text: '', button_url: ''}]
+                    }, {
+                        width: 'col-md-4',
+                        cards: [{style: 'stat', title: '120+', text: '<p>Короткий підпис до показника.</p>', image: '', button_text: '', button_url: ''}]
+                    }, {
+                        width: 'col-md-4',
+                        cards: [{style: 'stat', title: '24/7', text: '<p>Короткий підпис до показника.</p>', image: '', button_text: '', button_url: ''}]
+                    }]
+                }]
+            };
+        }
+        if (type === 'cta') {
+            return {
+                type: 'layout',
+                title: '',
+                background: 'default',
+                rows: [{
+                    columns: [{
+                        width: 'col-md-12',
+                        cards: [{
+                            style: 'cta',
+                            title: 'Готові перейти до наступного кроку?',
+                            text: '<p>Додайте короткий заклик до дії для відвідувачів сторінки.</p>',
+                            image: '',
+                            button_text: 'Зв’язатися',
+                            button_url: '#'
+                        }]
+                    }]
+                }]
+            };
+        }
+        if (type === 'contact') {
+            return {
+                type: 'layout',
+                title: 'Контакти',
+                background: 'light',
+                rows: [{
+                    columns: [{
+                        width: 'col-md-6',
+                        cards: [{
+                            style: 'contact',
+                            title: 'Зв’язок',
+                            text: '<p><strong>Телефон:</strong> +380 XX XXX XX XX<br><strong>Email:</strong> info@example.com</p>',
+                            image: '',
+                            button_text: 'Написати',
+                            button_url: 'mailto:info@example.com'
+                        }]
+                    }, {
+                        width: 'col-md-6',
+                        cards: [{
+                            style: 'quote',
+                            title: 'Графік роботи',
+                            text: '<p>Пн-Пт: 09:00-18:00<br>Сб-Нд: вихідний</p>',
+                            image: '',
+                            button_text: '',
+                            button_url: ''
+                        }]
+                    }]
+                }]
             };
         }
 
@@ -132,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function normalizeCard(card) {
         return {
-            style: ['default', 'accent', 'plain'].includes(card.style) ? card.style : 'default',
+            style: cardStyles.includes(card.style) ? card.style : 'default',
             title: card.title || '',
             text: card.text || '',
             image: card.image || '',
@@ -201,6 +386,77 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         return hasHtml(text) ? sanitizePreviewHtml(text) : escapeHtml(text).replace(/\n/g, '<br>');
+    }
+
+    function cardTextHtml(value) {
+        const text = String(value || '').trim();
+        if (text === '') {
+            return '';
+        }
+
+        return hasHtml(text) ? text : '<p>' + escapeHtml(text).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+    }
+
+    function layoutToSimpleHtml() {
+        return sections.map(function (section) {
+            const sectionParts = [];
+            const sectionTitle = String(section.title || '').trim();
+            if (sectionTitle !== '') {
+                sectionParts.push('<h2>' + escapeHtml(sectionTitle) + '</h2>');
+            }
+
+            section.rows.forEach(function (row) {
+                row.columns.forEach(function (col) {
+                    col.cards.forEach(function (card) {
+                        const cardParts = [];
+                        const image = String(card.image || '').trim();
+                        const title = String(card.title || '').trim();
+                        const text = cardTextHtml(card.text);
+                        const buttonText = String(card.button_text || '').trim();
+                        const buttonUrl = String(card.button_url || '').trim();
+
+                        if (image !== '') {
+                            cardParts.push('<p><img src="' + escapeHtml(image) + '" alt="' + escapeHtml(title) + '"></p>');
+                        }
+                        if (title !== '') {
+                            cardParts.push('<h3>' + escapeHtml(title) + '</h3>');
+                        }
+                        if (text !== '') {
+                            cardParts.push(text);
+                        }
+                        if (buttonText !== '' && buttonUrl !== '') {
+                            cardParts.push('<p><a href="' + escapeHtml(buttonUrl) + '">' + escapeHtml(buttonText) + '</a></p>');
+                        }
+                        if (cardParts.length) {
+                            sectionParts.push(cardParts.join('\n'));
+                        }
+                    });
+                });
+            });
+
+            return sectionParts.join('\n\n');
+        }).filter(function (html) {
+            return html.trim() !== '';
+        }).join('\n\n');
+    }
+
+    function updateSimpleEditorFromLayout() {
+        if (!simpleTextarea) {
+            return;
+        }
+
+        const html = layoutToSimpleHtml();
+        simpleTextarea.value = html;
+
+        const editor = simpleTextarea.nextElementSibling;
+        const area = editor ? editor.querySelector('.rich-editor-area') : null;
+        const code = editor ? editor.querySelector('.rich-editor-code') : null;
+        if (area && (!editor.classList.contains('is-source-mode') || !code)) {
+            area.innerHTML = html;
+        }
+        if (code) {
+            code.value = html;
+        }
     }
 
     function render() {
@@ -283,11 +539,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const image = String(card.image || '').trim();
         const buttonText = String(card.button_text || '').trim();
         const buttonUrl = String(card.button_url || '').trim();
-        const style = ['default', 'accent', 'plain'].includes(card.style) ? card.style : 'default';
+        const style = cardStyles.includes(card.style) ? card.style : 'default';
 
         return '<article class="layout-editor-card layout-editor-card-preview page-layout-card page-layout-card-' + escapeHtml(style) + '" data-card-index="' + cardIndex + '" data-drag-kind="card">' +
             '<div class="layout-editor-card-head">' +
                 dragHandle('Перетягнути картку') +
+                (image ? '<img class="layout-editor-card-thumb" src="' + escapeHtml(image) + '" alt="' + escapeHtml(title) + '">' : '') +
                 '<strong>' + escapeHtml(title || ('Картка ' + (cardIndex + 1))) + '</strong>' +
                 '<div class="layout-editor-card-actions">' +
                     '<button class="button secondary compact" type="button" data-layout-edit-card title="Редагувати картку"><span class="mdi mdi-pencil-outline"></span></button>' +
@@ -351,6 +608,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function sync() {
         hidden.value = JSON.stringify(sections);
+        if (!modeInput || modeInput.value === 'advanced') {
+            updateSimpleEditorFromLayout();
+        }
         if (blockCountNode) {
             blockCountNode.textContent = String(sections.length);
         }
@@ -358,6 +618,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function setEditorMode(mode) {
         const isAdvanced = mode === 'advanced';
+        if (!isAdvanced) {
+            updateSimpleEditorFromLayout();
+        }
         if (modeInput) {
             modeInput.value = isAdvanced ? 'advanced' : 'simple';
         }
@@ -437,11 +700,152 @@ document.addEventListener('DOMContentLoaded', function () {
                 card[name] = field.value.trim();
             }
         });
-        if (!['default', 'accent', 'plain'].includes(card.style)) {
+        if (!cardStyles.includes(card.style)) {
             card.style = 'default';
         }
 
         return card;
+    }
+
+    function setCardModalTemplate(value) {
+        const templateField = cardModalNode ? cardModalNode.querySelector('[data-card-modal-template]') : null;
+        if (templateField) {
+            templateField.value = value || '';
+        }
+    }
+
+    function applyCardTemplate(name) {
+        const template = cardTemplates[name];
+        if (!template) {
+            return;
+        }
+
+        setCardModalValues(template);
+        setCardModalTemplate(name);
+        setCardModalError('');
+        updateCardModalPreview();
+    }
+
+    function updateCardModalPreview() {
+        if (!cardModalPreview) {
+            return;
+        }
+
+        const card = readCardModalValues();
+        const title = String(card.title || '').trim();
+        const text = String(card.text || '').trim();
+        const image = String(card.image || '').trim();
+        const buttonText = String(card.button_text || '').trim();
+        const buttonUrl = String(card.button_url || '').trim();
+        const style = cardStyles.includes(card.style) ? card.style : 'default';
+        const hasContent = title !== '' || text !== '' || image !== '' || buttonText !== '';
+
+        cardModalPreview.className = 'card content-card page-layout-card page-layout-card-' + style;
+        if (!hasContent) {
+            cardModalPreview.innerHTML = '<div class="layout-card-modal-preview-empty">Заповніть картку</div>';
+            return;
+        }
+
+        cardModalPreview.innerHTML =
+            (image ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(title) + '">' : '') +
+            (title ? '<h3>' + escapeHtml(title) + '</h3>' : '') +
+            (text ? '<div class="rich-content">' + cardTextPreview(text) + '</div>' : '') +
+            (buttonText && buttonUrl ? '<span class="button read-more layout-card-preview-button">' + escapeHtml(buttonText) + '</span>' : '');
+    }
+
+    function setCardImage(value) {
+        const imageField = cardModalField('image');
+        if (!imageField) {
+            return;
+        }
+
+        imageField.value = value || '';
+        setCardModalTemplate('');
+        updateCardModalPreview();
+    }
+
+    function openCardImagePicker() {
+        if (!imagePickerModal) {
+            return;
+        }
+
+        imagePickerModal.show();
+        loadCardImageItems();
+        const search = imagePickerNode.querySelector('[data-card-image-search]');
+        if (search) {
+            setTimeout(function () {
+                search.focus();
+            }, 180);
+        }
+    }
+
+    async function loadCardImageItems() {
+        if (!imagePickerNode) {
+            return;
+        }
+
+        const grid = imagePickerNode.querySelector('[data-card-image-grid]');
+        const status = imagePickerNode.querySelector('[data-card-image-status]');
+        const search = imagePickerNode.querySelector('[data-card-image-search]');
+        const adminBody = document.body;
+        const url = new URL(adminBody ? (adminBody.dataset.richMediaPickerUrl || '/admin/media/picker') : '/admin/media/picker', window.location.origin);
+        url.searchParams.set('limit', '80');
+        if (search && search.value.trim() !== '') {
+            url.searchParams.set('q', search.value.trim());
+        }
+
+        if (status) {
+            status.textContent = 'Завантаження...';
+        }
+        if (grid) {
+            grid.innerHTML = '';
+        }
+
+        try {
+            const response = await fetch(url.toString(), {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.message || 'Не вдалося завантажити медіафайли.');
+            }
+
+            imagePickerItems = (data.items || []).filter(function (item) {
+                return item && item.is_image;
+            });
+            renderCardImageItems();
+            if (status) {
+                status.textContent = imagePickerItems.length ? 'Знайдено зображень: ' + imagePickerItems.length + '.' : 'Зображень не знайдено.';
+            }
+        } catch (error) {
+            if (status) {
+                status.textContent = error.message || 'Помилка завантаження.';
+            }
+        }
+    }
+
+    function renderCardImageItems() {
+        if (!imagePickerNode) {
+            return;
+        }
+
+        const grid = imagePickerNode.querySelector('[data-card-image-grid]');
+        const currentImage = cardModalField('image') ? cardModalField('image').value : '';
+        if (!grid) {
+            return;
+        }
+
+        if (!imagePickerItems.length) {
+            grid.innerHTML = '<div class="layout-card-image-picker-empty">Немає зображень за цим запитом.</div>';
+            return;
+        }
+
+        grid.innerHTML = imagePickerItems.map(function (item, index) {
+            const selected = currentImage === item.url;
+            return '<button class="layout-card-image-option' + (selected ? ' is-selected' : '') + '" type="button" data-card-image-index="' + index + '">' +
+                '<img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(item.name) + '">' +
+                '<span>' + escapeHtml(item.name) + '</span>' +
+                '<small>' + escapeHtml(item.size_label || item.type || '') + '</small>' +
+            '</button>';
+        }).join('');
     }
 
     function openCardModal(i, cardIndex) {
@@ -461,6 +865,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
         setCardModalError('');
         setCardModalValues(card);
+        setCardModalTemplate('');
         const title = cardModalNode.querySelector('[data-card-modal-title]');
         const saveLabel = cardModalNode.querySelector('[data-layout-card-save-label]');
         if (title) {
@@ -469,6 +874,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (saveLabel) {
             saveLabel.textContent = isEdit ? 'Оновити картку' : 'Додати картку';
         }
+        updateCardModalPreview();
         cardModal.show();
         const titleField = cardModalField('title');
         if (titleField) {
@@ -479,7 +885,34 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (cardModalNode) {
+        cardModalNode.addEventListener('input', function (event) {
+            if (event.target.closest('[data-card-modal-field]')) {
+                setCardModalTemplate('');
+                updateCardModalPreview();
+            }
+        });
+        cardModalNode.addEventListener('change', function (event) {
+            const template = event.target.closest('[data-card-modal-template]');
+            if (template) {
+                applyCardTemplate(template.value);
+                return;
+            }
+            if (event.target.closest('[data-card-modal-field]')) {
+                setCardModalTemplate('');
+                updateCardModalPreview();
+            }
+        });
         const saveCardButton = cardModalNode.querySelector('[data-layout-card-save]');
+        const openImagePickerButton = cardModalNode.querySelector('[data-card-image-picker-open]');
+        const clearImageButton = cardModalNode.querySelector('[data-card-image-clear]');
+        if (openImagePickerButton) {
+            openImagePickerButton.addEventListener('click', openCardImagePicker);
+        }
+        if (clearImageButton) {
+            clearImageButton.addEventListener('click', function () {
+                setCardImage('');
+            });
+        }
         if (saveCardButton) {
             saveCardButton.addEventListener('click', function () {
                 if (!cardModalState) {
@@ -508,10 +941,64 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    if (imagePickerNode) {
+        const search = imagePickerNode.querySelector('[data-card-image-search]');
+        if (search) {
+            search.addEventListener('input', function () {
+                window.clearTimeout(imagePickerSearchTimer);
+                imagePickerSearchTimer = window.setTimeout(loadCardImageItems, 250);
+            });
+        }
+        imagePickerNode.addEventListener('click', function (event) {
+            const option = event.target.closest('[data-card-image-index]');
+            if (!option) {
+                return;
+            }
+
+            const item = imagePickerItems[Number(option.dataset.cardImageIndex)];
+            if (!item) {
+                return;
+            }
+
+            setCardImage(item.url);
+            if (imagePickerModal) {
+                imagePickerModal.hide();
+            }
+        });
+    }
+
+    function addSectionFromTemplate(template) {
+        sections.push(presetSection(template || 'blank'));
+        expandedSections.add(sections.length - 1);
+        render();
+    }
+
+    if (sectionPickerNode) {
+        sectionPickerNode.addEventListener('click', function (event) {
+            const templateButton = event.target.closest('[data-layout-template]');
+            if (!templateButton) {
+                return;
+            }
+
+            addSectionFromTemplate(templateButton.dataset.layoutTemplate);
+            if (sectionPickerModal) {
+                sectionPickerModal.hide();
+            }
+        });
+    }
+
     builder.addEventListener('click', function (event) {
         const button = event.target.closest('button');
         if (!button) return;
         const i = indexes(button);
+        if (button.matches('[data-layout-open-section-picker]')) {
+            if (sectionPickerModal) {
+                sectionPickerModal.show();
+            } else {
+                addSectionFromTemplate('blank');
+            }
+            return;
+        }
         if (button.matches('[data-layout-toggle-section]')) {
             if (expandedSections.has(i.section)) {
                 expandedSections.delete(i.section);
@@ -526,8 +1013,8 @@ document.addEventListener('DOMContentLoaded', function () {
             expandedSections.add(sections.length - 1);
         }
         if (button.matches('[data-layout-template]')) {
-            sections.push(presetSection(button.dataset.layoutTemplate));
-            expandedSections.add(sections.length - 1);
+            addSectionFromTemplate(button.dataset.layoutTemplate);
+            return;
         }
         if (button.matches('[data-layout-remove-section]')) {
             sections.splice(i.section, 1);
@@ -654,7 +1141,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const form = builder.closest('form');
     if (form) {
-        form.addEventListener('submit', sync);
+        form.addEventListener('submit', function () {
+            if (!modeInput || modeInput.value === 'advanced') {
+                updateSimpleEditorFromLayout();
+            }
+            sync();
+        }, true);
     }
     render();
 });

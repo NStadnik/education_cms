@@ -83,12 +83,25 @@ img { max-width: 100%; height: auto; }
 .page-layout-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; }
 .page-layout-card-accent { border-color: rgba(31,111,235,.35); background: #f7fbff; }
 .page-layout-card-plain { border-color: transparent; background: transparent; box-shadow: none; }
+.page-layout-card-feature { border-color: rgba(31,111,235,.22); border-left: 4px solid var(--brand); background: #fbfcff; }
+.page-layout-card-media { overflow: hidden; border-color: #d6e2f5; background: #fff; }
+.page-layout-card-media img { margin: -2px -2px 4px; width: calc(100% + 4px); max-width: none; border-radius: 6px 6px 4px 4px; }
+.page-layout-card-cta { border-color: #10233f; background: #10233f; color: #fff; }
+.page-layout-card-cta .rich-content, .page-layout-card-cta .rich-content p { color: rgba(255,255,255,.86); }
+.page-layout-card-cta .button { border-color: #fff; background: #fff; color: #10233f; }
+.page-layout-card-stat { border-color: rgba(11,122,85,.28); background: #f2fbf7; }
+.page-layout-card-stat h3 { color: #0b7a55; font-size: 46px; line-height: 1; }
+.page-layout-card-quote { border-color: #f0d28a; background: #fffaf0; }
+.page-layout-card-quote blockquote { margin-bottom: 0; border-left-color: #c27b1a; background: rgba(255,255,255,.7); }
+.page-layout-card-contact { border-color: #cfd9e8; background: #f8fafc; }
+.page-layout-card-contact strong { color: var(--text); }
 .rich-content { line-height: 1.65; }
 .rich-content p, .rich-content ul, .rich-content ol, .rich-content blockquote { margin: 0 0 14px; }
 .rich-content ul, .rich-content ol { padding-left: 24px; }
 .rich-content blockquote { padding: 10px 14px; border-left: 3px solid var(--brand); background: #f6f8fc; color: #344054; }
 .rich-content h2, .rich-content h3, .rich-content h4 { margin: 18px 0 10px; }
 .rich-content img { display: block; max-width: 100%; height: auto; margin: 14px 0; border-radius: 6px; }
+
 .wide-content { max-width: 920px; }
 .empty-state { padding: 18px; border: 1px dashed var(--line); border-radius: var(--radius); background: #fff; color: var(--muted); }
 .empty-state.small { padding: 12px; }
@@ -102,8 +115,6 @@ img { max-width: 100%; height: auto; }
     padding: 8px 13px;
     border-radius: 6px;
     border: 1px solid var(--brand);
-    background: var(--brand);
-    color: #fff;
     font: inherit;
     cursor: pointer;
 }

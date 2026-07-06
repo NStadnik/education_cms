@@ -153,7 +153,7 @@ final class PagesController extends \App\Controllers\AdminBaseController
 
                         $cards[] = [
                             'type' => 'card',
-                            'style' => $this->layoutChoice((string) ($card['style'] ?? 'default'), ['default', 'accent', 'plain'], 'default'),
+                            'style' => $this->layoutChoice((string) ($card['style'] ?? 'default'), ['default', 'accent', 'plain', 'feature', 'media', 'cta', 'stat', 'quote', 'contact'], 'default'),
                             'title' => $title,
                             'text' => $text,
                             'image' => $image,

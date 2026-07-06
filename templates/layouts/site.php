@@ -6,6 +6,7 @@
     <title><?= e($title ?? 'Сайт закладу освіти') ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/rich-editor.css') ?>">
     <?php
         $siteTemplateKey = preg_replace('/[^a-z0-9_-]/i', '', (string) ($settings['site_template'] ?? 'official')) ?: 'official';
         $siteTheme = \App\Services\SiteThemes::get($siteTemplateKey);

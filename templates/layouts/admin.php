@@ -24,6 +24,7 @@
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css') ?>">
     <link rel="stylesheet" href="<?= url('/assets/admin.css') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/rich-editor.css') ?>">
     <?php if (strpos($currentPath, '/admin/pages') === 0): ?>
         <link rel="stylesheet" href="<?= url('/assets/admin-pages-form.css') ?>">
     <?php endif; ?>
@@ -129,7 +130,24 @@
                         </label>
                     </div>
                     <div class="rich-media-status meta" data-rich-media-status></div>
-                    <div class="rich-media-grid" data-rich-media-grid></div>
+                    <div class="rich-media-workspace">
+                        <div class="rich-media-grid" data-rich-media-grid></div>
+                        <aside class="rich-media-selection" aria-live="polite">
+                            <div class="rich-media-selection-head">
+                                <div>
+                                    <strong data-rich-media-selection-count>Нічого не вибрано</strong>
+                                    <span data-rich-media-selection-help>Оберіть файл у списку.</span>
+                                </div>
+                                <button type="button" class="button secondary compact" data-rich-media-clear hidden>
+                                    <span class="mdi mdi-close" aria-hidden="true"></span><span>Очистити</span>
+                                </button>
+                            </div>
+                            <div class="rich-media-selected-list" data-rich-media-selected-list></div>
+                            <div class="rich-media-preview" data-rich-media-preview>
+                                <div class="rich-media-preview-empty">Попередній перегляд зʼявиться після вибору медіафайлів.</div>
+                            </div>
+                        </aside>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="button secondary" data-bs-dismiss="modal">Скасувати</button>
@@ -141,6 +159,7 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="<?= url('/assets/rich-editor.js') ?>"></script>
     <script src="<?= url('/assets/admin.js') ?>"></script>
 </body>
 </html>

@@ -51,6 +51,7 @@
     $previewContext = [
         'bootstrapCss' => 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
         'siteCss' => url('/assets/site.css'),
+        'richEditorCss' => url('/assets/rich-editor.css'),
         'templates' => $previewTemplates,
         'institutionName' => (string) ($settings['institution_name'] ?? 'Заклад освіти'),
         'menu' => is_array($previewMenu ?? null) ? $previewMenu : [],

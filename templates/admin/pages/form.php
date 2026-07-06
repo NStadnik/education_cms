@@ -5,26 +5,79 @@
     $hasLayoutBlocks = !empty($layoutBlocks);
     $blockCount = count($layoutBlocks ?: ($blocks ?: []));
     $statusLabel = (($item['status'] ?? 'draft') === 'published') ? 'Опубліковано' : 'Чернетка';
+    $textToHtml = static function (string $text): string {
+        $text = trim($text);
+        if ($text === '') {
+            return '';
+        }
+        if ($text !== strip_tags($text)) {
+            return $text;
+        }
+
+        $paragraphs = preg_split('/\R{2,}/', $text) ?: [];
+        $html = [];
+        foreach ($paragraphs as $paragraph) {
+            $paragraph = trim($paragraph);
+            if ($paragraph !== '') {
+                $html[] = '<p>' . nl2br(e($paragraph), false) . '</p>';
+            }
+        }
+
+        return implode("\n", $html);
+    };
     $simpleTextParts = [];
     foreach (($blocks ?: []) as $block) {
         if (!is_array($block)) {
             continue;
         }
         if (($block['type'] ?? '') === 'layout') {
+            $sectionParts = [];
+            $sectionTitle = trim((string) ($block['title'] ?? ''));
+            if ($sectionTitle !== '') {
+                $sectionParts[] = '<h2>' . e($sectionTitle) . '</h2>';
+            }
             foreach (($block['rows'] ?? []) as $row) {
                 foreach (($row['columns'] ?? []) as $column) {
                     foreach (($column['cards'] ?? []) as $card) {
+                        $cardParts = [];
                         $cardTitle = trim((string) ($card['title'] ?? ''));
                         $cardText = trim((string) ($card['text'] ?? ''));
-                        if ($cardTitle !== '' || $cardText !== '') {
-                            $simpleTextParts[] = trim(($cardTitle !== '' ? $cardTitle . "\n" : '') . $cardText);
+                        $cardImage = trim((string) ($card['image'] ?? ''));
+                        $buttonText = trim((string) ($card['button_text'] ?? ''));
+                        $buttonUrl = trim((string) ($card['button_url'] ?? ''));
+                        if ($cardImage !== '') {
+                            $cardParts[] = '<p><img src="' . e($cardImage) . '" alt="' . e($cardTitle) . '"></p>';
+                        }
+                        if ($cardTitle !== '') {
+                            $cardParts[] = '<h3>' . e($cardTitle) . '</h3>';
+                        }
+                        if ($cardText !== '') {
+                            $cardParts[] = $textToHtml($cardText);
+                        }
+                        if ($buttonText !== '' && $buttonUrl !== '') {
+                            $cardParts[] = '<p><a href="' . e($buttonUrl) . '">' . e($buttonText) . '</a></p>';
+                        }
+                        if ($cardParts) {
+                            $sectionParts[] = implode("\n", $cardParts);
                         }
                     }
                 }
             }
+            if ($sectionParts) {
+                $simpleTextParts[] = implode("\n\n", $sectionParts);
+            }
             continue;
         }
-        $simpleTextParts[] = trim((string) ($block['text'] ?? ''));
+        $blockParts = [];
+        $blockTitle = trim((string) ($block['title'] ?? ''));
+        $blockText = trim((string) ($block['text'] ?? ''));
+        if ($blockTitle !== '') {
+            $blockParts[] = '<h2>' . e($blockTitle) . '</h2>';
+        }
+        if ($blockText !== '') {
+            $blockParts[] = $textToHtml($blockText);
+        }
+        $simpleTextParts[] = trim(implode("\n", $blockParts));
     }
     $simpleText = trim(implode("\n\n", array_filter($simpleTextParts)));
 ?>
@@ -95,17 +148,8 @@
                             <p class="meta mb-0">Створюйте секції, ряди, колонки та картки. На сайті вони рендеряться через Bootstrap grid.</p>
                         </div>
                         <div class="layout-builder-actions">
-                            <button class="button secondary compact" type="button" data-layout-template="hero">
-                                <span class="mdi mdi-page-layout-header" aria-hidden="true"></span><span>Hero</span>
-                            </button>
-                            <button class="button secondary compact" type="button" data-layout-template="two-cards">
-                                <span class="mdi mdi-view-column-outline" aria-hidden="true"></span><span>2 колонки</span>
-                            </button>
-                            <button class="button secondary compact" type="button" data-layout-template="three-cards">
-                                <span class="mdi mdi-view-grid-outline" aria-hidden="true"></span><span>3 колонки</span>
-                            </button>
-                            <button class="button compact" type="button" data-layout-add-section>
-                                <span class="mdi mdi-plus" aria-hidden="true"></span><span>Секція</span>
+                            <button class="button compact" type="button" data-layout-open-section-picker>
+                                <span class="mdi mdi-view-grid-plus-outline" aria-hidden="true"></span><span>Додати секцію</span>
                             </button>
                         </div>
                     </div>
@@ -172,8 +216,68 @@
     </form>
 <?php endif; ?>
 
+<div class="modal fade" id="layoutSectionPickerModal" tabindex="-1" aria-labelledby="layoutSectionPickerTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow mb-1">Конструктор</p>
+                    <h5 class="modal-title" id="layoutSectionPickerTitle">Обрати секцію</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+            </div>
+            <div class="modal-body">
+                <div class="layout-section-template-grid">
+                    <button type="button" class="layout-section-template-card" data-layout-template="hero">
+                        <span class="layout-section-template-icon mdi mdi-page-layout-header" aria-hidden="true"></span>
+                        <strong>Hero-секція</strong>
+                        <small>Великий вступ із CTA-кнопкою</small>
+                        <span class="layout-section-template-preview is-hero"><i></i><i></i><i></i></span>
+                    </button>
+                    <button type="button" class="layout-section-template-card" data-layout-template="media-story">
+                        <span class="layout-section-template-icon mdi mdi-image-text" aria-hidden="true"></span>
+                        <strong>Медіа + текст</strong>
+                        <small>Дві колонки для історії або послуги</small>
+                        <span class="layout-section-template-preview is-media"><i></i><i></i></span>
+                    </button>
+                    <button type="button" class="layout-section-template-card" data-layout-template="feature-grid">
+                        <span class="layout-section-template-icon mdi mdi-view-grid-outline" aria-hidden="true"></span>
+                        <strong>Переваги</strong>
+                        <small>Три сучасні інформаційні картки</small>
+                        <span class="layout-section-template-preview is-grid"><i></i><i></i><i></i></span>
+                    </button>
+                    <button type="button" class="layout-section-template-card" data-layout-template="stats">
+                        <span class="layout-section-template-icon mdi mdi-chart-box-outline" aria-hidden="true"></span>
+                        <strong>Показники</strong>
+                        <small>Три картки з цифрами та підписами</small>
+                        <span class="layout-section-template-preview is-stats"><i></i><i></i><i></i></span>
+                    </button>
+                    <button type="button" class="layout-section-template-card" data-layout-template="cta">
+                        <span class="layout-section-template-icon mdi mdi-bullhorn-outline" aria-hidden="true"></span>
+                        <strong>CTA-блок</strong>
+                        <small>Акцентний заклик до дії</small>
+                        <span class="layout-section-template-preview is-cta"><i></i></span>
+                    </button>
+                    <button type="button" class="layout-section-template-card" data-layout-template="contact">
+                        <span class="layout-section-template-icon mdi mdi-card-account-phone-outline" aria-hidden="true"></span>
+                        <strong>Контакти</strong>
+                        <small>Контактна інформація і кнопка</small>
+                        <span class="layout-section-template-preview is-contact"><i></i><i></i></span>
+                    </button>
+                    <button type="button" class="layout-section-template-card" data-layout-template="blank">
+                        <span class="layout-section-template-icon mdi mdi-plus-box-outline" aria-hidden="true"></span>
+                        <strong>Порожня секція</strong>
+                        <small>Одна колонка для власної структури</small>
+                        <span class="layout-section-template-preview is-blank"><i></i></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="layoutCardModal" tabindex="-1" aria-labelledby="layoutCardModalTitle" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <div>
@@ -184,34 +288,92 @@
             </div>
             <div class="modal-body">
                 <div class="alert alert-danger py-2" data-card-modal-error hidden></div>
-                <div class="layout-card-modal-grid">
-                    <label>Стиль
-                        <select data-card-modal-field="style">
-                            <option value="default">Картка</option>
-                            <option value="accent">Акцент</option>
-                            <option value="plain">Без рамки</option>
-                        </select>
-                    </label>
-                    <label>Заголовок
-                        <input data-card-modal-field="title" required placeholder="Заголовок картки">
-                    </label>
-                    <label class="layout-card-modal-wide">Текст
-                        <textarea data-card-modal-field="text" rows="6" required placeholder="Основний текст картки"></textarea>
-                    </label>
-                    <label class="layout-card-modal-wide">Зображення URL
-                        <input data-card-modal-field="image" placeholder="/uploads/image.jpg">
-                    </label>
-                    <label>Текст кнопки
-                        <input data-card-modal-field="button_text" placeholder="Детальніше">
-                    </label>
-                    <label>URL кнопки
-                        <input data-card-modal-field="button_url" placeholder="/page/about">
-                    </label>
+                <div class="layout-card-modal-layout">
+                    <div class="layout-card-modal-grid">
+                        <label class="layout-card-modal-wide">Стандартний шаблон
+                            <select data-card-modal-template>
+                                <option value="">Обрати шаблон</option>
+                                <option value="feature">Інформаційна картка</option>
+                                <option value="media">Медіа-картка</option>
+                                <option value="cta">Заклик до дії</option>
+                                <option value="stat">Показник / цифра</option>
+                                <option value="quote">Цитата</option>
+                                <option value="contact">Контакти</option>
+                            </select>
+                        </label>
+                        <label>Стиль
+                            <select data-card-modal-field="style">
+                                <option value="default">Картка</option>
+                                <option value="accent">Акцент</option>
+                                <option value="plain">Без рамки</option>
+                                <option value="feature">Сучасна інформаційна</option>
+                                <option value="media">Медіа</option>
+                                <option value="cta">CTA</option>
+                                <option value="stat">Показник</option>
+                                <option value="quote">Цитата</option>
+                                <option value="contact">Контакти</option>
+                            </select>
+                        </label>
+                        <label>Заголовок
+                            <input data-card-modal-field="title" required placeholder="Заголовок картки">
+                        </label>
+                        <label class="layout-card-modal-wide">Текст
+                            <textarea data-card-modal-field="text" rows="6" required placeholder="Основний текст картки"></textarea>
+                        </label>
+                        <div class="layout-card-modal-wide layout-card-image-field">
+                            <label>Зображення
+                                <input data-card-modal-field="image" readonly placeholder="Оберіть з медіафайлів">
+                            </label>
+                            <div class="layout-card-image-actions">
+                                <button class="button secondary compact" type="button" data-card-image-picker-open>
+                                    <span class="mdi mdi-image-search-outline" aria-hidden="true"></span><span>Обрати</span>
+                                </button>
+                                <button class="button secondary compact" type="button" data-card-image-clear>
+                                    <span class="mdi mdi-close" aria-hidden="true"></span><span>Очистити</span>
+                                </button>
+                            </div>
+                        </div>
+                        <label>Текст кнопки
+                            <input data-card-modal-field="button_text" placeholder="Детальніше">
+                        </label>
+                        <label>URL кнопки
+                            <input data-card-modal-field="button_url" placeholder="/page/about">
+                        </label>
+                    </div>
+                    <aside class="layout-card-modal-preview" aria-live="polite">
+                        <article class="card content-card page-layout-card page-layout-card-default" data-card-modal-preview>
+                            <div class="layout-card-modal-preview-empty">Заповніть картку</div>
+                        </article>
+                    </aside>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="button secondary" data-bs-dismiss="modal"><span class="mdi mdi-close" aria-hidden="true"></span><span>Скасувати</span></button>
                 <button type="button" data-layout-card-save><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span data-layout-card-save-label>Додати картку</span></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="layoutCardImagePickerModal" tabindex="-1" aria-labelledby="layoutCardImagePickerTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow mb-1">Медіафайли</p>
+                    <h5 class="modal-title" id="layoutCardImagePickerTitle">Обрати зображення</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+            </div>
+            <div class="modal-body">
+                <div class="layout-card-image-picker-tools">
+                    <input type="search" class="form-control" data-card-image-search placeholder="Пошук за назвою або шляхом">
+                    <div class="layout-card-image-picker-status meta" data-card-image-status></div>
+                </div>
+                <div class="layout-card-image-picker-grid" data-card-image-grid></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="button secondary" data-bs-dismiss="modal">Скасувати</button>
             </div>
         </div>
     </div>
