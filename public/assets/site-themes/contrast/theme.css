@@ -1,0 +1,19 @@
+.site-template-contrast {
+    --brand: #9a6700;
+    --brand-strong: #6f4a00;
+    --bg: #fffdf5;
+}
+
+.site-template-contrast .topbar {
+    background: #111827;
+}
+
+.site-template-contrast .hero {
+    background: #fff4d6;
+    border-bottom-color: #e8b84f;
+}
+
+.site-template-contrast .button:not(.secondary) {
+    background: #111827;
+    border-color: #111827;
+}

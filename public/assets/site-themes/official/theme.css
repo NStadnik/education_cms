@@ -1,0 +1,13 @@
+.site-template-official {
+    --brand: #1f6feb;
+    --brand-strong: #174ea6;
+    --bg: #f7f8fb;
+}
+
+.site-template-official .topbar {
+    background: #10233f;
+}
+
+.site-template-official .hero {
+    background: #dfeafb;
+}

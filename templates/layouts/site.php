@@ -6,9 +6,16 @@
     <title><?= e($title ?? 'Сайт закладу освіти') ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css') ?>">
+    <?php
+        $siteTemplateKey = preg_replace('/[^a-z0-9_-]/i', '', (string) ($settings['site_template'] ?? 'official')) ?: 'official';
+        $siteTheme = \App\Services\SiteThemes::get($siteTemplateKey);
+        if (!empty($siteTheme['css'])):
+    ?>
+        <link rel="stylesheet" href="<?= e(url((string) $siteTheme['css'])) ?>">
+    <?php endif; ?>
 </head>
 <?php
-    $siteTemplate = preg_replace('/[^a-z0-9_-]/i', '', (string) ($settings['site_template'] ?? 'official')) ?: 'official';
+    $siteTemplate = (string) ($siteTheme['key'] ?? $siteTemplateKey);
     $globalFields = json_decode((string) ($settings['global_fields'] ?? '[]'), true);
     $globalFields = is_array($globalFields) ? $globalFields : [];
 ?>

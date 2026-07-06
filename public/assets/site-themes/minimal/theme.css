@@ -1,0 +1,24 @@
+.site-template-minimal {
+    --bg: #ffffff;
+    --brand: #0b7a55;
+    --brand-strong: #075d42;
+}
+
+.site-template-minimal .topbar {
+    background: #fff;
+    color: var(--text);
+    border-bottom: 1px solid var(--line);
+}
+
+.site-template-minimal .brand,
+.site-template-minimal .nav a {
+    color: var(--text);
+}
+
+.site-template-minimal .nav a:hover {
+    background: #eef7f2;
+}
+
+.site-template-minimal .hero {
+    background: #eef7f2;
+}

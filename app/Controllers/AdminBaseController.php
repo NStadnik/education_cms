@@ -9,6 +9,7 @@ use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Files;
+use App\Services\SiteThemes;
 use Throwable;
 
 abstract class AdminBaseController extends BaseController
@@ -234,23 +235,7 @@ abstract class AdminBaseController extends BaseController
 
     protected function siteTemplates(): array
     {
-        return [
-            'official' => [
-                'name' => 'Офіційний',
-                'description' => 'Стриманий державний стиль із темною навігацією.',
-                'accent' => '#1f6feb',
-            ],
-            'minimal' => [
-                'name' => 'Світлий',
-                'description' => 'Легкий білий інтерфейс із чітким контентним фокусом.',
-                'accent' => '#0b7a55',
-            ],
-            'contrast' => [
-                'name' => 'Контрастний',
-                'description' => 'Виразний шаблон для кращої помітності навігації.',
-                'accent' => '#9a6700',
-            ],
-        ];
+        return SiteThemes::all();
     }
 
     protected function bulkIds(Request $request): array
