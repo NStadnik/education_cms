@@ -18,38 +18,18 @@
     $siteTemplate = (string) ($siteTheme['key'] ?? $siteTemplateKey);
     $globalFields = json_decode((string) ($settings['global_fields'] ?? '[]'), true);
     $globalFields = is_array($globalFields) ? $globalFields : [];
+    $templateLayouts = json_decode((string) ($settings['site_template_layouts'] ?? ''), true);
+    $templateLayouts = is_array($templateLayouts) ? $templateLayouts : [];
+    $activeTemplateLayout = is_array($templateLayouts[$siteTemplate] ?? null) ? $templateLayouts[$siteTemplate] : [];
+    $legacyHeaderLayout = json_decode((string) ($settings['site_header_layout'] ?? ''), true);
+    $legacyFooterLayout = json_decode((string) ($settings['site_footer_layout'] ?? ''), true);
+    $headerLayout = is_array($activeTemplateLayout['header'] ?? null) ? $activeTemplateLayout['header'] : (is_array($legacyHeaderLayout) ? $legacyHeaderLayout : []);
+    $footerLayout = is_array($activeTemplateLayout['footer'] ?? null) ? $activeTemplateLayout['footer'] : (is_array($legacyFooterLayout) ? $legacyFooterLayout : []);
 ?>
 <body class="site-template-<?= e($siteTemplate) ?>">
-    <header class="topbar">
-        <div class="container topbar-inner">
-            <a class="brand" href="<?= url('/') ?>"><?= e($settings['institution_name'] ?? 'Заклад освіти') ?></a>
-            <nav class="nav" aria-label="Головне меню">
-                <a href="<?= url('/') ?>">Головна</a>
-                <?php foreach (($menu ?? []) as $item): ?>
-                    <?php if ($item['slug'] !== 'home'): ?>
-                        <a href="<?= url('/page/' . $item['slug']) ?>"><?= e($item['title']) ?></a>
-                    <?php endif; ?>
-                <?php endforeach; ?>
-                <a href="<?= url('/news') ?>">Новини</a>
-            </nav>
-        </div>
-    </header>
+    <?= $this->partial('layouts/site-header', ['settings' => $settings, 'menu' => $menu ?? [], 'headerLayout' => $headerLayout]) ?>
     <?= $content ?>
-    <footer class="footer">
-        <div class="container">
-            <strong><?= e($settings['institution_name'] ?? 'Заклад освіти') ?></strong><br>
-            <?php foreach ($globalFields as $field): ?>
-                <?php
-                    $field = is_array($field) ? $field : [];
-                    $fieldLabel = (string) ($field['label'] ?? 'Поле');
-                    $fieldValue = trim((string) ($field['value'] ?? ''));
-                ?>
-                <?php if ($fieldValue !== ''): ?>
-                    <span><?= e($fieldLabel) ?>: <?= e($fieldValue) ?></span><br>
-                <?php endif; ?>
-            <?php endforeach; ?>
-        </div>
-    </footer>
+    <?= $this->partial('layouts/site-footer', ['settings' => $settings, 'globalFields' => $globalFields, 'footerLayout' => $footerLayout]) ?>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

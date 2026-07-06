@@ -62,9 +62,14 @@ final class PagesController extends \App\Controllers\AdminBaseController
         try {
             $now = date('c');
             $id = (int) $request->input('id', 0);
-            $blocks = $this->blocksFromLayoutJson((string) $request->input('layout_json'));
-            if (!$blocks) {
+            $editorMode = (string) $request->input('editor_mode', 'simple');
+            if ($editorMode === 'simple') {
                 $blocks = $this->blocksFromText((string) $request->input('blocks_text'));
+            } else {
+                $blocks = $this->blocksFromLayoutJson((string) $request->input('layout_json'));
+                if (!$blocks) {
+                    $blocks = $this->blocksFromText((string) $request->input('blocks_text'));
+                }
             }
             $slug = $this->slug((string) $request->input('slug', $request->input('title')));
             $template = (string) $request->input('template', 'default');

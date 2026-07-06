@@ -123,6 +123,7 @@ final class App
         $this->router->post('/admin/users/save', [$adminUsers, 'userSave']);
         $this->router->post('/admin/users/bulk', [$adminUsers, 'usersBulk']);
         $this->router->get('/admin/templates', [$adminSettings, 'templates']);
+        $this->router->get('/admin/templates/link-picker', [$adminSettings, 'templatesLinkPicker']);
         $this->router->post('/admin/templates/save', [$adminSettings, 'templatesSave']);
         $this->router->get('/admin/import', [$adminImport, 'import']);
         $this->router->post('/admin/import/preview', [$adminImport, 'importPreview']);

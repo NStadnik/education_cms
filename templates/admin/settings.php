@@ -9,6 +9,49 @@
     <section class="card admin-form-card">
         <div class="form-section-head">
             <div>
+                <h2>Шаблон сайту</h2>
+                <p class="meta">Активний шаблон визначає глобальне оформлення публічного сайту. Структура хедера й футера редагується в розділі “Шаблони”.</p>
+            </div>
+        </div>
+        <label>Активний шаблон
+            <select name="site_template">
+                <?php foreach (($siteTemplates ?? []) as $key => $template): ?>
+                    <option value="<?= e((string) $key) ?>" <?= selected($settings['site_template'] ?? 'official', $key) ?>>
+                        <?= e($template['name'] ?? (string) $key) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+    </section>
+
+    <section class="card admin-form-card">
+        <div class="form-section-head">
+            <div>
+                <h2>Головна сторінка</h2>
+                <p class="meta">Виберіть опубліковану сторінку, яка відкриватиметься за адресою сайту.</p>
+            </div>
+        </div>
+        <?php $selectedHomePageId = (int) ($settings['home_page_id'] ?? 0); ?>
+        <label>Сторінка
+            <select name="home_page_id">
+                <option value="">Автоматично: сторінка зі slug home</option>
+                <?php foreach (($homePages ?? []) as $page): ?>
+                    <?php
+                        $page = is_array($page) ? $page : [];
+                        $pageId = (int) ($page['id'] ?? 0);
+                        $isPublished = ($page['status'] ?? '') === 'published';
+                    ?>
+                    <option value="<?= e((string) $pageId) ?>" <?= selected($selectedHomePageId, $pageId) ?> <?= ($isPublished || $selectedHomePageId === $pageId) ? '' : 'disabled' ?>>
+                        <?= e($page['title'] ?? 'Без назви') ?><?= $isPublished ? '' : ' (чернетка)' ?> /<?= e($page['slug'] ?? '') ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+    </section>
+
+    <section class="card admin-form-card">
+        <div class="form-section-head">
+            <div>
                 <h2>Дані закладу</h2>
                 <p class="meta">Ці дані використовуються в шапці, підвалі та публічних сторінках сайту.</p>
             </div>

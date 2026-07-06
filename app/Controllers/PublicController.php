@@ -17,7 +17,13 @@ final class PublicController extends BaseController
             redirect('/install');
         }
 
-        $page = $this->db()->fetch('select * from pages where slug = ? and status = ?', ['home', 'published']);
+        $settings = $this->siteSettings();
+        $homePageId = (int) ($settings['home_page_id'] ?? 0);
+        $page = null;
+        if ($homePageId > 0) {
+            $page = $this->db()->fetch('select * from pages where id = ? and status = ?', [$homePageId, 'published']);
+        }
+        $page ??= $this->db()->fetch('select * from pages where slug = ? and status = ?', ['home', 'published']);
         return $this->renderPage($page ?: ['title' => 'Головна', 'blocks_json' => '[]']);
     }
 
@@ -167,7 +173,13 @@ final class PublicController extends BaseController
 
     private function menu(): array
     {
-        return $this->db()->fetchAll('select title, slug from pages where status = ? order by sort_order asc, title asc', ['published']);
+        $settings = $this->siteSettings();
+        $homePageId = (int) ($settings['home_page_id'] ?? 0);
+        if ($homePageId > 0) {
+            return $this->db()->fetchAll('select title, slug from pages where status = ? and id <> ? order by sort_order asc, title asc', ['published', $homePageId]);
+        }
+
+        return $this->db()->fetchAll('select title, slug from pages where status = ? and slug <> ? order by sort_order asc, title asc', ['published', 'home']);
     }
 
 }

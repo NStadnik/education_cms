@@ -36,7 +36,6 @@
             <?php if (!empty($block['title'])): ?>
                 <div class="page-head public-head">
                     <div>
-                        <p class="eyebrow">Сторінка</p>
                         <h2><?= e($block['title']) ?></h2>
                     </div>
                 </div>
@@ -69,7 +68,6 @@
     <section class="section">
         <div class="container">
             <article class="card content-card">
-                <p class="eyebrow">Сторінка</p>
                 <h2><?= e($block['title'] ?? $page['title']) ?></h2>
                 <div class="rich-content"><?= safe_html($block['text'] ?? '') ?></div>
             </article>

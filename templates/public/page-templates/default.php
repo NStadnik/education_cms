@@ -3,7 +3,6 @@
         <div class="container">
             <div class="page-head public-head">
                 <div>
-                    <p class="eyebrow">Сторінка</p>
                     <h1><?= e($page['title']) ?></h1>
                     <?php if (!empty($page['excerpt'])): ?><p class="page-subtitle"><?= e($page['excerpt']) ?></p><?php endif; ?>
                 </div>
