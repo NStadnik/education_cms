@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
         initialBlocks = [];
     }
     let sections = normalizeInitial(initialBlocks);
+    let expandedSections = new Set([0]);
 
     function normalizeInitial(blocks) {
         if (!Array.isArray(blocks) || blocks.length === 0) {
@@ -204,22 +205,42 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function render() {
         list.innerHTML = sections.map(function (section, sectionIndex) {
+            const isExpanded = expandedSections.has(sectionIndex);
+            const rowCount = section.rows.length;
+            const cardCount = countCards(section);
+            const sectionTitle = String(section.title || '').trim() || 'Секція ' + (sectionIndex + 1);
             return '<section class="layout-editor-section" data-section-index="' + sectionIndex + '" data-drag-kind="section">' +
                 '<div class="layout-editor-section-head">' +
                     dragHandle('Перетягнути секцію') +
-                    '<label>Назва секції<input data-layout-field="section.title" value="' + escapeHtml(section.title) + '" placeholder="Необов’язково"></label>' +
-                    '<label>Фон<select data-layout-field="section.background">' +
-                        option('default', 'Звичайний', section.background) +
-                        option('light', 'Світлий', section.background) +
-                        option('accent', 'Акцентний', section.background) +
-                    '</select></label>' +
-                    '<span class="layout-editor-count">Рядів: ' + section.rows.length + '</span>' +
-                    '<button class="button secondary compact" type="button" data-layout-add-row><span class="mdi mdi-view-column-outline"></span><span>Ряд</span></button>' +
-                    '<button class="button danger compact" type="button" data-layout-remove-section title="Видалити секцію"><span class="mdi mdi-delete-outline"></span></button>' +
+                    '<button class="layout-editor-toggle" type="button" data-layout-toggle-section aria-expanded="' + (isExpanded ? 'true' : 'false') + '" title="' + (isExpanded ? 'Згорнути секцію' : 'Розгорнути секцію') + '">' +
+                        '<span class="mdi ' + (isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down') + '" aria-hidden="true"></span>' +
+                    '</button>' +
+                    '<button class="layout-editor-section-summary" type="button" data-layout-toggle-section aria-expanded="' + (isExpanded ? 'true' : 'false') + '">' +
+                        '<strong>' + escapeHtml(sectionTitle) + '</strong>' +
+                        '<span>' + backgroundLabel(section.background) + ' фон</span>' +
+                    '</button>' +
+                    '<div class="layout-editor-counts">' +
+                        '<span class="layout-editor-count">' + rowCount + ' ряд.</span>' +
+                        '<span class="layout-editor-count">' + cardCount + ' карт.</span>' +
+                    '</div>' +
+                    '<div class="layout-editor-section-actions">' +
+                        '<button class="button secondary compact" type="button" data-layout-add-row><span class="mdi mdi-view-column-outline"></span><span>Ряд</span></button>' +
+                        '<button class="button danger compact" type="button" data-layout-remove-section title="Видалити секцію"><span class="mdi mdi-delete-outline"></span></button>' +
+                    '</div>' +
                 '</div>' +
-                '<div class="layout-editor-rows">' + section.rows.map(function (row, rowIndex) {
-                    return renderRow(sectionIndex, rowIndex, row);
-                }).join('') + '</div>' +
+                '<div class="layout-editor-section-body"' + (isExpanded ? '' : ' hidden') + '>' +
+                    '<div class="layout-editor-section-settings">' +
+                        '<label>Назва секції<input data-layout-field="section.title" value="' + escapeHtml(section.title) + '" placeholder="Необов’язково"></label>' +
+                        '<label>Фон<select data-layout-field="section.background">' +
+                            option('default', 'Звичайний', section.background) +
+                            option('light', 'Світлий', section.background) +
+                            option('accent', 'Акцентний', section.background) +
+                        '</select></label>' +
+                    '</div>' +
+                    '<div class="layout-editor-rows">' + section.rows.map(function (row, rowIndex) {
+                        return renderRow(sectionIndex, rowIndex, row);
+                    }).join('') + '</div>' +
+                '</div>' +
             '</section>';
         }).join('');
         sync();
@@ -284,6 +305,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function option(value, label, current) {
         return '<option value="' + value + '"' + (value === current ? ' selected' : '') + '>' + label + '</option>';
+    }
+
+    function countCards(section) {
+        return section.rows.reduce(function (total, row) {
+            return total + row.columns.reduce(function (rowTotal, col) {
+                return rowTotal + col.cards.length;
+            }, 0);
+        }, 0);
+    }
+
+    function backgroundLabel(background) {
+        return {
+            default: 'Звичайний',
+            light: 'Світлий',
+            accent: 'Акцентний'
+        }[background] || 'Звичайний';
     }
 
     function dragHandle(title) {
@@ -475,10 +512,31 @@ document.addEventListener('DOMContentLoaded', function () {
         const button = event.target.closest('button');
         if (!button) return;
         const i = indexes(button);
-        if (button.matches('[data-layout-add-section]')) sections.push(emptySection());
-        if (button.matches('[data-layout-template]')) sections.push(presetSection(button.dataset.layoutTemplate));
-        if (button.matches('[data-layout-remove-section]')) sections.splice(i.section, 1);
-        if (button.matches('[data-layout-add-row]')) sections[i.section].rows.push(rowFromPreset('col-md-12'));
+        if (button.matches('[data-layout-toggle-section]')) {
+            if (expandedSections.has(i.section)) {
+                expandedSections.delete(i.section);
+            } else {
+                expandedSections.add(i.section);
+            }
+            render();
+            return;
+        }
+        if (button.matches('[data-layout-add-section]')) {
+            sections.push(emptySection());
+            expandedSections.add(sections.length - 1);
+        }
+        if (button.matches('[data-layout-template]')) {
+            sections.push(presetSection(button.dataset.layoutTemplate));
+            expandedSections.add(sections.length - 1);
+        }
+        if (button.matches('[data-layout-remove-section]')) {
+            sections.splice(i.section, 1);
+            expandedSections = new Set([Math.max(0, Math.min(i.section, sections.length - 1))]);
+        }
+        if (button.matches('[data-layout-add-row]')) {
+            sections[i.section].rows.push(rowFromPreset('col-md-12'));
+            expandedSections.add(i.section);
+        }
         if (button.matches('[data-layout-remove-row]')) sections[i.section].rows.splice(i.row, 1);
         if (button.matches('[data-layout-add-card]')) {
             openCardModal(i, -1);
@@ -489,7 +547,10 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         if (button.matches('[data-layout-remove-card]')) sections[i.section].rows[i.row].columns[i.column].cards.splice(i.card, 1);
-        if (!sections.length) sections.push(emptySection());
+        if (!sections.length) {
+            sections.push(emptySection());
+            expandedSections = new Set([0]);
+        }
         render();
     });
 
