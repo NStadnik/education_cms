@@ -79,7 +79,7 @@
 <div class="modal fade" id="mediaMetadataModal" tabindex="-1" aria-labelledby="mediaMetadataTitle" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-            <form method="post" action="<?= url('/admin/media/metadata') ?>" data-media-metadata-form>
+            <form method="post" action="<?= url('/admin/media/metadata') ?>" data-media-metadata-form data-no-ajax>
                 <div class="modal-header">
                     <div>
                         <p class="eyebrow mb-1">Медіафайл</p>

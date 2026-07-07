@@ -2,8 +2,8 @@
     $layout = array_replace([
         'variant' => 'default',
         'show_brand' => true,
-        'show_home' => true,
-        'show_news' => true,
+        'show_home' => false,
+        'show_news' => false,
         'links' => [],
         'cta_label' => '',
         'cta_url' => '',
@@ -44,17 +44,6 @@
             </a>
         <?php endif; ?>
         <nav class="nav site-header-nav" aria-label="Головне меню">
-            <?php if (!empty($layout['show_home'])): ?>
-                <a href="<?= url('/') ?>">Головна</a>
-            <?php endif; ?>
-            <?php foreach (($menu ?? []) as $item): ?>
-                <?php if (($item['slug'] ?? '') !== 'home'): ?>
-                    <a href="<?= url('/page/' . $item['slug']) ?>"><?= e($item['title']) ?></a>
-                <?php endif; ?>
-            <?php endforeach; ?>
-            <?php if (!empty($layout['show_news'])): ?>
-                <a href="<?= url('/news') ?>">Новини</a>
-            <?php endif; ?>
             <?php foreach (($layout['links'] ?? []) as $link): ?>
                 <?= $renderMenuLinks([$link]) ?>
             <?php endforeach; ?>

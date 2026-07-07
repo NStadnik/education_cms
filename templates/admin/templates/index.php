@@ -2,8 +2,8 @@
     $defaultHeaderLayout = [
         'variant' => 'default',
         'show_brand' => true,
-        'show_home' => true,
-        'show_news' => true,
+        'show_home' => false,
+        'show_news' => false,
         'links' => [],
         'cta_label' => '',
         'cta_url' => '',
@@ -37,6 +37,8 @@
             'header' => array_replace($defaultHeaderLayout, is_array($layout['header'] ?? null) ? $layout['header'] : []),
             'footer' => array_replace($defaultFooterLayout, is_array($layout['footer'] ?? null) ? $layout['footer'] : []),
         ];
+        $templateLayouts[$key]['header']['show_home'] = false;
+        $templateLayouts[$key]['header']['show_news'] = false;
     }
     $headerLayout = $templateLayouts[$selectedTemplate]['header'] ?? $defaultHeaderLayout;
     $footerLayout = $templateLayouts[$selectedTemplate]['footer'] ?? $defaultFooterLayout;
@@ -72,7 +74,7 @@
     </div>
 </div>
 
-<form class="form-grid wide" method="post" action="<?= url('/admin/templates/save') ?>">
+<form class="form-grid wide" method="post" action="<?= url('/admin/templates/save') ?>" data-template-form>
     <?= \App\Core\Csrf::field() ?>
     <section class="card admin-form-card template-picker-card">
         <div class="form-section-head">
@@ -80,8 +82,11 @@
                 <h2>Шаблон для редагування</h2>
                 <p class="meta">Оберіть, структуру якого шаблону змінювати. Це не перемикає активний шаблон сайту.</p>
             </div>
+            <button class="button secondary compact" type="button" data-template-picker-toggle aria-expanded="true">
+                <span class="mdi mdi-chevron-up" aria-hidden="true"></span><span>Згорнути</span>
+            </button>
         </div>
-        <div class="template-options">
+        <div class="template-options" data-template-picker-options>
             <?php foreach ($siteTemplates as $key => $template): ?>
                 <?php
                     $preview = is_array($template['preview'] ?? null) ? $template['preview'] : [];
@@ -199,8 +204,6 @@
                     </div>
                     <div class="template-toggle-grid">
                         <label class="check-row"><input type="checkbox" data-header-field="show_brand"> Показувати бренд</label>
-                        <label class="check-row"><input type="checkbox" data-header-field="show_home"> Показувати “Головна”</label>
-                        <label class="check-row"><input type="checkbox" data-header-field="show_news"> Показувати “Новини”</label>
                     </div>
                     <div class="template-link-quick-add" data-menu-quick-add>
                         <div>
@@ -212,6 +215,17 @@
                         </label>
                         <button class="button secondary compact" type="button" data-menu-picker-open>
                             <span class="mdi mdi-link-plus" aria-hidden="true"></span><span>Обрати посилання</span>
+                        </button>
+                    </div>
+                    <div class="template-menu-presets" aria-label="Швидкі набори меню">
+                        <button class="button secondary compact" type="button" data-menu-preset="core">
+                            <span class="mdi mdi-home-plus-outline" aria-hidden="true"></span><span>Головна + Новини</span>
+                        </button>
+                        <button class="button secondary compact" type="button" data-menu-preset="pages">
+                            <span class="mdi mdi-file-tree-outline" aria-hidden="true"></span><span>Опубліковані сторінки</span>
+                        </button>
+                        <button class="button secondary compact" type="button" data-menu-preset="clear">
+                            <span class="mdi mdi-menu-open" aria-hidden="true"></span><span>Очистити меню</span>
                         </button>
                     </div>
                     <div class="template-editor-list-head">
@@ -277,8 +291,13 @@
                         <h2>Головна сторінка</h2>
                         <p class="meta">Показує поточний шаблон і незбережені зміни.</p>
                     </div>
+                    <div class="template-preview-modes" role="group" aria-label="Розмір перегляду">
+                        <button class="button compact" type="button" data-template-preview-mode="desktop" title="Desktop"><span class="mdi mdi-monitor" aria-hidden="true"></span></button>
+                        <button class="button secondary compact" type="button" data-template-preview-mode="tablet" title="Tablet"><span class="mdi mdi-tablet" aria-hidden="true"></span></button>
+                        <button class="button secondary compact" type="button" data-template-preview-mode="mobile" title="Mobile"><span class="mdi mdi-cellphone" aria-hidden="true"></span></button>
+                    </div>
                 </div>
-                <div class="template-home-preview-shell">
+                <div class="template-home-preview-shell" data-template-preview-shell data-preview-mode="desktop">
                     <iframe
                         title="Попередній перегляд головної сторінки"
                         data-template-home-preview
@@ -344,6 +363,9 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="button" data-menu-picker-add-selected disabled>
+                    <span class="mdi mdi-plus-box-multiple-outline" aria-hidden="true"></span><span data-menu-picker-add-label>Додати вибрані</span>
+                </button>
                 <button type="button" class="button secondary" data-bs-dismiss="modal"><span class="mdi mdi-close" aria-hidden="true"></span><span>Закрити</span></button>
             </div>
         </div>

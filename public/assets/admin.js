@@ -359,6 +359,7 @@
                 return;
             }
 
+            document.dispatchEvent(new CustomEvent('admin:form-saved', {detail: {form: form, data: data}}));
             setAjaxFormMessage(form, data.message || 'Збережено.', false);
         } catch (error) {
             setAjaxFormMessage(form, error.message || 'Помилка збереження.', true);

@@ -208,9 +208,9 @@ final class SettingsController extends \App\Controllers\AdminBaseController
         return [
             'variant' => $this->choice((string) ($data['variant'] ?? 'default'), ['default', 'centered', 'compact'], 'default'),
             'show_brand' => array_key_exists('show_brand', $data) ? !empty($data['show_brand']) : true,
-            'show_home' => array_key_exists('show_home', $data) ? !empty($data['show_home']) : true,
-            'show_news' => array_key_exists('show_news', $data) ? !empty($data['show_news']) : true,
-            'links' => array_slice($links, 0, 8),
+            'show_home' => false,
+            'show_news' => false,
+            'links' => array_slice($links, 0, 16),
             'cta_label' => $this->limitString(trim((string) ($data['cta_label'] ?? '')), 80),
             'cta_url' => $this->limitString($ctaUrl, 240),
         ];

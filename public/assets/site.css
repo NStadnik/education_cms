@@ -195,7 +195,18 @@ table:not(.table) th { background: #f1f4f9; }
     .media-align-left, .media-align-right { float: none; max-width: none; margin: 0 0 16px; }
     .media-size-small, .media-size-medium, .media-size-large { max-width: none; }
     .metrics { grid-template-columns: 1fr; }
-    .site-submenu { position: static; display: grid; gap: 2px; width: 100%; margin-left: 10px; box-shadow: none; }
+    .topbar-inner { align-items: stretch; flex-direction: column; justify-content: center; gap: 10px; padding: 10px 0; }
+    .brand { width: 100%; min-width: 0; font-size: 18px; line-height: 1.2; }
+    .site-logo { width: 34px; height: 34px; }
+    .site-header-nav { display: grid; grid-template-columns: 1fr; width: 100%; gap: 4px; }
+    .site-header-nav a { display: flex; align-items: center; width: 100%; min-height: 38px; padding: 8px 10px; }
+    .site-menu-item { display: grid; width: 100%; }
+    .site-submenu { position: static; display: grid; gap: 2px; width: 100%; min-width: 0; margin: 3px 0 4px 10px; padding: 4px 0 4px 8px; border-width: 0 0 0 1px; border-radius: 0; background: transparent; box-shadow: none; }
+    .site-submenu .site-menu-item { display: grid; }
+    .site-submenu a { white-space: normal; }
+    .site-submenu .site-submenu { left: auto; margin-left: 8px; }
+    .site-header-centered .brand, .site-header-centered .site-header-nav { justify-content: stretch; text-align: left; }
+    .site-header-cta { width: 100%; }
     .sidebar { position: static; }
     .main { padding: 16px; }
     .admin-content { padding: 16px; }

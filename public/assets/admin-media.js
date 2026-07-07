@@ -90,8 +90,10 @@ document.addEventListener('submit', async function (event) {
         body.set('q', input.value.trim());
     }
     if (folderFilter) {
-        body.set('folder', folderFilter.value);
         body.set('current_folder', folderFilter.value);
+        if (form.matches('[data-media-delete]')) {
+            body.set('folder', folderFilter.value);
+        }
     }
 
     if (button) {
