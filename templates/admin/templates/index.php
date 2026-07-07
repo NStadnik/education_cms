@@ -7,6 +7,7 @@
         'links' => [],
         'cta_label' => '',
         'cta_url' => '',
+        'mobile_source' => 'main',
     ];
     $defaultFooterLayout = [
         'variant' => 'default',
@@ -178,7 +179,7 @@
                     <div>
                         <p class="eyebrow">Конструктор</p>
                         <h2>Налаштування шаблону</h2>
-                        <p class="meta">Розділіть навігацію, hero, мобільне меню та футер по вкладках.</p>
+                        <p class="meta">Розділіть навігацію, hero, меню під hero, мобільне меню та футер по вкладках.</p>
                     </div>
                 </div>
                 <div class="template-editor-tabs" role="tablist" aria-label="Розділи налаштувань шаблону">
@@ -187,6 +188,9 @@
                     </button>
                     <button class="button secondary compact" type="button" data-template-editor-tab="hero" aria-selected="false">
                         <span class="mdi mdi-page-layout-header" aria-hidden="true"></span><span>Hero</span>
+                    </button>
+                    <button class="button secondary compact" type="button" data-template-editor-tab="secondary" aria-selected="false">
+                        <span class="mdi mdi-tab" aria-hidden="true"></span><span>Меню під hero</span>
                     </button>
                     <button class="button secondary compact" type="button" data-template-editor-tab="mobile" aria-selected="false">
                         <span class="mdi mdi-cellphone" aria-hidden="true"></span><span>Мобільне меню</span>
@@ -247,30 +251,13 @@
                     <div class="template-menu-blueprints" aria-label="Готові шаблони меню" data-template-tab-panel="menu">
                         <div>
                             <strong>Готові шаблони меню</strong>
-                            <span>Швидко зібрати типову структуру і потім відредагувати деталі.</span>
+                            <span>Спочатку оберіть шаблон у модальному вікні, перегляньте структуру і лише потім застосуйте.</span>
                         </div>
-                        <button class="template-menu-blueprint" type="button" data-menu-template="basic">
-                            <span class="mdi mdi-view-list-outline" aria-hidden="true"></span>
-                            <strong>Базове</strong>
-                            <small>Головна, сторінки, новини, контакти</small>
+                        <button class="template-blueprint-open" type="button" data-template-library-open="menu" data-template-library-target="main">
+                            <span class="mdi mdi-view-grid-plus-outline" aria-hidden="true"></span>
+                            <strong>Обрати шаблон</strong>
+                            <small>Відкрити вибір з попереднім переглядом</small>
                         </button>
-                        <button class="template-menu-blueprint" type="button" data-menu-template="education">
-                            <span class="mdi mdi-school-outline" aria-hidden="true"></span>
-                            <strong>Заклад освіти</strong>
-                            <small>Про заклад, навчання, новини, контакти</small>
-                        </button>
-                        <button class="template-menu-blueprint" type="button" data-menu-template="mega">
-                            <span class="mdi mdi-view-column-outline" aria-hidden="true"></span>
-                            <strong>Мега-меню</strong>
-                            <small>Секції з колонками для великої навігації</small>
-                        </button>
-                    </div>
-                    <div class="template-menu-visual" data-template-tab-panel="menu">
-                        <div class="template-menu-visual-head">
-                            <strong>Preview меню</strong>
-                            <span>Так меню виглядатиме як структура: верхній рівень, вкладення та колонки.</span>
-                        </div>
-                        <div class="template-menu-visual-body" data-menu-visual-preview></div>
                     </div>
                     <div class="template-header-extra-grid" data-template-tab-panel="hero" hidden>
                         <section class="template-subeditor">
@@ -287,6 +274,7 @@
                                         <option value="default">Стандартний</option>
                                         <option value="accent">Акцентний</option>
                                         <option value="compact">Компактний</option>
+                                        <option value="fullscreen">На весь екран</option>
                                     </select>
                                 </label>
                                 <label>Заголовок
@@ -302,35 +290,57 @@
                                     <input data-header-field="hero_button_url" placeholder="/page/about">
                                 </label>
                             </div>
-                        </section>
-                        <section class="template-subeditor">
-                            <div class="template-subeditor-head">
+                            <div class="template-menu-blueprints template-hero-blueprints" aria-label="Готові шаблони hero">
                                 <div>
-                                    <strong>Меню під hero</strong>
-                                    <span>Швидкі посилання окремим рядком під hero-блоком.</span>
+                                    <strong>Готові шаблони hero</strong>
+                                    <span>Оберіть шаблон у модальному вікні, перегляньте перший екран і застосуйте.</span>
                                 </div>
-                                <label class="check-row"><input type="checkbox" data-header-field="secondary_enabled"> Увімкнути</label>
+                                <button class="template-blueprint-open" type="button" data-template-library-open="hero">
+                                    <span class="mdi mdi-view-grid-plus-outline" aria-hidden="true"></span>
+                                    <strong>Обрати шаблон</strong>
+                                    <small>Відкрити вибір з попереднім переглядом</small>
+                                </button>
                             </div>
-                            <div class="template-editor-grid template-editor-grid-2">
-                                <label>Стиль
-                                    <select data-header-field="secondary_variant">
-                                        <option value="pills">Плашки</option>
-                                        <option value="tabs">Вкладки</option>
-                                        <option value="plain">Простий</option>
-                                    </select>
-                                </label>
-                                <div class="template-editor-list-actions">
-                                    <button class="button secondary compact" type="button" data-secondary-add-section>
-                                        <span class="mdi mdi-format-list-group" aria-hidden="true"></span><span>Секція</span>
-                                    </button>
-                                    <button class="button secondary compact" type="button" data-secondary-add-link>
-                                        <span class="mdi mdi-plus" aria-hidden="true"></span><span>Пункт</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="template-editor-list template-secondary-list" data-secondary-links></div>
                         </section>
                     </div>
+                    <section class="template-subeditor" data-template-tab-panel="secondary" hidden>
+                        <div class="template-subeditor-head">
+                            <div>
+                                <strong>Меню під hero</strong>
+                                <span>Швидкі посилання окремим рядком під hero-блоком.</span>
+                            </div>
+                            <label class="check-row"><input type="checkbox" data-header-field="secondary_enabled"> Увімкнути</label>
+                        </div>
+                        <div class="template-editor-grid template-editor-grid-2">
+                            <label>Стиль
+                                <select data-header-field="secondary_variant">
+                                    <option value="pills">Плашки</option>
+                                    <option value="tabs">Вкладки</option>
+                                    <option value="plain">Простий</option>
+                                </select>
+                            </label>
+                            <div class="template-editor-list-actions">
+                                <button class="button secondary compact" type="button" data-secondary-add-section>
+                                    <span class="mdi mdi-format-list-group" aria-hidden="true"></span><span>Секція</span>
+                                </button>
+                                <button class="button secondary compact" type="button" data-secondary-add-link>
+                                    <span class="mdi mdi-plus" aria-hidden="true"></span><span>Пункт</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="template-menu-blueprints template-secondary-blueprints" aria-label="Готові шаблони меню під hero">
+                            <div>
+                                <strong>Готові шаблони меню</strong>
+                                <span>Спочатку оберіть шаблон у модальному вікні, перегляньте структуру і лише потім застосуйте.</span>
+                            </div>
+                            <button class="template-blueprint-open" type="button" data-template-library-open="menu" data-template-library-target="secondary">
+                                <span class="mdi mdi-view-grid-plus-outline" aria-hidden="true"></span>
+                                <strong>Обрати шаблон</strong>
+                                <small>Відкрити вибір з попереднім переглядом</small>
+                            </button>
+                        </div>
+                        <div class="template-editor-list template-secondary-list" data-secondary-links></div>
+                    </section>
                     <section class="template-subeditor" data-template-tab-panel="mobile" hidden>
                         <div class="template-subeditor-head">
                             <div>
@@ -344,6 +354,13 @@
                                     <option value="drawer">Згортання під хедером</option>
                                     <option value="panel">Панель на всю ширину</option>
                                     <option value="compact">Компактний список</option>
+                                </select>
+                            </label>
+                            <label>Наповнення
+                                <select data-header-field="mobile_source">
+                                    <option value="main">Основне меню</option>
+                                    <option value="secondary">Меню під hero</option>
+                                    <option value="both">Основне + під hero</option>
                                 </select>
                             </label>
                             <label>Текст кнопки
@@ -414,6 +431,17 @@
                             <input data-footer-field="bottom_text" placeholder="© Заклад освіти">
                         </label>
                     </div>
+                    <div class="template-menu-blueprints template-footer-blueprints" aria-label="Готові шаблони футера">
+                        <div>
+                            <strong>Готові шаблони футера</strong>
+                            <span>Оберіть шаблон у модальному вікні, перегляньте колонки і застосуйте.</span>
+                        </div>
+                        <button class="template-blueprint-open" type="button" data-template-library-open="footer">
+                            <span class="mdi mdi-view-grid-plus-outline" aria-hidden="true"></span>
+                            <strong>Обрати шаблон</strong>
+                            <small>Відкрити вибір з попереднім переглядом</small>
+                        </button>
+                    </div>
                     <div class="template-editor-list-head">
                         <strong>Колонки футера</strong>
                         <button class="button secondary compact" type="button" data-footer-add-column>
@@ -468,6 +496,39 @@
         </aside>
     </div>
 </form>
+
+<div class="modal fade" id="templateMenuBlueprintModal" tabindex="-1" aria-labelledby="templateMenuBlueprintTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow mb-1" data-menu-template-target-label>Готовий шаблон меню</p>
+                    <h2 class="modal-title h5" id="templateMenuBlueprintTitle" data-menu-template-title>Попередній перегляд</h2>
+                    <p class="meta mb-0" data-menu-template-description></p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+            </div>
+            <div class="modal-body">
+                <div class="template-blueprint-modal-grid">
+                    <div class="template-blueprint-choice-list" data-template-blueprint-list></div>
+                    <div class="template-menu-visual template-menu-blueprint-preview">
+                        <div class="template-menu-visual-head">
+                            <strong data-template-preview-label>Попередній перегляд</strong>
+                            <span data-menu-template-count></span>
+                        </div>
+                        <div class="template-menu-visual-body" data-menu-template-preview></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="button" data-menu-template-apply>
+                    <span class="mdi mdi-check" aria-hidden="true"></span><span>Застосувати</span>
+                </button>
+                <button type="button" class="button secondary" data-bs-dismiss="modal"><span class="mdi mdi-close" aria-hidden="true"></span><span>Закрити</span></button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="modal fade" id="templateMenuPickerModal" tabindex="-1" aria-labelledby="templateMenuPickerTitle" aria-hidden="true" data-link-picker-url="<?= url('/admin/templates/link-picker') ?>">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">

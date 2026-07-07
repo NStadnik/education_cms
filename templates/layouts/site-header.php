@@ -17,12 +17,14 @@
         'secondary_variant' => 'pills',
         'secondary_links' => [],
         'mobile_variant' => 'drawer',
+        'mobile_source' => 'main',
         'mobile_label' => 'Меню',
         'mobile_show_brand' => true,
         'mobile_show_cta' => true,
     ], is_array($headerLayout ?? null) ? $headerLayout : []);
     $variant = preg_replace('/[^a-z0-9_-]/i', '', (string) $layout['variant']) ?: 'default';
     $mobileVariant = preg_replace('/[^a-z0-9_-]/i', '', (string) ($layout['mobile_variant'] ?? 'drawer')) ?: 'drawer';
+    $mobileSource = in_array((string) ($layout['mobile_source'] ?? 'main'), ['main', 'secondary', 'both'], true) ? (string) $layout['mobile_source'] : 'main';
     $heroVariant = preg_replace('/[^a-z0-9_-]/i', '', (string) ($layout['hero_variant'] ?? 'default')) ?: 'default';
     $secondaryVariant = preg_replace('/[^a-z0-9_-]/i', '', (string) ($layout['secondary_variant'] ?? 'pills')) ?: 'pills';
     $siteLogo = \App\Services\Files::normalize((string) ($settings['site_logo'] ?? ''));
@@ -84,6 +86,13 @@
 
         return $html;
     };
+    $mainLinks = is_array($layout['links'] ?? null) ? $layout['links'] : [];
+    $secondaryLinks = is_array($layout['secondary_links'] ?? null) ? $layout['secondary_links'] : [];
+    $mobileLinks = match ($mobileSource) {
+        'secondary' => $secondaryLinks,
+        'both' => array_merge($mainLinks, $secondaryLinks),
+        default => $mainLinks,
+    };
 ?>
 <header class="topbar site-header site-header-<?= e($variant) ?> site-mobile-menu-<?= e($mobileVariant) ?>" data-site-header>
     <div class="container topbar-inner site-header-inner">
@@ -104,7 +113,12 @@
                 <span class="site-mobile-menu-brand"><?= e($settings['institution_name'] ?? 'Заклад освіти') ?></span>
             <?php endif; ?>
             <nav class="nav site-header-nav" aria-label="Головне меню">
-                <?php foreach (($layout['links'] ?? []) as $link): ?>
+                <?php foreach ($mainLinks as $link): ?>
+                    <?= is_array($link) ? $renderMenuLinks([$link]) : '' ?>
+                <?php endforeach; ?>
+            </nav>
+            <nav class="nav site-mobile-source-nav" aria-label="Мобільне меню">
+                <?php foreach ($mobileLinks as $link): ?>
                     <?= $renderMenuLinks([$link]) ?>
                 <?php endforeach; ?>
             </nav>

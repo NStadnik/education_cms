@@ -81,6 +81,7 @@ document.addEventListener('DOMContentLoaded', function () {
         secondary_variant: 'pills',
         secondary_links: [],
         mobile_variant: 'drawer',
+        mobile_source: 'main',
         mobile_label: 'Меню',
         mobile_show_brand: true,
         mobile_show_cta: true
@@ -102,9 +103,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const expandedMenuNodes = new Set();
     const menuPickerNode = document.getElementById('templateMenuPickerModal');
     const menuPickerModal = menuPickerNode && window.bootstrap ? new window.bootstrap.Modal(menuPickerNode) : null;
+    const menuTemplateNode = document.getElementById('templateMenuBlueprintModal');
+    const menuTemplateModal = menuTemplateNode && window.bootstrap ? new window.bootstrap.Modal(menuTemplateNode) : null;
     const iconPickerNode = document.getElementById('templateIconPickerModal');
     const iconPickerModal = iconPickerNode && window.bootstrap ? new window.bootstrap.Modal(iconPickerNode) : null;
     const iconPickerState = {path: '', input: null};
+    const menuTemplateState = {kind: 'menu', type: '', target: 'main', payload: null};
     const menuIconOptions = [
         'home-outline', 'home-city-outline', 'view-dashboard-outline', 'menu', 'menu-open', 'apps', 'view-grid-outline',
         'view-list-outline', 'format-list-group', 'sitemap-outline', 'subdirectory-arrow-right', 'link-variant',
@@ -1059,6 +1063,54 @@ document.addEventListener('DOMContentLoaded', function () {
         return makeMenuTemplateItem(link.label, link.url, icon);
     }
 
+    function menuTemplateMeta(type) {
+        return {
+            basic: {
+                title: 'Базове',
+                description: 'Головна, сторінки, новини та контакти для простого старту.'
+            },
+            education: {
+                title: 'Заклад освіти',
+                description: 'Типова структура для школи або освітнього закладу з розділами для учнів і батьків.'
+            },
+            mega: {
+                title: 'Мега-меню',
+                description: 'Секції з колонками для великої навігації та швидких дій.'
+            }
+        }[type] || {
+            title: 'Готовий шаблон',
+            description: 'Попередній перегляд структури перед застосуванням.'
+        };
+    }
+
+    function templateCatalog(kind) {
+        if (kind === 'hero') {
+            return [
+                {type: 'welcome', title: 'Вітання', description: 'Назва закладу, короткий вступ і кнопка', icon: 'mdi-hand-wave-outline'},
+                {type: 'admission', title: 'Вступникам', description: 'Акцент на вступі, документах і дії', icon: 'mdi-account-school-outline'},
+                {type: 'news', title: 'Оголошення', description: 'Компактний hero для новин і подій', icon: 'mdi-newspaper-variant-outline'}
+            ];
+        }
+        if (kind === 'footer') {
+            return [
+                {type: 'basic', title: 'Базовий', description: 'Про заклад, швидкі посилання, контакти', icon: 'mdi-view-list-outline'},
+                {type: 'education', title: 'Заклад освіти', description: 'Навчання, інформація для батьків, документи', icon: 'mdi-school-outline'},
+                {type: 'contacts', title: 'Контакти', description: 'Адреса, телефон, пошта та корисні дії', icon: 'mdi-card-account-phone-outline'}
+            ];
+        }
+        return [
+            {type: 'basic', title: 'Базове', description: 'Головна, сторінки, новини, контакти', icon: 'mdi-view-list-outline'},
+            {type: 'education', title: 'Заклад освіти', description: 'Про заклад, навчання, новини, контакти', icon: 'mdi-school-outline'},
+            {type: 'mega', title: 'Мега-меню', description: 'Секції з колонками для великої навігації', icon: 'mdi-view-column-outline'}
+        ];
+    }
+
+    function templateCatalogItem(kind, type) {
+        return templateCatalog(kind).find(function (item) {
+            return item.type === type;
+        }) || templateCatalog(kind)[0];
+    }
+
     function buildMenuTemplate(type) {
         if (type === 'education') {
             return [
@@ -1128,22 +1180,197 @@ document.addEventListener('DOMContentLoaded', function () {
         ];
     }
 
-    function applyMenuTemplate(type) {
-        if ((header.links || []).length && !window.confirm('Замінити поточне меню готовим шаблоном?')) {
-            return;
+    function findHeroLink(keywords, fallbackUrl) {
+        return findTemplateLink(keywords, '', fallbackUrl).url || fallbackUrl;
+    }
+
+    function buildHeroTemplate(type) {
+        const institutionName = previewContext.institutionName || 'Заклад освіти';
+        if (type === 'admission') {
+            return {
+                hero_enabled: true,
+                hero_variant: 'fullscreen',
+                hero_title: 'Вступникам',
+                hero_text: institutionName + ' запрошує до навчання. Перегляньте умови вступу, необхідні документи та важливі дати.',
+                hero_button_label: 'Детальніше про вступ',
+                hero_button_url: findHeroLink(['вступ', 'заява', 'admission', 'apply'], '/page/admission')
+            };
         }
-        header.links = buildMenuTemplate(type);
-        menuSearchQuery = '';
-        menuIssuesOnly = false;
-        menuIssueCursor = -1;
-        expandedMenuNodes.clear();
-        collectMenuPaths(header.links || [], '').forEach(function (path) {
+        if (type === 'news') {
+            return {
+                hero_enabled: true,
+                hero_variant: 'compact',
+                hero_title: 'Новини та оголошення',
+                hero_text: 'Актуальні події, важливі повідомлення та корисна інформація для спільноти закладу.',
+                hero_button_label: 'Перейти до новин',
+                hero_button_url: findHeroLink(['новин', 'news'], '/news')
+            };
+        }
+        return {
+            hero_enabled: true,
+            hero_variant: 'fullscreen',
+            hero_title: institutionName,
+            hero_text: 'Сучасний освітній простір для навчання, розвитку та спільних досягнень.',
+            hero_button_label: 'Дізнатися більше',
+            hero_button_url: findHeroLink(['про', 'about'], '/page/about')
+        };
+    }
+
+    function applyHeroTemplate(type) {
+        const template = buildHeroTemplate(type);
+        Object.keys(template).forEach(function (key) {
+            header[key] = template[key];
+        });
+        renderHeader();
+        setTemplateEditorTab('hero');
+    }
+
+    function expandTemplateMenuItems(items, parentPath) {
+        collectMenuPaths(items || [], parentPath || '').forEach(function (path) {
             const item = getMenuItem(path);
             if (item && (item.type === 'section' || (Array.isArray(item.children) && item.children.length) || (Array.isArray(item.columns) && item.columns.length))) {
                 expandedMenuNodes.add(path);
             }
         });
+    }
+
+    function renderHeroTemplatePreview(template) {
+        return '<div class="template-blueprint-hero-preview site-header-hero site-header-hero-' + escapeHtml(template.hero_variant || 'default') + '">' +
+            '<div class="site-header-hero-inner">' +
+                '<div>' +
+                    (template.hero_title ? '<h1>' + escapeHtml(template.hero_title) + '</h1>' : '') +
+                    (template.hero_text ? '<p>' + escapeHtml(template.hero_text) + '</p>' : '') +
+                '</div>' +
+                (template.hero_button_label ? '<span class="button">' + escapeHtml(template.hero_button_label) + '</span>' : '') +
+            '</div>' +
+        '</div>';
+    }
+
+    function renderFooterTemplatePreview(template) {
+        const previousFooter = footer;
+        footer = cloneLayout(template);
+        const html = renderPreviewFooter();
+        footer = previousFooter;
+        return html;
+    }
+
+    function selectTemplateLibraryItem(kind, type, target) {
+        const normalizedKind = ['menu', 'hero', 'footer'].indexOf(kind) !== -1 ? kind : 'menu';
+        const normalizedTarget = target === 'secondary' ? 'secondary' : 'main';
+        const meta = templateCatalogItem(normalizedKind, type);
+        let payload = null;
+        let previewHtml = '';
+        let countText = '';
+        if (normalizedKind === 'hero') {
+            payload = buildHeroTemplate(meta.type);
+            previewHtml = renderHeroTemplatePreview(payload);
+            countText = payload.hero_variant === 'fullscreen' ? 'На весь екран' : 'Hero блок';
+        } else if (normalizedKind === 'footer') {
+            payload = buildFooterTemplate(meta.type);
+            previewHtml = renderFooterTemplatePreview(payload);
+            const columnCount = Array.isArray(payload.columns) ? payload.columns.length : 0;
+            countText = columnCount + ' ' + pluralizeUk(columnCount, 'колонка', 'колонки', 'колонок');
+        } else {
+            payload = buildMenuTemplate(meta.type);
+            previewHtml = renderMenuVisualTree(payload, 'Шаблон порожній.');
+            const itemsCount = countMenuItems(payload);
+            countText = itemsCount + ' ' + pluralizeUk(itemsCount, 'пункт', 'пункти', 'пунктів');
+        }
+        menuTemplateState.kind = normalizedKind;
+        menuTemplateState.type = meta.type;
+        menuTemplateState.target = normalizedTarget;
+        menuTemplateState.payload = cloneLayout(payload);
+        const title = menuTemplateNode.querySelector('[data-menu-template-title]');
+        const description = menuTemplateNode.querySelector('[data-menu-template-description]');
+        const count = menuTemplateNode.querySelector('[data-menu-template-count]');
+        const preview = menuTemplateNode.querySelector('[data-menu-template-preview]');
+        const applyButton = menuTemplateNode.querySelector('[data-menu-template-apply] span:last-child');
+        if (title) {
+            title.textContent = meta.title;
+        }
+        if (description) {
+            description.textContent = meta.description;
+        }
+        if (count) {
+            count.textContent = countText;
+        }
+        if (preview) {
+            preview.innerHTML = previewHtml;
+        }
+        if (applyButton) {
+            applyButton.textContent = normalizedKind === 'hero' ? 'Застосувати hero' : (normalizedKind === 'footer' ? 'Застосувати футер' : (normalizedTarget === 'secondary' ? 'Застосувати під hero' : 'Застосувати до меню'));
+        }
+        menuTemplateNode.querySelectorAll('[data-template-blueprint-select]').forEach(function (button) {
+            button.classList.toggle('is-selected', button.dataset.templateBlueprintSelect === meta.type);
+            button.setAttribute('aria-pressed', button.dataset.templateBlueprintSelect === meta.type ? 'true' : 'false');
+        });
+    }
+
+    function openTemplateLibrary(kind, target) {
+        const normalizedKind = ['menu', 'hero', 'footer'].indexOf(kind) !== -1 ? kind : 'menu';
+        const normalizedTarget = target === 'secondary' ? 'secondary' : 'main';
+        if (!menuTemplateNode || !menuTemplateModal) {
+            if (normalizedKind === 'hero') {
+                applyHeroTemplate('welcome');
+            } else if (normalizedKind === 'footer') {
+                applyFooterTemplate('basic');
+            } else {
+                applyMenuTemplate('basic', normalizedTarget, buildMenuTemplate('basic'));
+            }
+            return;
+        }
+        const targetLabel = menuTemplateNode.querySelector('[data-menu-template-target-label]');
+        const previewLabel = menuTemplateNode.querySelector('[data-template-preview-label]');
+        const list = menuTemplateNode.querySelector('[data-template-blueprint-list]');
+        const labels = {
+            menu: normalizedTarget === 'secondary' ? 'Шаблони меню під hero' : 'Шаблони основного меню',
+            hero: 'Шаблони hero',
+            footer: 'Шаблони футера'
+        };
+        if (targetLabel) {
+            targetLabel.textContent = labels[normalizedKind];
+        }
+        if (previewLabel) {
+            previewLabel.textContent = normalizedKind === 'hero' ? 'Preview hero' : (normalizedKind === 'footer' ? 'Preview футера' : 'Структура шаблону');
+        }
+        if (list) {
+            list.innerHTML = templateCatalog(normalizedKind).map(function (item) {
+                return '<button class="template-blueprint-choice" type="button" data-template-blueprint-kind="' + escapeHtml(normalizedKind) + '" data-template-blueprint-target="' + escapeHtml(normalizedTarget) + '" data-template-blueprint-select="' + escapeHtml(item.type) + '" aria-pressed="false">' +
+                    '<span class="mdi ' + escapeHtml(item.icon) + '" aria-hidden="true"></span>' +
+                    '<strong>' + escapeHtml(item.title) + '</strong>' +
+                    '<small>' + escapeHtml(item.description) + '</small>' +
+                '</button>';
+            }).join('');
+        }
+        selectTemplateLibraryItem(normalizedKind, templateCatalog(normalizedKind)[0].type, normalizedTarget);
+        menuTemplateModal.show();
+    }
+
+    function openMenuTemplatePreview(type, target) {
+        openTemplateLibrary('menu', target);
+        selectTemplateLibraryItem('menu', type, target);
+    }
+
+    function applyMenuTemplate(type, target, preparedItems) {
+        const normalizedTarget = target === 'secondary' ? 'secondary' : 'main';
+        const items = cloneLayout(preparedItems || buildMenuTemplate(type));
+        if (normalizedTarget === 'secondary') {
+            header.secondary_links = items;
+            header.secondary_enabled = true;
+            expandedMenuNodes.clear();
+            expandTemplateMenuItems(header.secondary_links || [], 'secondary');
+            renderHeader();
+            setTemplateEditorTab('secondary');
+            return;
+        }
+        header.links = items;
+        menuSearchQuery = '';
+        menuIssuesOnly = false;
+        menuIssueCursor = -1;
+        expandedMenuNodes.clear();
+        expandTemplateMenuItems(header.links || [], '');
         renderHeader();
+        setTemplateEditorTab('menu');
     }
 
     function addSelectedMenuPickerItems() {
@@ -1421,6 +1648,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }[type] || 'mdi-link-variant';
     }
 
+    function mobileMenuLinks() {
+        const source = header.mobile_source || 'main';
+        const mainLinks = Array.isArray(header.links) ? header.links : [];
+        const secondaryLinks = Array.isArray(header.secondary_links) ? header.secondary_links : [];
+        if (source === 'secondary') {
+            return secondaryLinks;
+        }
+        if (source === 'both') {
+            return mainLinks.concat(secondaryLinks);
+        }
+        return mainLinks;
+    }
+
     function syncLayouts() {
         ensureTemplateLayout(selectedTemplate);
         header.show_home = false;
@@ -1468,6 +1708,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 links.push(renderPreviewLinks([link]));
             }
         });
+        const mobileLinks = [];
+        mobileMenuLinks().forEach(function (link) {
+            if (link.label || (Array.isArray(link.children) && link.children.length) || (Array.isArray(link.columns) && link.columns.length)) {
+                mobileLinks.push(renderPreviewLinks([link]));
+            }
+        });
 
         const mobileClass = ' site-mobile-menu-' + escapeHtml(header.mobile_variant || 'drawer');
         const heroHtml = header.hero_enabled ? '<section class="site-header-hero site-header-hero-' + escapeHtml(header.hero_variant || 'default') + '">' +
@@ -1492,14 +1738,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 '<div class="site-header-menu-panel" id="templatePreviewMenuPanel" data-site-menu-panel>' +
                     (header.mobile_show_brand === false ? '' : '<span class="site-mobile-menu-brand">' + escapeHtml(previewContext.institutionName || 'Заклад освіти') + '</span>') +
                     '<nav class="nav site-header-nav" aria-label="Головне меню">' + links.join('') + '</nav>' +
+                    '<nav class="nav site-mobile-source-nav" aria-label="Мобільне меню">' + mobileLinks.join('') + '</nav>' +
                     (header.cta_label && header.cta_url ? '<a class="button site-header-cta' + (header.mobile_show_cta === false ? ' site-header-cta-mobile-hidden' : '') + '" href="' + escapeHtml(previewUrl(header.cta_url)) + '">' + escapeHtml(header.cta_label) + '</a>' : '') +
                 '</div>' +
             '</div>' +
         '</header>' + heroHtml + secondaryHtml;
     }
 
-    function renderMenuVisualPreview() {
-        const links = Array.isArray(header.links) ? header.links : [];
+    function renderMenuVisualTree(links, emptyText) {
         function renderVisualItems(items, depth) {
             const html = (items || []).map(function (item) {
                 const type = item.type === 'section' ? 'section' : 'link';
@@ -1529,7 +1775,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return html;
         }
         if (!links.length) {
-            return '<div class="template-menu-visual-empty"><span class="mdi mdi-menu-open" aria-hidden="true"></span><span>Меню ще порожнє.</span></div>';
+            return '<div class="template-menu-visual-empty"><span class="mdi mdi-menu-open" aria-hidden="true"></span><span>' + escapeHtml(emptyText || 'Меню ще порожнє.') + '</span></div>';
         }
         return '<div class="template-menu-visual-tree">' + renderVisualItems(links, 0) + '</div>';
     }
@@ -1604,6 +1850,114 @@ document.addEventListener('DOMContentLoaded', function () {
         '</footer>';
     }
 
+    function globalFieldValue(keywords) {
+        const words = (Array.isArray(keywords) ? keywords : []).map(function (word) {
+            return String(word || '').toLowerCase();
+        });
+        const fields = Array.isArray(previewContext.globalFields) ? previewContext.globalFields : [];
+        const field = fields.find(function (item) {
+            const haystack = [item.label || '', item.key || '', item.value || ''].join(' ').toLowerCase();
+            return words.some(function (word) {
+                return word && haystack.indexOf(word) !== -1;
+            });
+        });
+        return field && field.value ? String(field.value) : '';
+    }
+
+    function makeFooterColumn(title, items) {
+        return {
+            title: title || '',
+            items: Array.isArray(items) ? items.map(function (item) {
+                return {
+                    label: item.label || '',
+                    text: item.text || '',
+                    url: item.url || ''
+                };
+            }) : []
+        };
+    }
+
+    function buildFooterTemplate(type) {
+        const institutionName = previewContext.institutionName || 'Заклад освіти';
+        const phone = globalFieldValue(['тел', 'phone']);
+        const email = globalFieldValue(['email', 'пошта', 'mail']);
+        const address = globalFieldValue(['адрес', 'address']);
+        if (type === 'education') {
+            return {
+                variant: 'default',
+                bottom_text: '© ' + institutionName,
+                columns: [
+                    makeFooterColumn('Про заклад', [
+                        {label: institutionName, text: 'Освітній простір для навчання, розвитку та підтримки спільноти.', url: ''},
+                        {label: 'Про нас', text: '', url: '/page/about'}
+                    ]),
+                    makeFooterColumn('Навчання', [
+                        {label: 'Розклад занять', text: '', url: '/page/schedule'},
+                        {label: 'Гуртки', text: '', url: '/page/clubs'},
+                        {label: 'Новини', text: '', url: '/news'}
+                    ]),
+                    makeFooterColumn('Батькам', [
+                        {label: 'Інформація для батьків', text: '', url: '/page/parents'},
+                        {label: 'Документи', text: '', url: '/page/documents'},
+                        {label: 'Харчування', text: '', url: '/page/food'}
+                    ]),
+                    makeFooterColumn('Контакти', [
+                        {label: phone ? 'Телефон' : '', text: phone, url: phone ? 'tel:' + phone.replace(/[^+\d]/g, '') : ''},
+                        {label: email ? 'Email' : '', text: email, url: email ? 'mailto:' + email : ''},
+                        {label: address ? 'Адреса' : '', text: address, url: ''}
+                    ])
+                ]
+            };
+        }
+        if (type === 'contacts') {
+            return {
+                variant: 'light',
+                bottom_text: '© ' + institutionName,
+                columns: [
+                    makeFooterColumn('Контакти', [
+                        {label: phone ? 'Телефон' : 'Телефон', text: phone || 'Вкажіть номер телефону', url: phone ? 'tel:' + phone.replace(/[^+\d]/g, '') : ''},
+                        {label: email ? 'Email' : 'Email', text: email || 'Вкажіть електронну пошту', url: email ? 'mailto:' + email : ''},
+                        {label: address ? 'Адреса' : 'Адреса', text: address || 'Вкажіть адресу закладу', url: ''}
+                    ]),
+                    makeFooterColumn('Швидкі дії', [
+                        {label: 'Написати нам', text: '', url: email ? 'mailto:' + email : '/contacts'},
+                        {label: 'Як нас знайти', text: '', url: '/contacts'},
+                        {label: 'Новини', text: '', url: '/news'}
+                    ])
+                ]
+            };
+        }
+        return {
+            variant: 'default',
+            bottom_text: '© ' + institutionName,
+            columns: [
+                makeFooterColumn('Про заклад', [
+                    {label: institutionName, text: 'Коротка інформація про заклад та його освітню спільноту.', url: ''},
+                    {label: 'Детальніше', text: '', url: '/page/about'}
+                ]),
+                makeFooterColumn('Швидкі посилання', [
+                    {label: 'Головна', text: '', url: '/'},
+                    {label: 'Новини', text: '', url: '/news'},
+                    {label: 'Контакти', text: '', url: '/contacts'}
+                ]),
+                makeFooterColumn('Контакти', [
+                    {label: phone ? 'Телефон' : '', text: phone, url: phone ? 'tel:' + phone.replace(/[^+\d]/g, '') : ''},
+                    {label: email ? 'Email' : '', text: email, url: email ? 'mailto:' + email : ''},
+                    {label: address ? 'Адреса' : '', text: address, url: ''}
+                ])
+            ]
+        };
+    }
+
+    function applyFooterTemplate(type) {
+        const template = buildFooterTemplate(type);
+        footer.variant = template.variant || 'default';
+        footer.bottom_text = template.bottom_text || '';
+        footer.columns = Array.isArray(template.columns) ? template.columns : [];
+        renderFooter();
+        setTemplateEditorTab('footer');
+    }
+
     function renderHomePreview() {
         if (!previewFrame) {
             return;
@@ -1635,7 +1989,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const expandAll = headerEditor.querySelector('[data-menu-expand-all]');
         const collapseAll = headerEditor.querySelector('[data-menu-collapse-all]');
         const issuesNode = headerEditor.querySelector('[data-menu-issues]');
-        const visualPreview = headerEditor.querySelector('[data-menu-visual-preview]');
         const query = normalizeMenuSearch(menuSearchQuery);
         const hasMenuItems = (header.links || []).length > 0;
         const duplicateUrls = duplicatedMenuUrls(header.links || []);
@@ -1663,6 +2016,7 @@ document.addEventListener('DOMContentLoaded', function () {
         headerEditor.querySelector('[data-header-field="secondary_enabled"]').checked = Boolean(header.secondary_enabled);
         headerEditor.querySelector('[data-header-field="secondary_variant"]').value = header.secondary_variant || 'pills';
         headerEditor.querySelector('[data-header-field="mobile_variant"]').value = header.mobile_variant || 'drawer';
+        headerEditor.querySelector('[data-header-field="mobile_source"]').value = header.mobile_source || 'main';
         headerEditor.querySelector('[data-header-field="mobile_label"]').value = header.mobile_label || 'Меню';
         headerEditor.querySelector('[data-header-field="mobile_show_brand"]').checked = header.mobile_show_brand !== false;
         headerEditor.querySelector('[data-header-field="mobile_show_cta"]').checked = header.mobile_show_cta !== false;
@@ -1694,9 +2048,6 @@ document.addEventListener('DOMContentLoaded', function () {
         headerEditor.querySelector('[data-header-links]').innerHTML = hasMenuItems
             ? (hasSearchResults ? renderMenuLinks(header.links || [], '', 0, query, menuIssuesOnly, duplicateUrls) : '<div class="template-empty-state"><span class="mdi mdi-magnify-close" aria-hidden="true"></span><strong>Нічого не знайдено</strong><p>Спробуйте іншу назву, URL або вимкніть фільтр проблем.</p></div>')
             : '<div class="template-empty-state"><span class="mdi mdi-menu-open" aria-hidden="true"></span><strong>Меню ще порожнє</strong><p>Додайте власний пункт або оберіть готове посилання зі сторінок, категорій чи новин.</p></div>';
-        if (visualPreview) {
-            visualPreview.innerHTML = renderMenuVisualPreview();
-        }
         renderSecondaryLinks();
         fillMenuParentSelect();
         syncLayouts();
@@ -1803,6 +2154,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (event.target.closest('[data-menu-picker-open]')) {
             openMenuPicker();
         }
+        const libraryOpen = event.target.closest('[data-template-library-open]');
+        if (libraryOpen) {
+            openTemplateLibrary(libraryOpen.dataset.templateLibraryOpen || 'menu', libraryOpen.dataset.templateLibraryTarget || 'main');
+            return;
+        }
         if (event.target.closest('[data-secondary-add-link]')) {
             header.secondary_links = Array.isArray(header.secondary_links) ? header.secondary_links : [];
             header.secondary_links.push({label: '', url: '', icon: ''});
@@ -1866,7 +2222,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         const menuTemplate = event.target.closest('[data-menu-template]');
         if (menuTemplate) {
-            applyMenuTemplate(menuTemplate.dataset.menuTemplate);
+            openMenuTemplatePreview(menuTemplate.dataset.menuTemplate, menuTemplate.dataset.menuTemplateTarget || 'main');
             return;
         }
         if (event.target.closest('[data-header-add-link]')) {
@@ -1995,6 +2351,35 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    if (menuTemplateNode) {
+        menuTemplateNode.addEventListener('click', function (event) {
+            const choice = event.target.closest('[data-template-blueprint-select]');
+            if (choice) {
+                selectTemplateLibraryItem(choice.dataset.templateBlueprintKind || 'menu', choice.dataset.templateBlueprintSelect || 'basic', choice.dataset.templateBlueprintTarget || 'main');
+                return;
+            }
+            if (!event.target.closest('[data-menu-template-apply]')) {
+                return;
+            }
+            if (menuTemplateState.kind === 'hero') {
+                Object.keys(menuTemplateState.payload || {}).forEach(function (key) {
+                    header[key] = menuTemplateState.payload[key];
+                });
+                renderHeader();
+                setTemplateEditorTab('hero');
+            } else if (menuTemplateState.kind === 'footer') {
+                footer = cloneLayout(menuTemplateState.payload || {});
+                renderFooter();
+                setTemplateEditorTab('footer');
+            } else {
+                applyMenuTemplate(menuTemplateState.type, menuTemplateState.target, menuTemplateState.payload);
+            }
+            if (menuTemplateModal) {
+                menuTemplateModal.hide();
+            }
+        });
+    }
+
     if (iconPickerNode) {
         iconPickerNode.addEventListener('input', function (event) {
             if (event.target.closest('[data-icon-picker-search]')) {
@@ -2103,6 +2488,16 @@ document.addEventListener('DOMContentLoaded', function () {
         event.returnValue = '';
     });
     footerEditor.addEventListener('click', function (event) {
+        const libraryOpen = event.target.closest('[data-template-library-open]');
+        if (libraryOpen) {
+            openTemplateLibrary(libraryOpen.dataset.templateLibraryOpen || 'footer', libraryOpen.dataset.templateLibraryTarget || 'main');
+            return;
+        }
+        const footerTemplate = event.target.closest('[data-footer-template]');
+        if (footerTemplate) {
+            applyFooterTemplate(footerTemplate.dataset.footerTemplate || 'basic');
+            return;
+        }
         if (event.target.closest('[data-footer-add-column]')) {
             footer.columns = footer.columns || [];
             footer.columns.push({title: '', items: [{label: '', text: '', url: ''}]});
