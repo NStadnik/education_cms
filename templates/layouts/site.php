@@ -28,7 +28,7 @@
     $footerLayout = is_array($activeTemplateLayout['footer'] ?? null) ? $activeTemplateLayout['footer'] : (is_array($legacyFooterLayout) ? $legacyFooterLayout : []);
 ?>
 <body class="site-template-<?= e($siteTemplate) ?>">
-    <?= $this->partial('layouts/site-header', ['settings' => $settings, 'menu' => $menu ?? [], 'headerLayout' => $headerLayout]) ?>
+    <?= $this->partial('layouts/site-header', ['settings' => $settings, 'menu' => $menu ?? [], 'headerLayout' => $headerLayout, 'isHomePage' => !empty($isHomePage)]) ?>
     <?= $content ?>
     <?= $this->partial('layouts/site-footer', ['settings' => $settings, 'globalFields' => $globalFields, 'footerLayout' => $footerLayout]) ?>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

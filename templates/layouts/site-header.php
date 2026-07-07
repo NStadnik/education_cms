@@ -13,6 +13,12 @@
         'hero_text' => '',
         'hero_button_label' => '',
         'hero_button_url' => '',
+        'home_hero_enabled' => false,
+        'home_hero_variant' => 'fullscreen',
+        'home_hero_title' => '',
+        'home_hero_text' => '',
+        'home_hero_button_label' => '',
+        'home_hero_button_url' => '',
         'secondary_enabled' => false,
         'secondary_variant' => 'pills',
         'secondary_links' => [],
@@ -26,7 +32,10 @@
     $mobileVariant = preg_replace('/[^a-z0-9_-]/i', '', (string) ($layout['mobile_variant'] ?? 'drawer')) ?: 'drawer';
     $mobileSource = in_array((string) ($layout['mobile_source'] ?? 'main'), ['main', 'secondary', 'both'], true) ? (string) $layout['mobile_source'] : 'main';
     $heroVariant = preg_replace('/[^a-z0-9_-]/i', '', (string) ($layout['hero_variant'] ?? 'default')) ?: 'default';
+    $homeHeroVariant = preg_replace('/[^a-z0-9_-]/i', '', (string) ($layout['home_hero_variant'] ?? 'fullscreen')) ?: 'fullscreen';
     $secondaryVariant = preg_replace('/[^a-z0-9_-]/i', '', (string) ($layout['secondary_variant'] ?? 'pills')) ?: 'pills';
+    $hasHeaderHero = !empty($layout['hero_enabled']) && ((string) ($layout['hero_title'] ?? '') !== '' || (string) ($layout['hero_text'] ?? '') !== '');
+    $hasHomeHero = !empty($isHomePage) && !empty($layout['home_hero_enabled']) && ((string) ($layout['home_hero_title'] ?? '') !== '' || (string) ($layout['home_hero_text'] ?? '') !== '');
     $siteLogo = \App\Services\Files::normalize((string) ($settings['site_logo'] ?? ''));
     $renderMenuLabel = static function (string $label, string $icon, string $fallback): string {
         $icon = trim($icon);
@@ -128,7 +137,7 @@
         </div>
     </div>
 </header>
-<?php if (!empty($layout['hero_enabled']) && ((string) ($layout['hero_title'] ?? '') !== '' || (string) ($layout['hero_text'] ?? '') !== '')): ?>
+<?php if ($hasHeaderHero && !$hasHomeHero): ?>
     <section class="site-header-hero site-header-hero-<?= e($heroVariant) ?>">
         <div class="container site-header-hero-inner">
             <div>
@@ -149,4 +158,17 @@
             <?php endforeach; ?>
         </div>
     </nav>
+<?php endif; ?>
+<?php if ($hasHomeHero): ?>
+    <section class="site-home-hero site-header-hero site-header-hero-<?= e($homeHeroVariant) ?>">
+        <div class="container site-header-hero-inner">
+            <div>
+                <?php if (!empty($layout['home_hero_title'])): ?><h1><?= e((string) $layout['home_hero_title']) ?></h1><?php endif; ?>
+                <?php if (!empty($layout['home_hero_text'])): ?><p><?= e((string) $layout['home_hero_text']) ?></p><?php endif; ?>
+            </div>
+            <?php if (!empty($layout['home_hero_button_label']) && !empty($layout['home_hero_button_url'])): ?>
+                <a class="button" href="<?= e((string) $layout['home_hero_button_url']) ?>"><?= e((string) $layout['home_hero_button_label']) ?></a>
+            <?php endif; ?>
+        </div>
+    </section>
 <?php endif; ?>

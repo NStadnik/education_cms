@@ -2,12 +2,14 @@
     $type = (string) ($block['type'] ?? 'text');
 ?>
 <?php if ($type === 'hero'): ?>
-    <section class="hero">
-        <div class="container hero-inner">
-            <h1><?= e($block['title'] ?? $page['title']) ?></h1>
-            <p><?= e($block['text'] ?? '') ?></p>
-        </div>
-    </section>
+    <?php if (empty($homeHeroVisible)): ?>
+        <section class="hero">
+            <div class="container hero-inner">
+                <h1><?= e($block['title'] ?? $page['title']) ?></h1>
+                <p><?= e($block['text'] ?? '') ?></p>
+            </div>
+        </section>
+    <?php endif; ?>
 <?php elseif ($type === 'news_list'): ?>
     <section class="section">
         <div class="container">

@@ -8,6 +8,12 @@
         'cta_label' => '',
         'cta_url' => '',
         'mobile_source' => 'main',
+        'home_hero_enabled' => false,
+        'home_hero_variant' => 'fullscreen',
+        'home_hero_title' => '',
+        'home_hero_text' => '',
+        'home_hero_button_label' => '',
+        'home_hero_button_url' => '',
     ];
     $defaultFooterLayout = [
         'variant' => 'default',
@@ -189,6 +195,9 @@
                     <button class="button secondary compact" type="button" data-template-editor-tab="hero" aria-selected="false">
                         <span class="mdi mdi-page-layout-header" aria-hidden="true"></span><span>Hero</span>
                     </button>
+                    <button class="button secondary compact" type="button" data-template-editor-tab="home-hero" aria-selected="false">
+                        <span class="mdi mdi-home-variant-outline" aria-hidden="true"></span><span>Hero головної</span>
+                    </button>
                     <button class="button secondary compact" type="button" data-template-editor-tab="secondary" aria-selected="false">
                         <span class="mdi mdi-tab" aria-hidden="true"></span><span>Меню під hero</span>
                     </button>
@@ -296,6 +305,50 @@
                                     <span>Оберіть шаблон у модальному вікні, перегляньте перший екран і застосуйте.</span>
                                 </div>
                                 <button class="template-blueprint-open" type="button" data-template-library-open="hero">
+                                    <span class="mdi mdi-view-grid-plus-outline" aria-hidden="true"></span>
+                                    <strong>Обрати шаблон</strong>
+                                    <small>Відкрити вибір з попереднім переглядом</small>
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+                    <div class="template-header-extra-grid" data-template-tab-panel="home-hero" hidden>
+                        <section class="template-subeditor">
+                            <div class="template-subeditor-head">
+                                <div>
+                                    <strong>Hero головної сторінки</strong>
+                                    <span>Окремий блок тільки для головної сторінки, незалежний від hero під хедером.</span>
+                                </div>
+                                <label class="check-row"><input type="checkbox" data-header-field="home_hero_enabled"> Увімкнути</label>
+                            </div>
+                            <div class="template-editor-grid template-editor-grid-2">
+                                <label>Вигляд
+                                    <select data-header-field="home_hero_variant">
+                                        <option value="default">Стандартний</option>
+                                        <option value="accent">Акцентний</option>
+                                        <option value="compact">Компактний</option>
+                                        <option value="fullscreen">На весь екран</option>
+                                    </select>
+                                </label>
+                                <label>Заголовок
+                                    <input data-header-field="home_hero_title" placeholder="Ласкаво просимо">
+                                </label>
+                                <label class="template-editor-wide">Текст
+                                    <textarea data-header-field="home_hero_text" rows="3" placeholder="Короткий вступний текст для головної сторінки"></textarea>
+                                </label>
+                                <label>Текст кнопки
+                                    <input data-header-field="home_hero_button_label" placeholder="Детальніше">
+                                </label>
+                                <label>URL кнопки
+                                    <input data-header-field="home_hero_button_url" placeholder="/page/about">
+                                </label>
+                            </div>
+                            <div class="template-menu-blueprints template-hero-blueprints" aria-label="Готові шаблони hero головної">
+                                <div>
+                                    <strong>Готові шаблони hero</strong>
+                                    <span>Оберіть шаблон у модальному вікні, перегляньте перший екран і застосуйте до головної.</span>
+                                </div>
+                                <button class="template-blueprint-open" type="button" data-template-library-open="hero" data-template-library-target="home">
                                     <span class="mdi mdi-view-grid-plus-outline" aria-hidden="true"></span>
                                     <strong>Обрати шаблон</strong>
                                     <small>Відкрити вибір з попереднім переглядом</small>

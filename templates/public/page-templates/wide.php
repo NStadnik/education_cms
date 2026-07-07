@@ -1,12 +1,17 @@
-<?php $hasLayoutBlocks = !empty(array_filter($blocks, static fn ($block): bool => is_array($block) && ($block['type'] ?? '') !== 'text')); ?>
+<?php
+    $hasLayoutBlocks = !empty(array_filter($blocks, static fn ($block): bool => is_array($block) && ($block['type'] ?? '') !== 'text'));
+    $showPageHead = empty($homeHeroVisible);
+?>
 <section class="section page-template-wide">
     <div class="container">
-        <div class="page-head public-head">
-            <div>
-                <h1><?= e($page['title']) ?></h1>
-                <?php if (!empty($page['excerpt'])): ?><p class="page-subtitle"><?= e($page['excerpt']) ?></p><?php endif; ?>
+        <?php if ($showPageHead): ?>
+            <div class="page-head public-head">
+                <div>
+                    <h1><?= e($page['title']) ?></h1>
+                    <?php if (!empty($page['excerpt'])): ?><p class="page-subtitle"><?= e($page['excerpt']) ?></p><?php endif; ?>
+                </div>
             </div>
-        </div>
+        <?php endif; ?>
         <?php foreach ($blocks as $block): ?>
             <?php if (($block['type'] ?? '') === 'text'): ?>
                 <div class="rich-content wide-content"><?= safe_html($block['text'] ?? '') ?></div>
@@ -17,7 +22,7 @@
 <?php if ($hasLayoutBlocks): ?>
     <?php foreach ($blocks as $block): ?>
         <?php if (($block['type'] ?? '') !== 'text'): ?>
-            <?= $this->partial('public/partials/page-block', ['page' => $page, 'block' => $block, 'latestNews' => $latestNews]) ?>
+            <?= $this->partial('public/partials/page-block', ['page' => $page, 'block' => $block, 'latestNews' => $latestNews, 'homeHeroVisible' => $homeHeroVisible ?? false]) ?>
         <?php endif; ?>
     <?php endforeach; ?>
 <?php endif; ?>

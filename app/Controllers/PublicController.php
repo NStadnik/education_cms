@@ -8,6 +8,7 @@ use App\Core\Debug;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Installer;
+use App\Services\SiteThemes;
 use App\Services\Thumbnails;
 
 final class PublicController extends BaseController
@@ -25,7 +26,7 @@ final class PublicController extends BaseController
             $page = $this->db()->fetch('select * from pages where id = ? and status = ?', [$homePageId, 'published']);
         }
         $page ??= $this->db()->fetch('select * from pages where slug = ? and status = ?', ['home', 'published']);
-        return $this->renderPage($page ?: ['title' => 'Головна', 'blocks_json' => '[]']);
+        return $this->renderPage($page ?: ['title' => 'Головна', 'blocks_json' => '[]'], true);
     }
 
     public function page(Request $request, array $params): Response
@@ -179,16 +180,35 @@ final class PublicController extends BaseController
         ], 'layouts/minimal');
     }
 
-    private function renderPage(array $page): Response
+    private function renderPage(array $page, bool $isHomePage = false): Response
     {
+        $settings = $this->siteSettings();
         return $this->render('public/page', [
             'title' => $page['title'],
-            'settings' => $this->siteSettings(),
+            'settings' => $settings,
             'page' => $page,
+            'isHomePage' => $isHomePage,
+            'homeHeroVisible' => $isHomePage && $this->homeHeroVisible($settings),
             'blocks' => json_decode($page['blocks_json'] ?? '[]', true) ?: [],
             'menu' => $this->menu(),
             'latestNews' => $this->db()->fetchAll('select * from news where status = ? order by published_at desc, id desc limit 3', ['published']),
         ]);
+    }
+
+    private function homeHeroVisible(array $settings): bool
+    {
+        $siteTemplateKey = preg_replace('/[^a-z0-9_-]/i', '', (string) ($settings['site_template'] ?? 'official')) ?: 'official';
+        $siteTheme = SiteThemes::get($siteTemplateKey);
+        $siteTemplate = (string) ($siteTheme['key'] ?? $siteTemplateKey);
+        $templateLayouts = json_decode((string) ($settings['site_template_layouts'] ?? ''), true);
+        $templateLayouts = is_array($templateLayouts) ? $templateLayouts : [];
+        $legacyHeaderLayout = json_decode((string) ($settings['site_header_layout'] ?? ''), true);
+        $headerLayout = is_array($templateLayouts[$siteTemplate]['header'] ?? null)
+            ? $templateLayouts[$siteTemplate]['header']
+            : (is_array($legacyHeaderLayout) ? $legacyHeaderLayout : []);
+
+        return !empty($headerLayout['home_hero_enabled'])
+            && (trim((string) ($headerLayout['home_hero_title'] ?? '')) !== '' || trim((string) ($headerLayout['home_hero_text'] ?? '')) !== '');
     }
 
     private function menu(): array

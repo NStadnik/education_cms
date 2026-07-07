@@ -206,6 +206,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
         $secondaryLinks = $this->normalizeMenuLinks(is_array($data['secondary_links'] ?? null) ? $data['secondary_links'] : []);
         $ctaUrl = $this->normalizeUrl(trim((string) ($data['cta_url'] ?? '')));
         $heroButtonUrl = $this->normalizeUrl(trim((string) ($data['hero_button_url'] ?? '')));
+        $homeHeroButtonUrl = $this->normalizeUrl(trim((string) ($data['home_hero_button_url'] ?? '')));
 
         return [
             'variant' => $this->choice((string) ($data['variant'] ?? 'default'), ['default', 'centered', 'compact'], 'default'),
@@ -221,6 +222,12 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'hero_text' => $this->limitString(trim((string) ($data['hero_text'] ?? '')), 500),
             'hero_button_label' => $this->limitString(trim((string) ($data['hero_button_label'] ?? '')), 80),
             'hero_button_url' => $this->limitString($heroButtonUrl, 240),
+            'home_hero_enabled' => !empty($data['home_hero_enabled']),
+            'home_hero_variant' => $this->choice((string) ($data['home_hero_variant'] ?? 'fullscreen'), ['default', 'accent', 'compact', 'fullscreen'], 'fullscreen'),
+            'home_hero_title' => $this->limitString(trim((string) ($data['home_hero_title'] ?? '')), 140),
+            'home_hero_text' => $this->limitString(trim((string) ($data['home_hero_text'] ?? '')), 500),
+            'home_hero_button_label' => $this->limitString(trim((string) ($data['home_hero_button_label'] ?? '')), 80),
+            'home_hero_button_url' => $this->limitString($homeHeroButtonUrl, 240),
             'secondary_enabled' => !empty($data['secondary_enabled']),
             'secondary_variant' => $this->choice((string) ($data['secondary_variant'] ?? 'pills'), ['pills', 'tabs', 'plain'], 'pills'),
             'secondary_links' => array_slice($secondaryLinks, 0, 12),

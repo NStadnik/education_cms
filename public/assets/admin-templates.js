@@ -77,6 +77,12 @@ document.addEventListener('DOMContentLoaded', function () {
         hero_text: '',
         hero_button_label: '',
         hero_button_url: '',
+        home_hero_enabled: false,
+        home_hero_variant: 'fullscreen',
+        home_hero_title: '',
+        home_hero_text: '',
+        home_hero_button_label: '',
+        home_hero_button_url: '',
         secondary_enabled: false,
         secondary_variant: 'pills',
         secondary_links: [],
@@ -1216,13 +1222,16 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    function applyHeroTemplate(type) {
+    function applyHeroTemplate(type, target, preparedTemplate) {
         const template = buildHeroTemplate(type);
-        Object.keys(template).forEach(function (key) {
-            header[key] = template[key];
+        const payload = preparedTemplate || template;
+        const normalizedTarget = target === 'home' ? 'home' : 'header';
+        Object.keys(payload).forEach(function (key) {
+            const targetKey = normalizedTarget === 'home' ? key.replace(/^hero_/, 'home_hero_') : key;
+            header[targetKey] = payload[key];
         });
         renderHeader();
-        setTemplateEditorTab('hero');
+        setTemplateEditorTab(normalizedTarget === 'home' ? 'home-hero' : 'hero');
     }
 
     function expandTemplateMenuItems(items, parentPath) {
@@ -1256,7 +1265,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function selectTemplateLibraryItem(kind, type, target) {
         const normalizedKind = ['menu', 'hero', 'footer'].indexOf(kind) !== -1 ? kind : 'menu';
-        const normalizedTarget = target === 'secondary' ? 'secondary' : 'main';
+        const normalizedTarget = target === 'secondary' ? 'secondary' : (target === 'home' ? 'home' : 'main');
         const meta = templateCatalogItem(normalizedKind, type);
         let payload = null;
         let previewHtml = '';
@@ -1298,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', function () {
             preview.innerHTML = previewHtml;
         }
         if (applyButton) {
-            applyButton.textContent = normalizedKind === 'hero' ? 'Застосувати hero' : (normalizedKind === 'footer' ? 'Застосувати футер' : (normalizedTarget === 'secondary' ? 'Застосувати під hero' : 'Застосувати до меню'));
+            applyButton.textContent = normalizedKind === 'hero' ? (normalizedTarget === 'home' ? 'Застосувати до головної' : 'Застосувати hero') : (normalizedKind === 'footer' ? 'Застосувати футер' : (normalizedTarget === 'secondary' ? 'Застосувати під hero' : 'Застосувати до меню'));
         }
         menuTemplateNode.querySelectorAll('[data-template-blueprint-select]').forEach(function (button) {
             button.classList.toggle('is-selected', button.dataset.templateBlueprintSelect === meta.type);
@@ -1308,10 +1317,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function openTemplateLibrary(kind, target) {
         const normalizedKind = ['menu', 'hero', 'footer'].indexOf(kind) !== -1 ? kind : 'menu';
-        const normalizedTarget = target === 'secondary' ? 'secondary' : 'main';
+        const normalizedTarget = target === 'secondary' ? 'secondary' : (target === 'home' ? 'home' : 'main');
         if (!menuTemplateNode || !menuTemplateModal) {
             if (normalizedKind === 'hero') {
-                applyHeroTemplate('welcome');
+                applyHeroTemplate('welcome', normalizedTarget);
             } else if (normalizedKind === 'footer') {
                 applyFooterTemplate('basic');
             } else {
@@ -1324,7 +1333,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const list = menuTemplateNode.querySelector('[data-template-blueprint-list]');
         const labels = {
             menu: normalizedTarget === 'secondary' ? 'Шаблони меню під hero' : 'Шаблони основного меню',
-            hero: 'Шаблони hero',
+            hero: normalizedTarget === 'home' ? 'Шаблони hero головної' : 'Шаблони hero',
             footer: 'Шаблони футера'
         };
         if (targetLabel) {
@@ -1716,7 +1725,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         const mobileClass = ' site-mobile-menu-' + escapeHtml(header.mobile_variant || 'drawer');
-        const heroHtml = header.hero_enabled ? '<section class="site-header-hero site-header-hero-' + escapeHtml(header.hero_variant || 'default') + '">' +
+        const hasHomeHero = Boolean(header.home_hero_enabled && (header.home_hero_title || header.home_hero_text));
+        const heroHtml = header.hero_enabled && !hasHomeHero ? '<section class="site-header-hero site-header-hero-' + escapeHtml(header.hero_variant || 'default') + '">' +
             '<div class="container site-header-hero-inner">' +
                 '<div>' +
                     (header.hero_title ? '<h1>' + escapeHtml(header.hero_title) + '</h1>' : '') +
@@ -1743,6 +1753,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 '</div>' +
             '</div>' +
         '</header>' + heroHtml + secondaryHtml;
+    }
+
+    function homeHeroTemplate() {
+        return {
+            hero_enabled: Boolean(header.home_hero_enabled),
+            hero_variant: header.home_hero_variant || 'fullscreen',
+            hero_title: header.home_hero_title || '',
+            hero_text: header.home_hero_text || '',
+            hero_button_label: header.home_hero_button_label || '',
+            hero_button_url: header.home_hero_button_url || ''
+        };
+    }
+
+    function renderPreviewHomeHero() {
+        const template = homeHeroTemplate();
+        if (!template.hero_enabled || (!template.hero_title && !template.hero_text)) {
+            return '';
+        }
+        return '<section class="site-home-hero site-header-hero site-header-hero-' + escapeHtml(template.hero_variant || 'fullscreen') + '">' +
+            '<div class="container site-header-hero-inner">' +
+                '<div>' +
+                    (template.hero_title ? '<h1>' + escapeHtml(template.hero_title) + '</h1>' : '') +
+                    (template.hero_text ? '<p>' + escapeHtml(template.hero_text) + '</p>' : '') +
+                '</div>' +
+                (template.hero_button_label && template.hero_button_url ? '<a class="button" href="' + escapeHtml(previewUrl(template.hero_button_url)) + '">' + escapeHtml(template.hero_button_label) + '</a>' : '') +
+            '</div>' +
+        '</section>';
     }
 
     function renderMenuVisualTree(links, emptyText) {
@@ -1974,7 +2011,7 @@ document.addEventListener('DOMContentLoaded', function () {
             '</head><body class="site-template-' + escapeHtml(selectedTemplate) + '">' +
             '<div class="template-preview-note">Перегляд: ' + escapeHtml(template.name || selectedTemplate) + ' <span>незбережені зміни</span></div>' +
             renderPreviewHeader() +
-            '<main><section class="hero"><div class="container hero-inner"><h1>' + escapeHtml(title) + '</h1><p>' + escapeHtml(excerpt) + '</p></div></section>' +
+            '<main>' + (renderPreviewHomeHero() || '<section class="hero"><div class="container hero-inner"><h1>' + escapeHtml(title) + '</h1><p>' + escapeHtml(excerpt) + '</p></div></section>') +
             '<section class="section"><div class="container"><div class="grid grid-3"><article class="card"><p class="meta">Блок</p><h3>Про заклад</h3><p>Тут буде контент головної сторінки.</p></article><article class="card"><p class="meta">Блок</p><h3>Новини</h3><p>Приклад картки для оцінки відступів і кольорів.</p></article><article class="card"><p class="meta">Блок</p><h3>Контакти</h3><p>Додатковий блок для перевірки сітки.</p></article></div></div></section></main>' +
             renderPreviewFooter() +
             '<script src="' + escapeHtml(previewContext.siteJs || '') + '"></script>' +
@@ -2013,6 +2050,12 @@ document.addEventListener('DOMContentLoaded', function () {
         headerEditor.querySelector('[data-header-field="hero_text"]').value = header.hero_text || '';
         headerEditor.querySelector('[data-header-field="hero_button_label"]').value = header.hero_button_label || '';
         headerEditor.querySelector('[data-header-field="hero_button_url"]').value = header.hero_button_url || '';
+        headerEditor.querySelector('[data-header-field="home_hero_enabled"]').checked = Boolean(header.home_hero_enabled);
+        headerEditor.querySelector('[data-header-field="home_hero_variant"]').value = header.home_hero_variant || 'fullscreen';
+        headerEditor.querySelector('[data-header-field="home_hero_title"]').value = header.home_hero_title || '';
+        headerEditor.querySelector('[data-header-field="home_hero_text"]').value = header.home_hero_text || '';
+        headerEditor.querySelector('[data-header-field="home_hero_button_label"]').value = header.home_hero_button_label || '';
+        headerEditor.querySelector('[data-header-field="home_hero_button_url"]').value = header.home_hero_button_url || '';
         headerEditor.querySelector('[data-header-field="secondary_enabled"]').checked = Boolean(header.secondary_enabled);
         headerEditor.querySelector('[data-header-field="secondary_variant"]').value = header.secondary_variant || 'pills';
         headerEditor.querySelector('[data-header-field="mobile_variant"]').value = header.mobile_variant || 'drawer';
@@ -2362,11 +2405,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
             if (menuTemplateState.kind === 'hero') {
-                Object.keys(menuTemplateState.payload || {}).forEach(function (key) {
-                    header[key] = menuTemplateState.payload[key];
-                });
-                renderHeader();
-                setTemplateEditorTab('hero');
+                applyHeroTemplate(menuTemplateState.type, menuTemplateState.target, menuTemplateState.payload);
             } else if (menuTemplateState.kind === 'footer') {
                 footer = cloneLayout(menuTemplateState.payload || {});
                 renderFooter();

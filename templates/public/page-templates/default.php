@@ -1,4 +1,4 @@
-<?php if (!$blocks): ?>
+<?php if (!$blocks && empty($homeHeroVisible)): ?>
     <section class="section">
         <div class="container">
             <div class="page-head public-head">
@@ -11,5 +11,5 @@
     </section>
 <?php endif; ?>
 <?php foreach ($blocks as $block): ?>
-    <?= $this->partial('public/partials/page-block', ['page' => $page, 'block' => $block, 'latestNews' => $latestNews]) ?>
+    <?= $this->partial('public/partials/page-block', ['page' => $page, 'block' => $block, 'latestNews' => $latestNews, 'homeHeroVisible' => $homeHeroVisible ?? false]) ?>
 <?php endforeach; ?>

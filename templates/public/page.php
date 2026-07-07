@@ -9,4 +9,6 @@
     'page' => $page,
     'blocks' => $blocks,
     'latestNews' => $latestNews,
+    'isHomePage' => $isHomePage ?? false,
+    'homeHeroVisible' => $homeHeroVisible ?? false,
 ]) ?>
