@@ -203,7 +203,9 @@ final class SettingsController extends \App\Controllers\AdminBaseController
         $data = json_decode($json, true);
         $data = is_array($data) ? $data : [];
         $links = $this->normalizeMenuLinks(is_array($data['links'] ?? null) ? $data['links'] : []);
+        $secondaryLinks = $this->normalizeMenuLinks(is_array($data['secondary_links'] ?? null) ? $data['secondary_links'] : []);
         $ctaUrl = $this->normalizeUrl(trim((string) ($data['cta_url'] ?? '')));
+        $heroButtonUrl = $this->normalizeUrl(trim((string) ($data['hero_button_url'] ?? '')));
 
         return [
             'variant' => $this->choice((string) ($data['variant'] ?? 'default'), ['default', 'centered', 'compact'], 'default'),
@@ -213,6 +215,19 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'links' => array_slice($links, 0, 16),
             'cta_label' => $this->limitString(trim((string) ($data['cta_label'] ?? '')), 80),
             'cta_url' => $this->limitString($ctaUrl, 240),
+            'hero_enabled' => !empty($data['hero_enabled']),
+            'hero_variant' => $this->choice((string) ($data['hero_variant'] ?? 'default'), ['default', 'accent', 'compact'], 'default'),
+            'hero_title' => $this->limitString(trim((string) ($data['hero_title'] ?? '')), 140),
+            'hero_text' => $this->limitString(trim((string) ($data['hero_text'] ?? '')), 500),
+            'hero_button_label' => $this->limitString(trim((string) ($data['hero_button_label'] ?? '')), 80),
+            'hero_button_url' => $this->limitString($heroButtonUrl, 240),
+            'secondary_enabled' => !empty($data['secondary_enabled']),
+            'secondary_variant' => $this->choice((string) ($data['secondary_variant'] ?? 'pills'), ['pills', 'tabs', 'plain'], 'pills'),
+            'secondary_links' => array_slice($secondaryLinks, 0, 12),
+            'mobile_variant' => $this->choice((string) ($data['mobile_variant'] ?? 'drawer'), ['drawer', 'panel', 'compact'], 'drawer'),
+            'mobile_label' => $this->limitString(trim((string) ($data['mobile_label'] ?? 'Меню')), 40),
+            'mobile_show_brand' => array_key_exists('mobile_show_brand', $data) ? !empty($data['mobile_show_brand']) : true,
+            'mobile_show_cta' => array_key_exists('mobile_show_cta', $data) ? !empty($data['mobile_show_cta']) : true,
         ];
     }
 
@@ -328,7 +343,8 @@ final class SettingsController extends \App\Controllers\AdminBaseController
         ], $this->db()->fetchAll('select title, slug from pages where status = ? order by sort_order asc, title asc', ['published']));
 
         $categories = array_map(static fn (array $category): array => [
-            'label' => (string) ($category['label'] ?? $category['category'] ?? ''),
+            'label' => (string) ($category['category'] ?? $category['title'] ?? ''),
+            'display_label' => (string) ($category['label'] ?? $category['category'] ?? ''),
             'url' => url('/news?category=' . rawurlencode((string) ($category['category'] ?? ''))),
         ], $this->orderedNewsCategories($this->db()->fetchAll('select id, parent_id, title as category, title, sort_order from news_categories order by sort_order asc, title asc')));
 

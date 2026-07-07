@@ -49,12 +49,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveTitle = document.querySelector('[data-template-save-title]');
     const saveCopy = document.querySelector('[data-template-save-copy]');
     const saveBar = document.querySelector('.template-save-bar');
+    const revertButton = document.querySelector('[data-template-revert]');
     const templateForm = document.querySelector('[data-template-form]');
     const pickerToggle = document.querySelector('[data-template-picker-toggle]');
     const pickerOptions = document.querySelector('[data-template-picker-options]');
     const previewFrame = document.querySelector('[data-template-home-preview]');
     const previewShell = document.querySelector('[data-template-preview-shell]');
+    const previewPanel = document.querySelector('.template-preview-panel');
+    const builderLayout = document.querySelector('.template-builder-layout');
+    const previewCollapseButton = document.querySelector('[data-template-preview-collapse]');
     const previewModeButtons = document.querySelectorAll('[data-template-preview-mode]');
+    const editorTabButtons = document.querySelectorAll('[data-template-editor-tab]');
+    const editorTabPanels = document.querySelectorAll('[data-template-tab-panel]');
     const previewContext = previewFrame ? parseJson(previewFrame.dataset.context, {}) : {};
     const linkPicker = previewContext.linkPicker || {pages: [], categories: [], news: [], media: []};
     const defaultHeader = {
@@ -64,7 +70,20 @@ document.addEventListener('DOMContentLoaded', function () {
         show_news: false,
         links: [],
         cta_label: '',
-        cta_url: ''
+        cta_url: '',
+        hero_enabled: false,
+        hero_variant: 'default',
+        hero_title: '',
+        hero_text: '',
+        hero_button_label: '',
+        hero_button_url: '',
+        secondary_enabled: false,
+        secondary_variant: 'pills',
+        secondary_links: [],
+        mobile_variant: 'drawer',
+        mobile_label: 'Меню',
+        mobile_show_brand: true,
+        mobile_show_cta: true
     };
     const defaultFooter = {
         variant: 'default',
@@ -77,6 +96,10 @@ document.addEventListener('DOMContentLoaded', function () {
     let header = cloneLayout(layouts[selectedTemplate].header);
     let footer = cloneLayout(layouts[selectedTemplate].footer);
     let baselineLayouts = '';
+    let menuSearchQuery = '';
+    let menuIssuesOnly = false;
+    let menuIssueCursor = -1;
+    const expandedMenuNodes = new Set();
     const menuPickerNode = document.getElementById('templateMenuPickerModal');
     const menuPickerModal = menuPickerNode && window.bootstrap ? new window.bootstrap.Modal(menuPickerNode) : null;
     const iconPickerNode = document.getElementById('templateIconPickerModal');
@@ -130,6 +153,18 @@ document.addEventListener('DOMContentLoaded', function () {
         selected: new Map()
     };
 
+    function setTemplateEditorTab(tab) {
+        const activeTab = tab || 'menu';
+        editorTabButtons.forEach(function (button) {
+            const active = button.dataset.templateEditorTab === activeTab;
+            button.classList.toggle('secondary', !active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        editorTabPanels.forEach(function (panel) {
+            panel.hidden = panel.dataset.templateTabPanel !== activeTab;
+        });
+    }
+
     function parseJson(value, fallback) {
         try {
             const parsed = JSON.parse(value || '');
@@ -145,6 +180,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function cssEscape(value) {
+        if (window.CSS && typeof window.CSS.escape === 'function') {
+            return window.CSS.escape(String(value));
+        }
+        return String(value).replace(/["\\]/g, '\\$&');
+    }
+
     function previewUrl(value) {
         const url = String(value || '').trim();
         return /^(https?:\/\/|mailto:|tel:|\/|#)/i.test(url) ? url : '#';
@@ -154,8 +196,26 @@ document.addEventListener('DOMContentLoaded', function () {
         return {type: 'link', label: label || '', url: url || '', icon: '', children: []};
     }
 
+    function cleanMenuLabel(label) {
+        return String(label || '').replace(/^((—|–|-)\s*)+/, '').trim();
+    }
+
     function makeMenuSection(label) {
         return {type: 'section', label: label || '', url: '#', icon: '', children: [], columns: []};
+    }
+
+    function makeMenuTemplateItem(label, url, icon) {
+        const item = makeMenuItem(cleanMenuLabel(label), url);
+        item.icon = icon || '';
+        return item;
+    }
+
+    function makeMenuTemplateSection(label, icon, children, columns) {
+        const section = makeMenuSection(label);
+        section.icon = icon || '';
+        section.children = Array.isArray(children) ? children : [];
+        section.columns = Array.isArray(columns) ? columns : [];
+        return section;
     }
 
     function mdiIconClass(value) {
@@ -258,6 +318,7 @@ document.addEventListener('DOMContentLoaded', function () {
         layouts[template].header.show_home = false;
         layouts[template].header.show_news = false;
         layouts[template].header.links = Array.isArray(layouts[template].header.links) ? layouts[template].header.links : [];
+        layouts[template].header.secondary_links = Array.isArray(layouts[template].header.secondary_links) ? layouts[template].header.secondary_links : [];
         layouts[template].footer.columns = Array.isArray(layouts[template].footer.columns) ? layouts[template].footer.columns : [];
     }
 
@@ -266,6 +327,12 @@ document.addEventListener('DOMContentLoaded', function () {
         let items = header.links || [];
         let item = null;
         parts.forEach(function (index) {
+            if (index === 'secondary') {
+                header.secondary_links = Array.isArray(header.secondary_links) ? header.secondary_links : [];
+                items = header.secondary_links;
+                item = null;
+                return;
+            }
             if (/^c\d+$/.test(index)) {
                 const columnIndex = Number(index.slice(1));
                 const columns = item && Array.isArray(item.columns) ? item.columns : [];
@@ -280,12 +347,34 @@ document.addEventListener('DOMContentLoaded', function () {
         return item;
     }
 
+    function duplicateMenuItem(path) {
+        const parts = String(path || '').split('.').filter(Boolean);
+        const index = Number(parts.pop());
+        const items = menuListForPath(path);
+        const item = Number.isInteger(index) ? items[index] : null;
+        if (!item) {
+            return '';
+        }
+        const copy = cloneLayout(item);
+        if (copy.label) {
+            copy.label += ' (копія)';
+        }
+        items.splice(index + 1, 0, copy);
+        return (parts.length ? parts.join('.') + '.' : '') + String(index + 1);
+    }
+
     function removeMenuItem(path) {
         const parts = String(path || '').split('.').filter(Boolean);
         const index = parts.pop();
         let items = header.links || [];
         let item = null;
         parts.forEach(function (part) {
+            if (part === 'secondary') {
+                header.secondary_links = Array.isArray(header.secondary_links) ? header.secondary_links : [];
+                items = header.secondary_links;
+                item = null;
+                return;
+            }
             if (/^c\d+$/.test(part)) {
                 const column = item && Array.isArray(item.columns) ? item.columns[Number(part.slice(1))] : null;
                 items = column && Array.isArray(column.children) ? column.children : [];
@@ -315,6 +404,11 @@ document.addEventListener('DOMContentLoaded', function () {
         header.links = Array.isArray(header.links) ? header.links : [];
         if (!path) {
             header.links.push(section);
+            return;
+        }
+        if (path === 'secondary') {
+            header.secondary_links = Array.isArray(header.secondary_links) ? header.secondary_links : [];
+            header.secondary_links.push(section);
             return;
         }
         const parent = getMenuItem(path);
@@ -361,6 +455,12 @@ document.addEventListener('DOMContentLoaded', function () {
         let items = header.links || [];
         let item = null;
         parts.forEach(function (part) {
+            if (part === 'secondary') {
+                header.secondary_links = Array.isArray(header.secondary_links) ? header.secondary_links : [];
+                items = header.secondary_links;
+                item = null;
+                return;
+            }
             if (/^c\d+$/.test(part)) {
                 const column = item && Array.isArray(item.columns) ? item.columns[Number(part.slice(1))] : null;
                 items = column && Array.isArray(column.children) ? column.children : [];
@@ -380,10 +480,21 @@ document.addEventListener('DOMContentLoaded', function () {
             header.links = Array.isArray(header.links) ? header.links : [];
             return header.links;
         }
+        if (parts[0] === 'secondary') {
+            header.secondary_links = Array.isArray(header.secondary_links) ? header.secondary_links : [];
+            if (parts.length === 1) {
+                return header.secondary_links;
+            }
+        }
         let items = header.links || [];
         let item = null;
         for (let i = 0; i < parts.length; i += 1) {
             const part = parts[i];
+            if (part === 'secondary') {
+                items = header.secondary_links;
+                item = null;
+                continue;
+            }
             if (/^c\d+$/.test(part)) {
                 const column = item && Array.isArray(item.columns) ? item.columns[Number(part.slice(1))] : null;
                 if (!column) {
@@ -417,13 +528,85 @@ document.addEventListener('DOMContentLoaded', function () {
         items.splice(target, 0, moved);
     }
 
-    function renderSectionColumns(section, path, depth) {
+    function normalizeMenuSearch(value) {
+        return String(value || '').trim().toLowerCase();
+    }
+
+    function menuItemSearchText(item) {
+        return [
+            item.type === 'section' ? 'секція section' : 'посилання link',
+            item.label || '',
+            item.url || '',
+            item.icon || ''
+        ].join(' ').toLowerCase();
+    }
+
+    function menuItemMatchesSearch(item, query) {
+        return !query || menuItemSearchText(item).indexOf(query) !== -1;
+    }
+
+    function menuBranchMatchesSearch(item, query) {
+        if (!query || menuItemMatchesSearch(item, query)) {
+            return true;
+        }
+        if ((Array.isArray(item.children) ? item.children : []).some(function (child) {
+            return menuBranchMatchesSearch(child, query);
+        })) {
+            return true;
+        }
+        return (Array.isArray(item.columns) ? item.columns : []).some(function (column) {
+            const titleMatches = String(column.title || '').toLowerCase().indexOf(query) !== -1;
+            const childrenMatch = (Array.isArray(column.children) ? column.children : []).some(function (child) {
+                return menuBranchMatchesSearch(child, query);
+            });
+            return titleMatches || childrenMatch;
+        });
+    }
+
+    function collectMenuPaths(items, parentPath) {
+        const paths = [];
+        (items || []).forEach(function (item, index) {
+            const path = parentPath ? parentPath + '.' + index : String(index);
+            paths.push(path);
+            paths.push.apply(paths, collectMenuPaths(Array.isArray(item.children) ? item.children : [], path));
+            (Array.isArray(item.columns) ? item.columns : []).forEach(function (column, columnIndex) {
+                paths.push.apply(paths, collectMenuPaths(Array.isArray(column.children) ? column.children : [], path + '.c' + columnIndex));
+            });
+        });
+        return paths;
+    }
+
+    function renderSectionColumns(section, path, depth, query, issuesOnly, duplicateUrls) {
         const columns = Array.isArray(section.columns) ? section.columns : [];
         if (!columns.length) {
             return '';
         }
-        return '<div class="template-menu-columns">' + columns.map(function (column, columnIndex) {
+        const visibleColumns = columns.map(function (column, columnIndex) {
+            return {column: column, index: columnIndex};
+        }).filter(function (entry) {
+            if (!query && !issuesOnly) {
+                return true;
+            }
+            const titleMatches = String(entry.column.title || '').toLowerCase().indexOf(query) !== -1;
+            const children = Array.isArray(entry.column.children) ? entry.column.children : [];
+            const matchesSearch = !query || titleMatches || children.some(function (child) {
+                return menuBranchMatchesSearch(child, query);
+            });
+            const matchesIssues = !issuesOnly || children.some(function (child) {
+                return menuBranchHasIssues(child, duplicateUrls);
+            });
+            return matchesSearch && matchesIssues;
+        });
+        if (!visibleColumns.length) {
+            return '';
+        }
+        return '<div class="template-menu-columns">' + visibleColumns.map(function (entry) {
+            const column = entry.column;
+            const columnIndex = entry.index;
             const children = Array.isArray(column.children) ? column.children : [];
+            const hasVisibleChildren = (query || issuesOnly) ? children.some(function (child) {
+                return (!query || menuBranchMatchesSearch(child, query)) && (!issuesOnly || menuBranchHasIssues(child, duplicateUrls));
+            }) : children.length > 0;
             return '<section class="template-menu-column" data-menu-column="' + columnIndex + '">' +
                 '<div class="template-menu-column-head">' +
                     '<label>Назва колонки<input data-header-column-field="title" value="' + escapeHtml(column.title || '') + '" placeholder="Необов’язково"></label>' +
@@ -432,46 +615,233 @@ document.addEventListener('DOMContentLoaded', function () {
                         '<button class="button danger compact" type="button" data-header-column-remove title="Видалити колонку"><span class="mdi mdi-delete-outline"></span></button>' +
                     '</div>' +
                 '</div>' +
-                (children.length ? '<div class="template-menu-column-items">' + renderMenuLinks(children, path + '.c' + columnIndex, depth + 1) + '</div>' : '<div class="template-menu-column-empty">Пунктів ще немає.</div>') +
+                (hasVisibleChildren ? '<div class="template-menu-column-items">' + renderMenuLinks(children, path + '.c' + columnIndex, depth + 1, query, issuesOnly, duplicateUrls) + '</div>' : '<div class="template-menu-column-empty">Пунктів ще немає.</div>') +
             '</section>';
         }).join('') + '</div>';
     }
 
-    function renderMenuLinks(items, parentPath, depth) {
+    function normalizedMenuUrl(url) {
+        const value = String(url || '').trim();
+        if (!value) {
+            return '';
+        }
+        return value === '/' ? '/' : value.replace(/\/+$/, '');
+    }
+
+    function collectMenuUrlCounts(items, counts) {
+        (items || []).forEach(function (item) {
+            const type = item.type === 'section' ? 'section' : 'link';
+            const url = normalizedMenuUrl(item.url || '');
+            if (type === 'link' && url && url !== '#') {
+                counts[url] = (counts[url] || 0) + 1;
+            }
+            collectMenuUrlCounts(Array.isArray(item.children) ? item.children : [], counts);
+            (Array.isArray(item.columns) ? item.columns : []).forEach(function (column) {
+                collectMenuUrlCounts(Array.isArray(column.children) ? column.children : [], counts);
+            });
+        });
+        return counts;
+    }
+
+    function duplicatedMenuUrls(items) {
+        const counts = collectMenuUrlCounts(items, {});
+        return Object.keys(counts).reduce(function (duplicates, url) {
+            if (counts[url] > 1) {
+                duplicates[url] = true;
+            }
+            return duplicates;
+        }, {});
+    }
+
+    function menuItemSummaryMeta(link, type, duplicateUrls) {
+        const pieces = [];
+        const issues = menuItemIssues(link, type, duplicateUrls);
+        const childCount = countMenuItems(Array.isArray(link.children) ? link.children : []);
+        const columns = Array.isArray(link.columns) ? link.columns : [];
+        const columnsItemCount = columns.reduce(function (total, column) {
+            return total + countMenuItems(Array.isArray(column.children) ? column.children : []);
+        }, 0);
+        if (type === 'link') {
+            pieces.push(link.url ? link.url : 'URL не вказано');
+        } else {
+            pieces.push('Секція меню');
+        }
+        if (childCount) {
+            pieces.push(childCount + ' ' + pluralizeUk(childCount, 'підпункт', 'підпункти', 'підпунктів'));
+        }
+        if (columns.length) {
+            pieces.push(columns.length + ' ' + pluralizeUk(columns.length, 'колонка', 'колонки', 'колонок'));
+        }
+        if (columnsItemCount) {
+            pieces.push(columnsItemCount + ' ' + pluralizeUk(columnsItemCount, 'пункт у колонках', 'пункти у колонках', 'пунктів у колонках'));
+        }
+        if (issues.length) {
+            pieces.push('Проблеми: ' + issues.join(', '));
+        }
+        return pieces.join(' · ');
+    }
+
+    function menuItemIssues(item, type, duplicateUrls) {
+        const issues = [];
+        const url = normalizedMenuUrl(item.url || '');
+        if (!String(item.label || '').trim()) {
+            issues.push('назву');
+        }
+        if (type === 'link' && !url) {
+            issues.push('URL');
+        }
+        if (type === 'link' && url && duplicateUrls && duplicateUrls[url]) {
+            issues.push('унікальний URL');
+        }
+        return issues;
+    }
+
+    function countMenuIssues(items, duplicateUrls) {
+        return (items || []).reduce(function (total, item) {
+            const type = item.type === 'section' ? 'section' : 'link';
+            const ownIssues = menuItemIssues(item, type, duplicateUrls).length ? 1 : 0;
+            const childIssues = countMenuIssues(Array.isArray(item.children) ? item.children : [], duplicateUrls);
+            const columnIssues = (Array.isArray(item.columns) ? item.columns : []).reduce(function (columnTotal, column) {
+                return columnTotal + countMenuIssues(Array.isArray(column.children) ? column.children : [], duplicateUrls);
+            }, 0);
+            return total + ownIssues + childIssues + columnIssues;
+        }, 0);
+    }
+
+    function collectMenuIssuePaths(items, duplicateUrls, parentPath) {
+        const paths = [];
+        (items || []).forEach(function (item, index) {
+            const type = item.type === 'section' ? 'section' : 'link';
+            const path = parentPath ? parentPath + '.' + index : String(index);
+            if (menuItemIssues(item, type, duplicateUrls).length) {
+                paths.push(path);
+            }
+            paths.push.apply(paths, collectMenuIssuePaths(Array.isArray(item.children) ? item.children : [], duplicateUrls, path));
+            (Array.isArray(item.columns) ? item.columns : []).forEach(function (column, columnIndex) {
+                paths.push.apply(paths, collectMenuIssuePaths(Array.isArray(column.children) ? column.children : [], duplicateUrls, path + '.c' + columnIndex));
+            });
+        });
+        return paths;
+    }
+
+    function expandMenuPath(path) {
+        const parts = String(path || '').split('.').filter(Boolean);
+        const stack = [];
+        parts.forEach(function (part) {
+            stack.push(part);
+            if (!/^c\d+$/.test(part)) {
+                expandedMenuNodes.add(stack.join('.'));
+            }
+        });
+    }
+
+    function focusMenuIssue(path, duplicateUrls) {
+        expandMenuPath(path);
+        renderHeader();
+        window.requestAnimationFrame(function () {
+            const row = headerEditor.querySelector('[data-header-link="' + cssEscape(path) + '"]');
+            const item = getMenuItem(path);
+            const type = item && item.type === 'section' ? 'section' : 'link';
+            const issues = item ? menuItemIssues(item, type, duplicateUrls) : [];
+            const targetField = issues.indexOf('назву') !== -1 ? 'label' : 'url';
+            const input = row ? row.querySelector('[data-header-link-field="' + targetField + '"]') : null;
+            if (row) {
+                row.scrollIntoView({behavior: 'smooth', block: 'center'});
+            }
+            if (input) {
+                input.focus({preventScroll: true});
+                input.select?.();
+            }
+        });
+    }
+
+    function menuBranchHasIssues(item, duplicateUrls) {
+        const type = item.type === 'section' ? 'section' : 'link';
+        if (menuItemIssues(item, type, duplicateUrls).length) {
+            return true;
+        }
+        if ((Array.isArray(item.children) ? item.children : []).some(function (child) {
+            return menuBranchHasIssues(child, duplicateUrls);
+        })) {
+            return true;
+        }
+        return (Array.isArray(item.columns) ? item.columns : []).some(function (column) {
+            return (Array.isArray(column.children) ? column.children : []).some(function (child) {
+                return menuBranchHasIssues(child, duplicateUrls);
+            });
+        });
+    }
+
+    function renderMenuLinks(items, parentPath, depth, query, issuesOnly, duplicateUrls) {
         if (!items || !items.length) {
             return '';
         }
         return (items || []).map(function (link, index) {
             const path = parentPath ? parentPath + '.' + index : String(index);
+            if (query && !menuBranchMatchesSearch(link, query)) {
+                return '';
+            }
+            if (issuesOnly && !menuBranchHasIssues(link, duplicateUrls)) {
+                return '';
+            }
             const children = Array.isArray(link.children) ? link.children : [];
+            const hasVisibleChildren = (query || issuesOnly) ? children.some(function (child) {
+                return (!query || menuBranchMatchesSearch(child, query)) && (!issuesOnly || menuBranchHasIssues(child, duplicateUrls));
+            }) : children.length > 0;
             const canMoveUp = index > 0;
             const canMoveDown = index < items.length - 1;
             const type = link.type === 'section' ? 'section' : 'link';
             const isSection = type === 'section';
-            return '<div class="template-menu-node template-menu-depth-' + depth + '" data-header-link="' + path + '">' +
-                '<div class="template-editor-row template-menu-row' + (isSection ? ' is-section' : '') + '">' +
-                    '<label>Тип<select data-header-link-field="type">' +
-                        '<option value="link"' + (type === 'link' ? ' selected' : '') + '>Посилання</option>' +
-                        '<option value="section"' + (type === 'section' ? ' selected' : '') + '>Секція</option>' +
-                    '</select></label>' +
-                    '<label>Назва<input data-header-link-field="label" value="' + escapeHtml(link.label) + '"></label>' +
-                    '<div class="template-menu-icon-field">' +
-                        '<label>MDI іконка<input data-header-link-field="icon" value="' + escapeHtml(link.icon || '') + '" placeholder="home-outline"></label>' +
-                        '<button class="button secondary compact" type="button" data-header-icon-picker title="Обрати іконку"><span class="mdi mdi-view-grid-plus-outline"></span></button>' +
-                        '<button class="button secondary compact" type="button" data-header-icon-clear title="Очистити іконку"><span class="mdi mdi-close"></span></button>' +
+            const isSearchMatch = Boolean(query && menuItemMatchesSearch(link, query));
+            const isExpanded = expandedMenuNodes.has(path) || Boolean(query) || Boolean(issuesOnly);
+            const hasIssues = menuItemIssues(link, type, duplicateUrls).length > 0;
+            const title = String(link.label || '').trim() || (isSection ? 'Нова секція' : 'Нове посилання');
+            return '<div class="template-menu-node template-menu-depth-' + depth + (isSearchMatch ? ' is-search-match' : '') + (hasIssues ? ' has-issues' : '') + '" data-header-link="' + path + '">' +
+                '<div class="template-menu-card-head' + (isSection ? ' is-section' : '') + '">' +
+                    '<button class="template-menu-toggle" type="button" data-header-toggle-link aria-expanded="' + (isExpanded ? 'true' : 'false') + '" title="' + (isExpanded ? 'Згорнути' : 'Редагувати') + '">' +
+                        '<span class="mdi mdi-chevron-' + (isExpanded ? 'up' : 'down') + '"></span>' +
+                    '</button>' +
+                    '<div class="template-menu-summary">' +
+                        '<div class="template-menu-summary-title">' +
+                            (link.icon ? '<span class="' + escapeHtml(mdiIconClass(link.icon)) + '" aria-hidden="true"></span>' : '') +
+                            '<strong>' + escapeHtml(title) + '</strong>' +
+                            '<span class="template-menu-type-badge">' + (isSection ? 'Секція' : 'Посилання') + '</span>' +
+                            (hasIssues ? '<span class="template-menu-issue-badge">Перевірити</span>' : '') +
+                        '</div>' +
+                        '<div class="template-menu-summary-meta">' + escapeHtml(menuItemSummaryMeta(link, type, duplicateUrls)) + '</div>' +
                     '</div>' +
-                    '<label' + (isSection ? ' class="template-menu-url-muted"' : '') + '>URL<input data-header-link-field="url" value="' + escapeHtml(link.url) + '" ' + (isSection ? 'disabled placeholder="Не використовується"' : '') + '></label>' +
                     '<div class="template-menu-actions">' +
-                        '<button class="button secondary compact" type="button" data-header-move-link="-1" title="Підняти" ' + (canMoveUp ? '' : 'disabled') + '><span class="mdi mdi-arrow-up"></span></button>' +
-                        '<button class="button secondary compact" type="button" data-header-move-link="1" title="Опустити" ' + (canMoveDown ? '' : 'disabled') + '><span class="mdi mdi-arrow-down"></span></button>' +
-                        (depth < 2 ? '<button class="button secondary compact" type="button" data-header-add-child title="Додати підпункт"><span class="mdi mdi-subdirectory-arrow-right"></span></button>' : '') +
-                        (depth < 2 ? '<button class="button secondary compact" type="button" data-header-add-section title="Додати секцію"><span class="mdi mdi-format-list-group"></span></button>' : '') +
-                        (isSection ? '<button class="button secondary compact" type="button" data-header-add-column title="Додати колонку"><span class="mdi mdi-view-column-outline"></span></button>' : '') +
-                        '<button class="button danger compact" type="button" data-header-remove-link title="Видалити"><span class="mdi mdi-delete-outline"></span></button>' +
+                        '<details class="template-menu-action-menu">' +
+                            '<summary title="Дії"><span class="mdi mdi-dots-vertical"></span><span>Дії</span></summary>' +
+                            '<div class="template-menu-action-list">' +
+                                '<button class="button secondary compact" type="button" data-header-move-link="-1" ' + (canMoveUp ? '' : 'disabled') + '><span class="mdi mdi-arrow-up"></span><span>Підняти</span></button>' +
+                                '<button class="button secondary compact" type="button" data-header-move-link="1" ' + (canMoveDown ? '' : 'disabled') + '><span class="mdi mdi-arrow-down"></span><span>Опустити</span></button>' +
+                                (depth < 2 ? '<button class="button secondary compact" type="button" data-header-add-child><span class="mdi mdi-subdirectory-arrow-right"></span><span>Підпункт</span></button>' : '') +
+                                (depth < 2 ? '<button class="button secondary compact" type="button" data-header-add-section><span class="mdi mdi-format-list-group"></span><span>Секція</span></button>' : '') +
+                                (isSection ? '<button class="button secondary compact" type="button" data-header-add-column><span class="mdi mdi-view-column-outline"></span><span>Колонка</span></button>' : '') +
+                                '<button class="button secondary compact" type="button" data-header-duplicate-link><span class="mdi mdi-content-copy"></span><span>Дублювати</span></button>' +
+                                '<button class="button danger compact" type="button" data-header-remove-link><span class="mdi mdi-delete-outline"></span><span>Видалити</span></button>' +
+                            '</div>' +
+                        '</details>' +
                     '</div>' +
                 '</div>' +
-                (isSection ? renderSectionColumns(link, path, depth) : '') +
-                (children.length ? '<div class="template-menu-children">' + renderMenuLinks(children, path, depth + 1) + '</div>' : '') +
+                '<div class="template-menu-card-body"' + (isExpanded ? '' : ' hidden') + '>' +
+                    '<div class="template-editor-row template-menu-row' + (isSection ? ' is-section' : '') + '">' +
+                        '<label>Тип<select data-header-link-field="type">' +
+                            '<option value="link"' + (type === 'link' ? ' selected' : '') + '>Посилання</option>' +
+                            '<option value="section"' + (type === 'section' ? ' selected' : '') + '>Секція</option>' +
+                        '</select></label>' +
+                        '<label>Назва<input data-header-link-field="label" value="' + escapeHtml(link.label) + '"></label>' +
+                        '<div class="template-menu-icon-field">' +
+                            '<label>MDI іконка<input data-header-link-field="icon" value="' + escapeHtml(link.icon || '') + '" placeholder="home-outline"></label>' +
+                            '<button class="button secondary compact" type="button" data-header-icon-picker title="Обрати іконку"><span class="mdi mdi-view-grid-plus-outline"></span></button>' +
+                            '<button class="button secondary compact" type="button" data-header-icon-clear title="Очистити іконку"><span class="mdi mdi-close"></span></button>' +
+                        '</div>' +
+                        '<label' + (isSection ? ' class="template-menu-url-muted"' : '') + '>URL<input data-header-link-field="url" value="' + escapeHtml(link.url) + '" ' + (isSection ? 'disabled placeholder="Не використовується"' : '') + '></label>' +
+                    '</div>' +
+                    (isSection ? renderSectionColumns(link, path, depth, query, issuesOnly, duplicateUrls) : '') +
+                    (hasVisibleChildren ? '<div class="template-menu-children">' + renderMenuLinks(children, path, depth + 1, query, issuesOnly, duplicateUrls) + '</div>' : '') +
+                '</div>' +
             '</div>';
         }).join('');
     }
@@ -503,12 +873,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateWorkbenchSummary() {
         const menuCount = countMenuItems(header.links || []);
+        const secondaryCount = Array.isArray(header.secondary_links) ? header.secondary_links.length : 0;
         const columnsCount = Array.isArray(footer.columns) ? footer.columns.length : 0;
         const footerItemsCount = (footer.columns || []).reduce(function (total, column) {
             return total + (Array.isArray(column.items) ? column.items.length : 0);
         }, 0);
         if (menuStat) {
-            menuStat.textContent = menuCount + ' ' + pluralizeUk(menuCount, 'пункт', 'пункти', 'пунктів') + (hasMeaningfulCta() ? ' + CTA' : '');
+            menuStat.textContent = menuCount + ' ' + pluralizeUk(menuCount, 'пункт', 'пункти', 'пунктів') + (secondaryCount ? ' + ' + secondaryCount + ' під hero' : '') + (hasMeaningfulCta() ? ' + CTA' : '');
         }
         if (footerStat) {
             footerStat.textContent = columnsCount + ' ' + pluralizeUk(columnsCount, 'колонка', 'колонки', 'колонок') + ', ' + footerItemsCount + ' ' + pluralizeUk(footerItemsCount, 'пункт', 'пункти', 'пунктів');
@@ -529,11 +900,36 @@ document.addEventListener('DOMContentLoaded', function () {
         if (saveBar) {
             saveBar.classList.toggle('is-dirty', changed);
         }
+        if (revertButton) {
+            revertButton.disabled = !changed;
+        }
     }
 
     function markSaved() {
         syncLayouts();
         baselineLayouts = JSON.stringify(layouts);
+        updateSaveStatus();
+    }
+
+    function revertTemplateChanges() {
+        if (!baselineLayouts || !isDirty()) {
+            return;
+        }
+        if (!window.confirm('Скасувати незбережені зміни в редакторі шаблону?')) {
+            return;
+        }
+        layouts = parseJson(baselineLayouts, {});
+        ensureTemplateLayout(selectedTemplate);
+        header = cloneLayout(layouts[selectedTemplate].header);
+        footer = cloneLayout(layouts[selectedTemplate].footer);
+        menuSearchQuery = '';
+        menuIssuesOnly = false;
+        menuIssueCursor = -1;
+        expandedMenuNodes.clear();
+        renderHeader();
+        renderFooter();
+        renderHomePreview();
+        updateWorkbenchSummary();
         updateSaveStatus();
     }
 
@@ -567,17 +963,27 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         const current = select.value;
         const options = menuTargets(header.links || [], '', 0);
-        select.innerHTML = '<option value="">Верхній рівень</option>' + options.map(function (item) {
+        const secondaryOptions = [{path: 'secondary', label: 'Меню під hero'}].concat(menuTargets(header.secondary_links || [], 'secondary', 0).map(function (item) {
+            return {path: item.path, label: '— ' + item.label};
+        }));
+        const allOptions = options.concat(secondaryOptions);
+        select.innerHTML = '<option value="">Верхній рівень</option>' + allOptions.map(function (item) {
             return '<option value="' + escapeHtml(item.path) + '">' + escapeHtml(item.label) + '</option>';
         }).join('');
-        select.value = options.some(function (item) { return item.path === current; }) ? current : '';
+        select.value = allOptions.some(function (item) { return item.path === current; }) ? current : '';
     }
 
     function addPickedMenuItem(item) {
         const parentSelect = headerEditor.querySelector('[data-menu-parent]');
         const parentPath = parentSelect ? parentSelect.value : '';
-        const menuItem = makeMenuItem(item.label, item.url);
-        menuContainerForPath(parentPath).push(menuItem);
+        const menuItem = makeMenuItem(item.cleanLabel || cleanMenuLabel(item.label), item.url);
+        const target = menuContainerForPath(parentPath);
+        const index = target.length;
+        target.push(menuItem);
+        if (parentPath) {
+            expandedMenuNodes.add(parentPath);
+        }
+        expandedMenuNodes.add(parentPath ? parentPath + '.' + index : String(index));
     }
 
     function menuPickerItemKey(item) {
@@ -616,6 +1022,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function toggleMenuPickerItem(button) {
         const item = {
             label: button.dataset.label || '',
+            cleanLabel: button.dataset.cleanLabel || button.dataset.label || '',
             url: button.dataset.url || ''
         };
         const key = menuPickerItemKey(item);
@@ -625,6 +1032,118 @@ document.addEventListener('DOMContentLoaded', function () {
             menuPickerState.selected.set(key, item);
         }
         updateMenuPickerSelection();
+    }
+
+    function findTemplateLink(keywords, fallbackLabel, fallbackUrl) {
+        const words = (Array.isArray(keywords) ? keywords : []).map(function (word) {
+            return String(word || '').toLowerCase();
+        });
+        const pools = []
+            .concat(Array.isArray(linkPicker.pages) ? linkPicker.pages : [])
+            .concat(Array.isArray(linkPicker.categories) ? linkPicker.categories : [])
+            .concat(Array.isArray(linkPicker.news) ? linkPicker.news : []);
+        const found = pools.find(function (item) {
+            const haystack = [item.label || '', item.url || '', item.slug || '', item.meta || ''].join(' ').toLowerCase();
+            return words.some(function (word) {
+                return word && haystack.indexOf(word) !== -1;
+            });
+        });
+        return {
+            label: found?.clean_label || found?.cleanLabel || cleanMenuLabel(found?.label || fallbackLabel),
+            url: found?.url || fallbackUrl
+        };
+    }
+
+    function menuTemplateLink(keywords, fallbackLabel, fallbackUrl, icon) {
+        const link = findTemplateLink(keywords, fallbackLabel, fallbackUrl);
+        return makeMenuTemplateItem(link.label, link.url, icon);
+    }
+
+    function buildMenuTemplate(type) {
+        if (type === 'education') {
+            return [
+                makeMenuTemplateItem('Головна', '/', 'home-outline'),
+                makeMenuTemplateSection('Про заклад', 'school-outline', [
+                    menuTemplateLink(['про', 'about'], 'Про нас', '/page/about', 'information-outline'),
+                    menuTemplateLink(['адміністрація', 'керівництво'], 'Адміністрація', '/page/administration', 'account-tie-outline'),
+                    menuTemplateLink(['документ', 'document'], 'Документи', '/page/documents', 'file-document-outline')
+                ]),
+                makeMenuTemplateSection('Навчання', 'book-open-page-variant-outline', [], [
+                    {
+                        title: 'Учням',
+                        children: [
+                            menuTemplateLink(['розклад'], 'Розклад занять', '/page/schedule', 'calendar-clock'),
+                            menuTemplateLink(['гурт'], 'Гуртки', '/page/clubs', 'star-outline')
+                        ]
+                    },
+                    {
+                        title: 'Батькам',
+                        children: [
+                            menuTemplateLink(['батьк'], 'Батькам', '/page/parents', 'account-child-outline'),
+                            menuTemplateLink(['харч'], 'Харчування', '/page/food', 'silverware-fork-knife')
+                        ]
+                    }
+                ]),
+                menuTemplateLink(['новин', 'news'], 'Новини', '/news', 'newspaper-variant-outline'),
+                menuTemplateLink(['контакт'], 'Контакти', '/contacts', 'phone-outline')
+            ];
+        }
+
+        if (type === 'mega') {
+            return [
+                makeMenuTemplateItem('Головна', '/', 'home-outline'),
+                makeMenuTemplateSection('Навігація', 'view-column-outline', [], [
+                    {
+                        title: 'Основне',
+                        children: [
+                            menuTemplateLink(['про', 'about'], 'Про нас', '/page/about', 'information-outline'),
+                            menuTemplateLink(['послуг'], 'Послуги', '/page/services', 'briefcase-outline'),
+                            menuTemplateLink(['контакт'], 'Контакти', '/contacts', 'phone-outline')
+                        ]
+                    },
+                    {
+                        title: 'Матеріали',
+                        children: [
+                            menuTemplateLink(['новин', 'news'], 'Новини', '/news', 'newspaper-variant-outline'),
+                            menuTemplateLink(['категор'], 'Категорії', '/news/categories', 'shape-outline'),
+                            menuTemplateLink(['медіа', 'media'], 'Медіафайли', '/media', 'folder-image')
+                        ]
+                    },
+                    {
+                        title: 'Швидкі дії',
+                        children: [
+                            menuTemplateLink(['заява', 'вступ'], 'Подати заявку', '/page/apply', 'send-outline'),
+                            menuTemplateLink(['кабінет', 'login'], 'Кабінет', '/login', 'login')
+                        ]
+                    }
+                ])
+            ];
+        }
+
+        return [
+            makeMenuTemplateItem('Головна', '/', 'home-outline'),
+            menuTemplateLink(['про', 'about'], 'Про нас', '/page/about', 'information-outline'),
+            menuTemplateLink(['новин', 'news'], 'Новини', '/news', 'newspaper-variant-outline'),
+            menuTemplateLink(['контакт'], 'Контакти', '/contacts', 'phone-outline')
+        ];
+    }
+
+    function applyMenuTemplate(type) {
+        if ((header.links || []).length && !window.confirm('Замінити поточне меню готовим шаблоном?')) {
+            return;
+        }
+        header.links = buildMenuTemplate(type);
+        menuSearchQuery = '';
+        menuIssuesOnly = false;
+        menuIssueCursor = -1;
+        expandedMenuNodes.clear();
+        collectMenuPaths(header.links || [], '').forEach(function (path) {
+            const item = getMenuItem(path);
+            if (item && (item.type === 'section' || (Array.isArray(item.children) && item.children.length) || (Array.isArray(item.columns) && item.columns.length))) {
+                expandedMenuNodes.add(path);
+            }
+        });
+        renderHeader();
     }
 
     function addSelectedMenuPickerItems() {
@@ -647,6 +1166,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
             header.links = [];
+            expandedMenuNodes.clear();
             renderHeader();
             return;
         }
@@ -661,6 +1181,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 makeMenuItem('Новини', '/news')
             ].forEach(function (item) {
                 if (!existing.has(item.url)) {
+                    expandedMenuNodes.add(String(header.links.length));
                     header.links.push(item);
                     existing.add(item.url);
                 }
@@ -680,6 +1201,7 @@ document.addEventListener('DOMContentLoaded', function () {
             header.links = Array.isArray(header.links) ? header.links : [];
             pages.forEach(function (page) {
                 if (page.url && !existing.has(page.url)) {
+                    expandedMenuNodes.add(String(header.links.length));
                     header.links.push(makeMenuItem(page.label || page.url, page.url));
                     existing.add(page.url);
                 }
@@ -696,6 +1218,28 @@ document.addEventListener('DOMContentLoaded', function () {
         previewModeButtons.forEach(function (button) {
             button.classList.toggle('secondary', button.dataset.templatePreviewMode !== mode);
         });
+    }
+
+    function setPreviewCollapsed(collapsed, persist) {
+        if (!previewShell || !previewCollapseButton || !previewPanel) {
+            return;
+        }
+        previewShell.hidden = collapsed;
+        previewPanel.classList.toggle('is-collapsed', collapsed);
+        if (builderLayout) {
+            builderLayout.classList.toggle('is-preview-collapsed', collapsed);
+        }
+        previewCollapseButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        previewCollapseButton.innerHTML = collapsed
+            ? '<span class="mdi mdi-chevron-down" aria-hidden="true"></span><span>Розгорнути</span>'
+            : '<span class="mdi mdi-chevron-up" aria-hidden="true"></span><span>Згорнути</span>';
+        if (persist) {
+            try {
+                window.localStorage.setItem('adminTemplatesPreviewCollapsed', collapsed ? '1' : '0');
+            } catch (error) {
+                // Ignore storage restrictions.
+            }
+        }
     }
 
     function setTemplatePickerCollapsed(collapsed) {
@@ -852,11 +1396,13 @@ document.addEventListener('DOMContentLoaded', function () {
             button.className = 'template-menu-picker-item' + (selected ? ' is-selected' : '');
             button.setAttribute('aria-pressed', selected ? 'true' : 'false');
             button.dataset.label = item.label || '';
+            button.dataset.cleanLabel = item.clean_label || item.cleanLabel || cleanMenuLabel(item.label || '');
             button.dataset.url = item.url || '';
+            const displayLabel = item.display_label || item.displayLabel || item.label || item.url || 'Посилання';
             button.innerHTML =
                 '<span class="template-menu-picker-item-icon mdi ' + menuPickerIcon(menuPickerState.type) + '" aria-hidden="true"></span>' +
                 '<span class="template-menu-picker-item-body">' +
-                    '<strong>' + escapeHtml(item.label || item.url || 'Посилання') + '</strong>' +
+                    '<strong>' + escapeHtml(displayLabel) + '</strong>' +
                     '<small>' + escapeHtml(item.meta || item.url || '') + '</small>' +
                     '<code class="w-100">' + escapeHtml(item.url || '#') + '</code>' +
                 '</span>' +
@@ -923,18 +1469,108 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        return '<header class="topbar site-header site-header-' + escapeHtml(header.variant || 'default') + '" data-site-header>' +
+        const mobileClass = ' site-mobile-menu-' + escapeHtml(header.mobile_variant || 'drawer');
+        const heroHtml = header.hero_enabled ? '<section class="site-header-hero site-header-hero-' + escapeHtml(header.hero_variant || 'default') + '">' +
+            '<div class="container site-header-hero-inner">' +
+                '<div>' +
+                    (header.hero_title ? '<h1>' + escapeHtml(header.hero_title) + '</h1>' : '') +
+                    (header.hero_text ? '<p>' + escapeHtml(header.hero_text) + '</p>' : '') +
+                '</div>' +
+                (header.hero_button_label && header.hero_button_url ? '<a class="button" href="' + escapeHtml(previewUrl(header.hero_button_url)) + '">' + escapeHtml(header.hero_button_label) + '</a>' : '') +
+            '</div>' +
+        '</section>' : '';
+        const secondaryHtml = header.secondary_enabled && Array.isArray(header.secondary_links) && header.secondary_links.length
+            ? '<nav class="site-secondary-menu site-secondary-menu-' + escapeHtml(header.secondary_variant || 'pills') + '" aria-label="Додаткове меню"><div class="container site-secondary-menu-inner">' + renderSecondaryPreviewLinks(header.secondary_links) + '</div></nav>'
+            : '';
+
+        return '<header class="topbar site-header site-header-' + escapeHtml(header.variant || 'default') + mobileClass + '" data-site-header>' +
             '<div class="container topbar-inner site-header-inner">' +
                 (header.show_brand !== false ? '<a class="brand" href="#">' + escapeHtml(previewContext.institutionName || 'Заклад освіти') + '</a>' : '') +
                 '<button class="site-menu-toggle" type="button" data-site-menu-toggle aria-expanded="false" aria-controls="templatePreviewMenuPanel">' +
-                    '<span class="site-menu-toggle-bars" aria-hidden="true"></span><span>Меню</span>' +
+                    '<span class="site-menu-toggle-bars" aria-hidden="true"></span><span>' + escapeHtml(header.mobile_label || 'Меню') + '</span>' +
                 '</button>' +
                 '<div class="site-header-menu-panel" id="templatePreviewMenuPanel" data-site-menu-panel>' +
+                    (header.mobile_show_brand === false ? '' : '<span class="site-mobile-menu-brand">' + escapeHtml(previewContext.institutionName || 'Заклад освіти') + '</span>') +
                     '<nav class="nav site-header-nav" aria-label="Головне меню">' + links.join('') + '</nav>' +
-                    (header.cta_label && header.cta_url ? '<a class="button site-header-cta" href="' + escapeHtml(previewUrl(header.cta_url)) + '">' + escapeHtml(header.cta_label) + '</a>' : '') +
+                    (header.cta_label && header.cta_url ? '<a class="button site-header-cta' + (header.mobile_show_cta === false ? ' site-header-cta-mobile-hidden' : '') + '" href="' + escapeHtml(previewUrl(header.cta_url)) + '">' + escapeHtml(header.cta_label) + '</a>' : '') +
                 '</div>' +
             '</div>' +
-        '</header>';
+        '</header>' + heroHtml + secondaryHtml;
+    }
+
+    function renderMenuVisualPreview() {
+        const links = Array.isArray(header.links) ? header.links : [];
+        function renderVisualItems(items, depth) {
+            const html = (items || []).map(function (item) {
+                const type = item.type === 'section' ? 'section' : 'link';
+                const children = Array.isArray(item.children) ? item.children : [];
+                const columns = Array.isArray(item.columns) ? item.columns : [];
+                if (!item.label && !children.length && !columns.length) {
+                    return '';
+                }
+                const columnsHtml = columns.length ? '<div class="template-menu-visual-columns">' + columns.map(function (column) {
+                    const columnChildren = Array.isArray(column.children) ? column.children : [];
+                    if (!column.title && !columnChildren.length) {
+                        return '';
+                    }
+                    return '<div class="template-menu-visual-column">' +
+                        (column.title ? '<strong>' + escapeHtml(column.title) + '</strong>' : '') +
+                        renderVisualItems(columnChildren, depth + 1) +
+                    '</div>';
+                }).join('') + '</div>' : '';
+                return '<div class="template-menu-visual-item template-menu-visual-depth-' + depth + '">' +
+                    '<div class="template-menu-visual-link">' +
+                        renderMenuLabel(item.label, item.icon, type === 'section' ? 'Секція' : 'Пункт') +
+                        (type === 'link' ? '<code>' + escapeHtml(item.url || '#') + '</code>' : '<small>секція</small>') +
+                    '</div>' +
+                    (columnsHtml || children.length ? '<div class="template-menu-visual-nested">' + columnsHtml + renderVisualItems(children, depth + 1) + '</div>' : '') +
+                '</div>';
+            }).join('');
+            return html;
+        }
+        if (!links.length) {
+            return '<div class="template-menu-visual-empty"><span class="mdi mdi-menu-open" aria-hidden="true"></span><span>Меню ще порожнє.</span></div>';
+        }
+        return '<div class="template-menu-visual-tree">' + renderVisualItems(links, 0) + '</div>';
+    }
+
+    function renderSecondaryLinks() {
+        const links = Array.isArray(header.secondary_links) ? header.secondary_links : [];
+        const list = headerEditor.querySelector('[data-secondary-links]');
+        if (!list) {
+            return;
+        }
+        const duplicateUrls = duplicatedMenuUrls(links);
+        list.innerHTML = links.length
+            ? renderMenuLinks(links, 'secondary', 0, '', false, duplicateUrls)
+            : '<div class="template-empty-state"><span class="mdi mdi-link-variant" aria-hidden="true"></span><strong>Меню під hero порожнє</strong><p>Додайте пункт, секцію або колонки так само, як в основному меню.</p></div>';
+    }
+
+    function renderSecondaryPreviewLinks(items) {
+        return (items || []).map(function (item) {
+            const children = Array.isArray(item.children) ? item.children : [];
+            const columns = Array.isArray(item.columns) ? item.columns : [];
+            const type = item.type === 'section' ? 'section' : 'link';
+            if (!item.label && !item.url && !children.length && !columns.length) {
+                return '';
+            }
+            const columnsHtml = columns.length ? '<span class="site-menu-columns">' + columns.map(function (column) {
+                const columnChildren = Array.isArray(column.children) ? column.children : [];
+                if (!column.title && !columnChildren.length) {
+                    return '';
+                }
+                return '<span class="site-menu-column">' +
+                    (column.title ? '<span class="site-menu-column-title">' + escapeHtml(column.title) + '</span>' : '') +
+                    renderSecondaryPreviewLinks(columnChildren) +
+                '</span>';
+            }).join('') + '</span>' : '';
+            return '<span class="site-menu-item">' +
+                (type === 'section'
+                    ? '<span class="site-menu-section"' + ((children.length || columns.length) ? ' tabindex="0"' : '') + '>' + renderMenuLabel(item.label, item.icon, 'Секція') + '</span>'
+                    : '<a href="' + escapeHtml(previewUrl(item.url || '#')) + '">' + renderMenuLabel(item.label, item.icon, 'Пункт') + '</a>') +
+                ((children.length || columns.length) ? '<span class="site-submenu">' + columnsHtml + renderSecondaryPreviewLinks(children) + '</span>' : '') +
+            '</span>';
+        }).join('');
     }
 
     function renderPreviewFooter() {
@@ -992,13 +1628,76 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderHeader() {
+        const searchInput = headerEditor.querySelector('[data-menu-search]');
+        const searchClear = headerEditor.querySelector('[data-menu-search-clear]');
+        const issuesOnlyButton = headerEditor.querySelector('[data-menu-issues-only]');
+        const nextIssueButton = headerEditor.querySelector('[data-menu-next-issue]');
+        const expandAll = headerEditor.querySelector('[data-menu-expand-all]');
+        const collapseAll = headerEditor.querySelector('[data-menu-collapse-all]');
+        const issuesNode = headerEditor.querySelector('[data-menu-issues]');
+        const visualPreview = headerEditor.querySelector('[data-menu-visual-preview]');
+        const query = normalizeMenuSearch(menuSearchQuery);
+        const hasMenuItems = (header.links || []).length > 0;
+        const duplicateUrls = duplicatedMenuUrls(header.links || []);
+        const issuePaths = collectMenuIssuePaths(header.links || [], duplicateUrls, '');
+        const issuesCount = countMenuIssues(header.links || [], duplicateUrls);
+        if (!issuesCount) {
+            menuIssuesOnly = false;
+            menuIssueCursor = -1;
+        } else if (menuIssueCursor >= issuePaths.length) {
+            menuIssueCursor = issuePaths.length - 1;
+        }
+        const hasSearchResults = !query || (header.links || []).some(function (item) {
+            return menuBranchMatchesSearch(item, query) && (!menuIssuesOnly || menuBranchHasIssues(item, duplicateUrls));
+        });
         headerEditor.querySelector('[data-header-field="variant"]').value = header.variant || 'default';
         headerEditor.querySelector('[data-header-field="cta_label"]').value = header.cta_label || '';
         headerEditor.querySelector('[data-header-field="cta_url"]').value = header.cta_url || '';
         headerEditor.querySelector('[data-header-field="show_brand"]').checked = header.show_brand !== false;
-        headerEditor.querySelector('[data-header-links]').innerHTML = (header.links || []).length
-            ? renderMenuLinks(header.links || [], '', 0)
+        headerEditor.querySelector('[data-header-field="hero_enabled"]').checked = Boolean(header.hero_enabled);
+        headerEditor.querySelector('[data-header-field="hero_variant"]').value = header.hero_variant || 'default';
+        headerEditor.querySelector('[data-header-field="hero_title"]').value = header.hero_title || '';
+        headerEditor.querySelector('[data-header-field="hero_text"]').value = header.hero_text || '';
+        headerEditor.querySelector('[data-header-field="hero_button_label"]').value = header.hero_button_label || '';
+        headerEditor.querySelector('[data-header-field="hero_button_url"]').value = header.hero_button_url || '';
+        headerEditor.querySelector('[data-header-field="secondary_enabled"]').checked = Boolean(header.secondary_enabled);
+        headerEditor.querySelector('[data-header-field="secondary_variant"]').value = header.secondary_variant || 'pills';
+        headerEditor.querySelector('[data-header-field="mobile_variant"]').value = header.mobile_variant || 'drawer';
+        headerEditor.querySelector('[data-header-field="mobile_label"]').value = header.mobile_label || 'Меню';
+        headerEditor.querySelector('[data-header-field="mobile_show_brand"]').checked = header.mobile_show_brand !== false;
+        headerEditor.querySelector('[data-header-field="mobile_show_cta"]').checked = header.mobile_show_cta !== false;
+        if (searchInput && searchInput.value !== menuSearchQuery) {
+            searchInput.value = menuSearchQuery;
+        }
+        if (searchClear) {
+            searchClear.hidden = !query;
+        }
+        if (issuesOnlyButton) {
+            issuesOnlyButton.hidden = !issuesCount;
+            issuesOnlyButton.classList.toggle('is-active', menuIssuesOnly);
+            issuesOnlyButton.setAttribute('aria-pressed', menuIssuesOnly ? 'true' : 'false');
+        }
+        if (nextIssueButton) {
+            nextIssueButton.hidden = !issuesCount;
+            nextIssueButton.querySelector('span:last-child').textContent = issuesCount ? 'Наступна ' + (menuIssueCursor + 1 > 0 ? menuIssueCursor + 1 : 1) + '/' + issuesCount : 'Наступна';
+        }
+        if (expandAll) {
+            expandAll.disabled = !hasMenuItems;
+        }
+        if (collapseAll) {
+            collapseAll.disabled = !hasMenuItems;
+        }
+        if (issuesNode) {
+            issuesNode.hidden = !issuesCount;
+            issuesNode.textContent = issuesCount ? issuesCount + ' ' + pluralizeUk(issuesCount, 'проблема', 'проблеми', 'проблем') : '';
+        }
+        headerEditor.querySelector('[data-header-links]').innerHTML = hasMenuItems
+            ? (hasSearchResults ? renderMenuLinks(header.links || [], '', 0, query, menuIssuesOnly, duplicateUrls) : '<div class="template-empty-state"><span class="mdi mdi-magnify-close" aria-hidden="true"></span><strong>Нічого не знайдено</strong><p>Спробуйте іншу назву, URL або вимкніть фільтр проблем.</p></div>')
             : '<div class="template-empty-state"><span class="mdi mdi-menu-open" aria-hidden="true"></span><strong>Меню ще порожнє</strong><p>Додайте власний пункт або оберіть готове посилання зі сторінок, категорій чи новин.</p></div>';
+        if (visualPreview) {
+            visualPreview.innerHTML = renderMenuVisualPreview();
+        }
+        renderSecondaryLinks();
         fillMenuParentSelect();
         syncLayouts();
     }
@@ -1040,6 +1739,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     headerEditor.addEventListener('input', function (event) {
+        const searchField = event.target.closest('[data-menu-search]');
+        if (searchField) {
+            menuSearchQuery = searchField.value;
+            renderHeader();
+            return;
+        }
         const field = event.target.closest('[data-header-field]');
         const linkField = event.target.closest('[data-header-link-field]');
         const columnField = event.target.closest('[data-header-column-field]');
@@ -1086,6 +1791,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     renderHeader();
                     return;
                 }
+                if (['label', 'url', 'icon'].indexOf(linkField.dataset.headerLinkField) !== -1) {
+                    renderHeader();
+                    return;
+                }
                 syncLayouts();
             }
         }
@@ -1094,13 +1803,76 @@ document.addEventListener('DOMContentLoaded', function () {
         if (event.target.closest('[data-menu-picker-open]')) {
             openMenuPicker();
         }
+        if (event.target.closest('[data-secondary-add-link]')) {
+            header.secondary_links = Array.isArray(header.secondary_links) ? header.secondary_links : [];
+            header.secondary_links.push({label: '', url: '', icon: ''});
+            expandedMenuNodes.add('secondary.' + (header.secondary_links.length - 1));
+            renderHeader();
+            return;
+        }
+        if (event.target.closest('[data-secondary-add-section]')) {
+            addMenuSection('secondary');
+            expandedMenuNodes.add('secondary.' + ((header.secondary_links || []).length - 1));
+            renderHeader();
+            return;
+        }
+        if (event.target.closest('[data-menu-search-clear]')) {
+            menuSearchQuery = '';
+            renderHeader();
+            headerEditor.querySelector('[data-menu-search]')?.focus();
+            return;
+        }
+        if (event.target.closest('[data-menu-issues-only]')) {
+            menuIssuesOnly = !menuIssuesOnly;
+            renderHeader();
+            return;
+        }
+        if (event.target.closest('[data-menu-next-issue]')) {
+            const duplicateUrls = duplicatedMenuUrls(header.links || []);
+            const issuePaths = collectMenuIssuePaths(header.links || [], duplicateUrls, '');
+            if (issuePaths.length) {
+                menuSearchQuery = '';
+                menuIssueCursor = (menuIssueCursor + 1) % issuePaths.length;
+                focusMenuIssue(issuePaths[menuIssueCursor], duplicateUrls);
+            }
+            return;
+        }
+        if (event.target.closest('[data-menu-expand-all]')) {
+            collectMenuPaths(header.links || [], '').forEach(function (path) {
+                expandedMenuNodes.add(path);
+            });
+            renderHeader();
+            return;
+        }
+        if (event.target.closest('[data-menu-collapse-all]')) {
+            expandedMenuNodes.clear();
+            renderHeader();
+            return;
+        }
+        const toggleLink = event.target.closest('[data-header-toggle-link]');
+        if (toggleLink) {
+            const row = toggleLink.closest('[data-header-link]');
+            if (row && expandedMenuNodes.has(row.dataset.headerLink)) {
+                expandedMenuNodes.delete(row.dataset.headerLink);
+            } else if (row) {
+                expandedMenuNodes.add(row.dataset.headerLink);
+            }
+            renderHeader();
+            return;
+        }
         const preset = event.target.closest('[data-menu-preset]');
         if (preset) {
             addMenuPreset(preset.dataset.menuPreset);
         }
+        const menuTemplate = event.target.closest('[data-menu-template]');
+        if (menuTemplate) {
+            applyMenuTemplate(menuTemplate.dataset.menuTemplate);
+            return;
+        }
         if (event.target.closest('[data-header-add-link]')) {
             header.links = header.links || [];
             header.links.push(makeMenuItem('', ''));
+            expandedMenuNodes.add(String(header.links.length - 1));
             renderHeader();
         }
         const iconPickerButton = event.target.closest('[data-header-icon-picker]');
@@ -1122,11 +1894,18 @@ document.addEventListener('DOMContentLoaded', function () {
         if (addSection) {
             const parentNode = addSection.closest('[data-header-link]');
             addMenuSection(parentNode ? parentNode.dataset.headerLink : '');
+            if (parentNode) {
+                expandedMenuNodes.add(parentNode.dataset.headerLink);
+            } else {
+                expandedMenuNodes.add(String((header.links || []).length - 1));
+            }
             renderHeader();
         }
         const addColumn = event.target.closest('[data-header-add-column]');
         if (addColumn) {
-            addSectionColumn(addColumn.closest('[data-header-link]').dataset.headerLink);
+            const row = addColumn.closest('[data-header-link]');
+            addSectionColumn(row.dataset.headerLink);
+            expandedMenuNodes.add(row.dataset.headerLink);
             renderHeader();
         }
         const addColumnLink = event.target.closest('[data-header-column-add-link]');
@@ -1134,6 +1913,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const row = addColumnLink.closest('[data-header-link]');
             const column = addColumnLink.closest('[data-menu-column]');
             addColumnMenuItem(row.dataset.headerLink, Number(column.dataset.menuColumn));
+            expandedMenuNodes.add(row.dataset.headerLink);
             renderHeader();
         }
         const removeColumn = event.target.closest('[data-header-column-remove]');
@@ -1145,12 +1925,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         const addChild = event.target.closest('[data-header-add-child]');
         if (addChild) {
-            addMenuChild(addChild.closest('[data-header-link]').dataset.headerLink);
+            const row = addChild.closest('[data-header-link]');
+            addMenuChild(row.dataset.headerLink);
+            expandedMenuNodes.add(row.dataset.headerLink);
             renderHeader();
         }
         const move = event.target.closest('[data-header-move-link]');
         if (move) {
             moveMenuItem(move.closest('[data-header-link]').dataset.headerLink, Number(move.dataset.headerMoveLink));
+            renderHeader();
+        }
+        const duplicate = event.target.closest('[data-header-duplicate-link]');
+        if (duplicate) {
+            const newPath = duplicateMenuItem(duplicate.closest('[data-header-link]').dataset.headerLink);
+            if (newPath) {
+                expandedMenuNodes.add(newPath);
+            }
             renderHeader();
         }
         const remove = event.target.closest('[data-header-remove-link]');
@@ -1273,6 +2063,8 @@ document.addEventListener('DOMContentLoaded', function () {
         syncLayouts();
     });
 
+    revertButton?.addEventListener('click', revertTemplateChanges);
+
     document.addEventListener('admin:form-saved', function (event) {
         if (event.detail && event.detail.form === templateForm) {
             markSaved();
@@ -1285,11 +2077,23 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    editorTabButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            setTemplateEditorTab(button.dataset.templateEditorTab || 'menu');
+        });
+    });
+
     previewModeButtons.forEach(function (button) {
         button.addEventListener('click', function () {
             setPreviewMode(button.dataset.templatePreviewMode || 'desktop');
         });
     });
+
+    if (previewCollapseButton) {
+        previewCollapseButton.addEventListener('click', function () {
+            setPreviewCollapsed(previewCollapseButton.getAttribute('aria-expanded') === 'true', true);
+        });
+    }
 
     window.addEventListener('beforeunload', function (event) {
         if (!isDirty()) {
@@ -1349,6 +2153,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     renderHeader();
     renderFooter();
+    setTemplateEditorTab('menu');
     baselineLayouts = JSON.stringify(layouts);
     updateSaveStatus();
     if (window.matchMedia('(max-width: 800px)').matches) {
@@ -1359,4 +2164,9 @@ document.addEventListener('DOMContentLoaded', function () {
             ? 'mobile'
             : (window.matchMedia('(max-width: 980px)').matches ? 'tablet' : 'desktop')
     );
+    try {
+        setPreviewCollapsed(window.localStorage.getItem('adminTemplatesPreviewCollapsed') === '1', false);
+    } catch (error) {
+        setPreviewCollapsed(false, false);
+    }
 });

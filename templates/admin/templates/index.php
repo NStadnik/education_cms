@@ -176,10 +176,24 @@
             <section class="card admin-form-card template-layout-editor" data-template-layout-editor>
                 <div class="form-section-head">
                     <div>
-                        <p class="eyebrow">Шапка</p>
-                        <h2>Хедер сайту</h2>
-                        <p class="meta">Налаштуйте бренд, навігацію та кнопку дії для вибраного шаблону.</p>
+                        <p class="eyebrow">Конструктор</p>
+                        <h2>Налаштування шаблону</h2>
+                        <p class="meta">Розділіть навігацію, hero, мобільне меню та футер по вкладках.</p>
                     </div>
+                </div>
+                <div class="template-editor-tabs" role="tablist" aria-label="Розділи налаштувань шаблону">
+                    <button class="button compact" type="button" data-template-editor-tab="menu" aria-selected="true">
+                        <span class="mdi mdi-menu" aria-hidden="true"></span><span>Меню</span>
+                    </button>
+                    <button class="button secondary compact" type="button" data-template-editor-tab="hero" aria-selected="false">
+                        <span class="mdi mdi-page-layout-header" aria-hidden="true"></span><span>Hero</span>
+                    </button>
+                    <button class="button secondary compact" type="button" data-template-editor-tab="mobile" aria-selected="false">
+                        <span class="mdi mdi-cellphone" aria-hidden="true"></span><span>Мобільне меню</span>
+                    </button>
+                    <button class="button secondary compact" type="button" data-template-editor-tab="footer" aria-selected="false">
+                        <span class="mdi mdi-page-layout-footer" aria-hidden="true"></span><span>Футер</span>
+                    </button>
                 </div>
                 <input type="hidden" name="site_template_layouts" data-template-layouts-json value="<?= e(json_encode($templateLayouts, JSON_UNESCAPED_UNICODE) ?: '{}') ?>">
                 <input type="hidden" data-template-header-json value="<?= e(json_encode($headerLayout, JSON_UNESCAPED_UNICODE) ?: '{}') ?>">
@@ -189,7 +203,7 @@
                     data-initial="<?= e(json_encode($headerLayout, JSON_UNESCAPED_UNICODE) ?: '{}') ?>"
                     data-layouts="<?= e(json_encode($templateLayouts, JSON_UNESCAPED_UNICODE) ?: '{}') ?>"
                 >
-                    <div class="template-editor-grid">
+                    <div class="template-editor-grid" data-template-tab-panel="menu">
                         <label>Варіант хедера
                             <select data-header-field="variant">
                                 <option value="default">Стандартний</option>
@@ -204,10 +218,10 @@
                             <input data-header-field="cta_url" placeholder="/page/admission">
                         </label>
                     </div>
-                    <div class="template-toggle-grid">
+                    <div class="template-toggle-grid" data-template-tab-panel="menu">
                         <label class="check-row"><input type="checkbox" data-header-field="show_brand"> Показувати бренд</label>
                     </div>
-                    <div class="template-link-quick-add" data-menu-quick-add>
+                    <div class="template-link-quick-add" data-menu-quick-add data-template-tab-panel="menu">
                         <div>
                             <strong>Швидко додати в меню</strong>
                             <span>Сторінки, категорії новин або окремі новини можна додати одним кліком.</span>
@@ -219,7 +233,7 @@
                             <span class="mdi mdi-link-plus" aria-hidden="true"></span><span>Обрати посилання</span>
                         </button>
                     </div>
-                    <div class="template-menu-presets" aria-label="Швидкі набори меню">
+                    <div class="template-menu-presets" aria-label="Швидкі набори меню" data-template-tab-panel="menu">
                         <button class="button secondary compact" type="button" data-menu-preset="core">
                             <span class="mdi mdi-home-plus-outline" aria-hidden="true"></span><span>Головна + Новини</span>
                         </button>
@@ -230,9 +244,138 @@
                             <span class="mdi mdi-menu-open" aria-hidden="true"></span><span>Очистити меню</span>
                         </button>
                     </div>
-                    <div class="template-editor-list-head">
-                        <strong>Структура меню</strong>
+                    <div class="template-menu-blueprints" aria-label="Готові шаблони меню" data-template-tab-panel="menu">
+                        <div>
+                            <strong>Готові шаблони меню</strong>
+                            <span>Швидко зібрати типову структуру і потім відредагувати деталі.</span>
+                        </div>
+                        <button class="template-menu-blueprint" type="button" data-menu-template="basic">
+                            <span class="mdi mdi-view-list-outline" aria-hidden="true"></span>
+                            <strong>Базове</strong>
+                            <small>Головна, сторінки, новини, контакти</small>
+                        </button>
+                        <button class="template-menu-blueprint" type="button" data-menu-template="education">
+                            <span class="mdi mdi-school-outline" aria-hidden="true"></span>
+                            <strong>Заклад освіти</strong>
+                            <small>Про заклад, навчання, новини, контакти</small>
+                        </button>
+                        <button class="template-menu-blueprint" type="button" data-menu-template="mega">
+                            <span class="mdi mdi-view-column-outline" aria-hidden="true"></span>
+                            <strong>Мега-меню</strong>
+                            <small>Секції з колонками для великої навігації</small>
+                        </button>
+                    </div>
+                    <div class="template-menu-visual" data-template-tab-panel="menu">
+                        <div class="template-menu-visual-head">
+                            <strong>Preview меню</strong>
+                            <span>Так меню виглядатиме як структура: верхній рівень, вкладення та колонки.</span>
+                        </div>
+                        <div class="template-menu-visual-body" data-menu-visual-preview></div>
+                    </div>
+                    <div class="template-header-extra-grid" data-template-tab-panel="hero" hidden>
+                        <section class="template-subeditor">
+                            <div class="template-subeditor-head">
+                                <div>
+                                    <strong>Hero під хедером</strong>
+                                    <span>Окремий перший блок одразу після навігації.</span>
+                                </div>
+                                <label class="check-row"><input type="checkbox" data-header-field="hero_enabled"> Увімкнути</label>
+                            </div>
+                            <div class="template-editor-grid template-editor-grid-2">
+                                <label>Вигляд
+                                    <select data-header-field="hero_variant">
+                                        <option value="default">Стандартний</option>
+                                        <option value="accent">Акцентний</option>
+                                        <option value="compact">Компактний</option>
+                                    </select>
+                                </label>
+                                <label>Заголовок
+                                    <input data-header-field="hero_title" placeholder="Ласкаво просимо">
+                                </label>
+                                <label class="template-editor-wide">Текст
+                                    <textarea data-header-field="hero_text" rows="3" placeholder="Короткий вступний текст для відвідувачів"></textarea>
+                                </label>
+                                <label>Текст кнопки
+                                    <input data-header-field="hero_button_label" placeholder="Детальніше">
+                                </label>
+                                <label>URL кнопки
+                                    <input data-header-field="hero_button_url" placeholder="/page/about">
+                                </label>
+                            </div>
+                        </section>
+                        <section class="template-subeditor">
+                            <div class="template-subeditor-head">
+                                <div>
+                                    <strong>Меню під hero</strong>
+                                    <span>Швидкі посилання окремим рядком під hero-блоком.</span>
+                                </div>
+                                <label class="check-row"><input type="checkbox" data-header-field="secondary_enabled"> Увімкнути</label>
+                            </div>
+                            <div class="template-editor-grid template-editor-grid-2">
+                                <label>Стиль
+                                    <select data-header-field="secondary_variant">
+                                        <option value="pills">Плашки</option>
+                                        <option value="tabs">Вкладки</option>
+                                        <option value="plain">Простий</option>
+                                    </select>
+                                </label>
+                                <div class="template-editor-list-actions">
+                                    <button class="button secondary compact" type="button" data-secondary-add-section>
+                                        <span class="mdi mdi-format-list-group" aria-hidden="true"></span><span>Секція</span>
+                                    </button>
+                                    <button class="button secondary compact" type="button" data-secondary-add-link>
+                                        <span class="mdi mdi-plus" aria-hidden="true"></span><span>Пункт</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="template-editor-list template-secondary-list" data-secondary-links></div>
+                        </section>
+                    </div>
+                    <section class="template-subeditor" data-template-tab-panel="mobile" hidden>
+                        <div class="template-subeditor-head">
+                            <div>
+                                <strong>Мобільне меню</strong>
+                                <span>Окремі налаштування поведінки та вигляду меню на малих екранах.</span>
+                            </div>
+                        </div>
+                        <div class="template-editor-grid template-editor-grid-2">
+                            <label>Тип мобільного меню
+                                <select data-header-field="mobile_variant">
+                                    <option value="drawer">Згортання під хедером</option>
+                                    <option value="panel">Панель на всю ширину</option>
+                                    <option value="compact">Компактний список</option>
+                                </select>
+                            </label>
+                            <label>Текст кнопки
+                                <input data-header-field="mobile_label" placeholder="Меню">
+                            </label>
+                        </div>
+                        <div class="template-toggle-grid">
+                            <label class="check-row"><input type="checkbox" data-header-field="mobile_show_brand"> Показувати бренд у мобільному меню</label>
+                            <label class="check-row"><input type="checkbox" data-header-field="mobile_show_cta"> Показувати CTA у мобільному меню</label>
+                        </div>
+                    </section>
+                    <div class="template-editor-list-head" data-template-tab-panel="menu">
+                        <strong>Структура меню <span class="template-menu-issues" data-menu-issues hidden></span></strong>
                         <div class="template-editor-list-actions">
+                            <label class="template-menu-search">Пошук у меню
+                                <input type="search" data-menu-search placeholder="Назва, URL або іконка">
+                            </label>
+                            <button class="button secondary compact" type="button" data-menu-search-clear hidden>
+                                <span class="mdi mdi-close" aria-hidden="true"></span><span>Очистити</span>
+                            </button>
+                            <button class="button secondary compact" type="button" data-menu-issues-only hidden aria-pressed="false">
+                                <span class="mdi mdi-alert-circle-outline" aria-hidden="true"></span><span>Проблеми</span>
+                            </button>
+                            <button class="button secondary compact" type="button" data-menu-next-issue hidden>
+                                <span class="mdi mdi-crosshairs-gps" aria-hidden="true"></span><span>Наступна</span>
+                            </button>
+                            <button class="button secondary compact" type="button" data-menu-expand-all>
+                                <span class="mdi mdi-arrow-expand-vertical" aria-hidden="true"></span><span>Розгорнути</span>
+                            </button>
+                            <button class="button secondary compact" type="button" data-menu-collapse-all>
+                                <span class="mdi mdi-arrow-collapse-vertical" aria-hidden="true"></span><span>Згорнути</span>
+                            </button>
                             <button class="button secondary compact" type="button" data-header-add-section>
                                 <span class="mdi mdi-format-list-group" aria-hidden="true"></span><span>Секція</span>
                             </button>
@@ -241,11 +384,11 @@
                             </button>
                         </div>
                     </div>
-                    <div class="template-editor-list" data-header-links></div>
+                    <div class="template-editor-list" data-header-links data-template-tab-panel="menu"></div>
                 </div>
             </section>
 
-            <section class="card admin-form-card template-layout-editor" data-template-footer-wrap>
+            <section class="card admin-form-card template-layout-editor" data-template-footer-wrap data-template-tab-panel="footer" hidden>
                 <div class="form-section-head">
                     <div>
                         <p class="eyebrow">Підвал</p>
@@ -286,7 +429,12 @@
                     <strong data-template-save-title>Готово до збереження</strong>
                     <span data-template-save-copy>Зміни застосуються до вибраного шаблону після збереження.</span>
                 </div>
-                <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти шаблон</span></button>
+                <div class="template-save-actions">
+                    <button class="button secondary" type="button" data-template-revert disabled>
+                        <span class="mdi mdi-restore" aria-hidden="true"></span><span>Скасувати</span>
+                    </button>
+                    <button type="submit"><span class="mdi mdi-content-save-outline" aria-hidden="true"></span><span>Зберегти шаблон</span></button>
+                </div>
             </div>
         </div>
 
@@ -298,13 +446,18 @@
                         <h2>Головна сторінка</h2>
                         <p class="meta">Показує поточний шаблон і незбережені зміни.</p>
                     </div>
-                    <div class="template-preview-modes" role="group" aria-label="Розмір перегляду">
-                        <button class="button compact" type="button" data-template-preview-mode="desktop" title="Desktop"><span class="mdi mdi-monitor" aria-hidden="true"></span></button>
-                        <button class="button secondary compact" type="button" data-template-preview-mode="tablet" title="Tablet"><span class="mdi mdi-tablet" aria-hidden="true"></span></button>
-                        <button class="button secondary compact" type="button" data-template-preview-mode="mobile" title="Mobile"><span class="mdi mdi-cellphone" aria-hidden="true"></span></button>
+                    <div class="template-preview-head-actions">
+                        <div class="template-preview-modes" role="group" aria-label="Розмір перегляду">
+                            <button class="button compact" type="button" data-template-preview-mode="desktop" title="Desktop"><span class="mdi mdi-monitor" aria-hidden="true"></span></button>
+                            <button class="button secondary compact" type="button" data-template-preview-mode="tablet" title="Tablet"><span class="mdi mdi-tablet" aria-hidden="true"></span></button>
+                            <button class="button secondary compact" type="button" data-template-preview-mode="mobile" title="Mobile"><span class="mdi mdi-cellphone" aria-hidden="true"></span></button>
+                        </div>
+                        <button class="button secondary compact template-preview-collapse-toggle" type="button" data-template-preview-collapse aria-expanded="true" aria-controls="templateHomePreviewShell">
+                            <span class="mdi mdi-chevron-up" aria-hidden="true"></span><span>Згорнути</span>
+                        </button>
                     </div>
                 </div>
-                <div class="template-home-preview-shell" data-template-preview-shell data-preview-mode="desktop">
+                <div class="template-home-preview-shell" id="templateHomePreviewShell" data-template-preview-shell data-preview-mode="desktop">
                     <iframe
                         title="Попередній перегляд головної сторінки"
                         data-template-home-preview

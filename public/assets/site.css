@@ -190,6 +190,28 @@ table:not(.table) th { background: #f1f4f9; }
 .site-header-compact .site-header-inner { min-height: 54px; }
 .site-header-compact .nav a { padding-top: 7px; padding-bottom: 7px; }
 .site-header-cta { min-height: 36px; padding: 7px 12px; white-space: nowrap; }
+.site-mobile-menu-brand { display: none; }
+.site-header-hero { border-bottom: 1px solid var(--line); background: #eef4ff; }
+.site-header-hero-inner { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 38px 0; }
+.site-header-hero h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 46px); line-height: 1.08; letter-spacing: 0; }
+.site-header-hero p { max-width: 720px; margin: 0; color: #344054; font-size: 17px; }
+.site-header-hero-accent { background: #10233f; color: #fff; }
+.site-header-hero-accent p { color: rgba(255,255,255,.78); }
+.site-header-hero-accent .button { border-color: #fff; background: #fff; color: #10233f; }
+.site-header-hero-compact .site-header-hero-inner { padding: 24px 0; }
+.site-header-hero-compact h1 { font-size: clamp(24px, 3vw, 34px); }
+.site-secondary-menu { border-bottom: 1px solid var(--line); background: #fff; }
+.site-secondary-menu-inner { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 10px; padding-bottom: 10px; }
+.site-secondary-menu a { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 11px; border-radius: 999px; color: var(--brand-strong); font-weight: 650; }
+.site-secondary-menu a:hover { background: #eef4ff; text-decoration: none; }
+.site-secondary-menu .site-menu-section { min-height: 36px; padding: 7px 11px; border-radius: 999px; color: var(--muted); background: #fbfcff; }
+.site-secondary-menu .site-submenu { border-color: var(--line); background: #fff; box-shadow: 0 16px 30px rgba(16,35,63,.14); }
+.site-secondary-menu .site-submenu a { color: var(--brand-strong); }
+.site-secondary-menu .site-submenu .site-menu-section { border-bottom-color: var(--line); color: var(--muted); }
+.site-secondary-menu .site-menu-column-title { color: var(--muted); }
+.site-secondary-menu-tabs .site-secondary-menu-inner { padding-bottom: 0; }
+.site-secondary-menu-tabs a { border: 1px solid var(--line); border-bottom: 0; border-radius: 6px 6px 0 0; background: #fbfcff; }
+.site-secondary-menu-plain a { padding-left: 0; padding-right: 0; border-radius: 0; }
 .site-footer-dark { background: #10233f; color: rgba(255,255,255,.78); }
 .site-footer-dark a, .site-footer-dark strong, .site-footer-dark h2 { color: #fff; }
 .site-footer-light { background: #f6f8fc; }
@@ -212,6 +234,11 @@ table:not(.table) th { background: #f1f4f9; }
     .site-menu-toggle { display: inline-flex !important; grid-column: 2; justify-self: end; min-height: 38px; }
     .site-header-menu-panel { display: none; grid-column: 1 / -1; width: 100%; align-items: stretch; flex-direction: column; gap: 8px; padding-top: 4px; }
     .site-header.is-menu-open .site-header-menu-panel { display: flex; }
+    .site-mobile-menu-brand { display: block; padding: 8px 10px; border: 1px solid rgba(255,255,255,.14); border-radius: 6px; color: #fff; font-weight: 750; }
+    .site-header-cta-mobile-hidden { display: none !important; }
+    .site-mobile-menu-panel .site-header-menu-panel { margin-top: 4px; padding: 12px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.06); }
+    .site-mobile-menu-compact .site-header-menu-panel { gap: 3px; }
+    .site-mobile-menu-compact .site-header-nav a { min-height: 34px; padding-top: 6px; padding-bottom: 6px; }
     .site-header-nav { display: grid; grid-template-columns: 1fr; width: 100%; gap: 4px; }
     .site-header-nav a { display: flex; align-items: center; width: 100%; min-height: 38px; padding: 8px 10px; }
     .site-menu-item { display: grid; width: 100%; }
@@ -224,6 +251,10 @@ table:not(.table) th { background: #f1f4f9; }
     .site-submenu .site-submenu { left: auto; margin-left: 8px; }
     .site-header-centered .brand, .site-header-centered .site-header-menu-panel { justify-content: stretch; text-align: left; }
     .site-header-cta { width: 100%; }
+    .site-header-hero-inner { align-items: flex-start; flex-direction: column; padding: 28px 0; }
+    .site-header-hero .button { width: 100%; }
+    .site-secondary-menu-inner { display: grid; grid-template-columns: 1fr; gap: 6px; }
+    .site-secondary-menu a { width: 100%; border-radius: 6px; background: #fbfcff; }
     .sidebar { position: static; }
     .main { padding: 16px; }
     .admin-content { padding: 16px; }
