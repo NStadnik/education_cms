@@ -52,7 +52,9 @@
     }
     $previewContext = [
         'bootstrapCss' => 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
+        'mdiCss' => 'https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css',
         'siteCss' => url('/assets/site.css'),
+        'siteJs' => url('/assets/site.js'),
         'templates' => $previewTemplates,
         'institutionName' => (string) ($settings['institution_name'] ?? 'Заклад освіти'),
         'menu' => is_array($previewMenu ?? null) ? $previewMenu : [],
@@ -230,9 +232,14 @@
                     </div>
                     <div class="template-editor-list-head">
                         <strong>Структура меню</strong>
-                        <button class="button secondary compact" type="button" data-header-add-link>
-                            <span class="mdi mdi-plus" aria-hidden="true"></span><span>Власний пункт</span>
-                        </button>
+                        <div class="template-editor-list-actions">
+                            <button class="button secondary compact" type="button" data-header-add-section>
+                                <span class="mdi mdi-format-list-group" aria-hidden="true"></span><span>Секція</span>
+                            </button>
+                            <button class="button secondary compact" type="button" data-header-add-link>
+                                <span class="mdi mdi-plus" aria-hidden="true"></span><span>Власний пункт</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="template-editor-list" data-header-links></div>
                 </div>
@@ -366,6 +373,33 @@
                 <button type="button" class="button" data-menu-picker-add-selected disabled>
                     <span class="mdi mdi-plus-box-multiple-outline" aria-hidden="true"></span><span data-menu-picker-add-label>Додати вибрані</span>
                 </button>
+                <button type="button" class="button secondary" data-bs-dismiss="modal"><span class="mdi mdi-close" aria-hidden="true"></span><span>Закрити</span></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="templateIconPickerModal" tabindex="-1" aria-labelledby="templateIconPickerTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow mb-1">Іконка</p>
+                    <h2 class="modal-title h5" id="templateIconPickerTitle">Обрати MDI іконку</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+            </div>
+            <div class="modal-body">
+                <div class="template-icon-picker">
+                    <label>Пошук
+                        <input type="search" data-icon-picker-search placeholder="home, news, calendar...">
+                    </label>
+                    <div class="template-menu-picker-status" data-icon-picker-status></div>
+                    <div class="template-icon-picker-grid" data-icon-picker-grid></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="button secondary" data-icon-picker-clear><span class="mdi mdi-close" aria-hidden="true"></span><span>Без іконки</span></button>
                 <button type="button" class="button secondary" data-bs-dismiss="modal"><span class="mdi mdi-close" aria-hidden="true"></span><span>Закрити</span></button>
             </div>
         </div>

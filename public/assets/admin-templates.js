@@ -79,6 +79,46 @@ document.addEventListener('DOMContentLoaded', function () {
     let baselineLayouts = '';
     const menuPickerNode = document.getElementById('templateMenuPickerModal');
     const menuPickerModal = menuPickerNode && window.bootstrap ? new window.bootstrap.Modal(menuPickerNode) : null;
+    const iconPickerNode = document.getElementById('templateIconPickerModal');
+    const iconPickerModal = iconPickerNode && window.bootstrap ? new window.bootstrap.Modal(iconPickerNode) : null;
+    const iconPickerState = {path: '', input: null};
+    const menuIconOptions = [
+        'home-outline', 'home-city-outline', 'view-dashboard-outline', 'menu', 'menu-open', 'apps', 'view-grid-outline',
+        'view-list-outline', 'format-list-group', 'sitemap-outline', 'subdirectory-arrow-right', 'link-variant',
+        'open-in-new', 'arrow-right', 'chevron-right', 'login', 'logout', 'cog-outline', 'tune-variant',
+        'file-document-outline', 'file-document-edit-outline', 'file-document-multiple-outline', 'file-tree-outline',
+        'file-pdf-box', 'file-word-outline', 'file-excel-outline', 'folder-outline', 'folder-open-outline',
+        'folder-image', 'archive-outline', 'download-outline', 'upload-outline', 'cloud-upload-outline',
+        'cloud-download-outline', 'printer-outline', 'content-save-outline', 'clipboard-list-outline',
+        'clipboard-text-outline', 'text-box-outline', 'note-text-outline', 'book-open-page-variant-outline',
+        'book-education-outline', 'book-open-outline', 'library-outline', 'school-outline', 'google-classroom',
+        'human-male-board', 'account-school-outline', 'account-group-outline', 'account-tie-outline',
+        'account-child-outline', 'account-multiple-outline',  'desk', 'laptop', 
+        'monitor', 'tablet', 'cellphone', 'web', 'web-box', 'earth', 'wifi', 'qrcode', 'barcode-scan',
+        'newspaper-variant-outline', 'newspaper', 'rss', 'bullhorn-outline', 'bullhorn-variant-outline',
+        'message-text-outline', 'comment-text-outline', 'comment-question-outline', 'forum-outline',
+        'email-outline', 'phone-outline', 'phone-in-talk-outline', 'map-marker-outline', 'map-outline',
+        'crosshairs-gps', 'clock-outline', 'calendar-month-outline', 'calendar-clock-outline',
+        'calendar-check-outline', 'calendar-star', 'alarm', 'timer-outline', 'bell-outline', 'bell-ring-outline',
+        'information-outline', 'help-circle-outline', 'alert-circle-outline', 'alert-outline',
+        'check-circle-outline', 'checkbox-marked-circle-outline', 'close-circle-outline', 'minus-circle-outline',
+        'plus-circle-outline', 'plus-box-outline', 'delete-outline', 'pencil-outline', 'square-edit-outline',
+        'magnify', 'filter-outline', 'sort', 'refresh', 'sync', 'eye-outline', 'eye-off-outline',
+        'lock-outline', 'lock-open-outline', 'shield-outline', 'shield-check-outline', 'key-outline',
+        'certificate-outline', 'medal-outline', 'trophy-outline', 'star-outline', 'star-circle-outline',
+        'heart-outline', 'thumb-up-outline', 'handshake-outline', 'briefcase-outline', 'briefcase-account-outline',
+        'chart-box-outline', 'chart-line', 'poll', 'finance', 'cash-multiple', 'wallet-outline',
+        'cart-outline', 'gift-outline', 'tag-outline', 'bookmark-outline', 'flag-outline',
+        'image-outline', 'image-multiple-outline', 'camera-outline', 'video-outline', 'play-circle-outline',
+        'music-note-outline', 'microphone-outline', 'palette-outline', 'brush-outline', 'draw',
+        'lightbulb-outline', 'rocket-launch-outline', 'target', 'puzzle-outline', 'tools', 'wrench-outline',
+        'hammer-wrench', 'flask-outline', 'test-tube', 'microscope', 'atom', 'calculator-variant-outline',
+        'ruler-square', 'compass-outline', 'leaf', 'tree-outline', 'flower-outline', 'weather-sunny',
+        'weather-cloudy', 'water-outline', 'fire', 'food-apple-outline', 'silverware-fork-knife',
+        'medical-bag', 'hospital-box-outline', 'bus-school', 'bus', 'car-outline', 'bike', 'walk',
+        'run', 'soccer', 'basketball', 'volleyball', 'swim', 'dumbbell', 'drama-masks',
+        'theater', 'music', 'account-music-outline', 'translate', 'flag-variant-outline'
+    ];
     const menuPickerState = {
         type: 'pages',
         offset: 0,
@@ -111,7 +151,90 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function makeMenuItem(label, url) {
-        return {label: label || '', url: url || '', children: []};
+        return {type: 'link', label: label || '', url: url || '', icon: '', children: []};
+    }
+
+    function makeMenuSection(label) {
+        return {type: 'section', label: label || '', url: '#', icon: '', children: [], columns: []};
+    }
+
+    function mdiIconClass(value) {
+        const icon = String(value || '').trim().replace(/^mdi\s+/, '').replace(/^mdi-/, '');
+        return /^[a-z0-9-]+$/i.test(icon) ? 'mdi-' + icon : '';
+    }
+
+    function renderMenuLabel(label, icon, fallback) {
+        const iconClass = mdiIconClass(icon);
+        return (iconClass ? '<span class="mdi ' + escapeHtml(iconClass) + '" aria-hidden="true"></span>' : '') +
+            '<span>' + escapeHtml(label || fallback) + '</span>';
+    }
+
+    function iconPickerLabel(icon) {
+        return icon.replace(/-/g, ' ');
+    }
+
+    function renderIconPicker() {
+        if (!iconPickerNode) {
+            return;
+        }
+        const grid = iconPickerNode.querySelector('[data-icon-picker-grid]');
+        const search = iconPickerNode.querySelector('[data-icon-picker-search]');
+        const status = iconPickerNode.querySelector('[data-icon-picker-status]');
+        const query = search ? search.value.trim().toLowerCase() : '';
+        const selected = iconPickerState.input ? mdiIconClass(iconPickerState.input.value).replace(/^mdi-/, '') : '';
+        let icons = menuIconOptions.filter(function (icon) {
+            return query === '' || icon.includes(query) || iconPickerLabel(icon).includes(query);
+        });
+        const customIcon = mdiIconClass(query).replace(/^mdi-/, '');
+        if (customIcon && !icons.includes(customIcon)) {
+            icons = [customIcon].concat(icons);
+        }
+        if (status) {
+            status.textContent = icons.length ? 'Знайдено: ' + icons.length : 'Нічого не знайдено.';
+        }
+        if (!grid) {
+            return;
+        }
+        grid.innerHTML = icons.length ? icons.map(function (icon) {
+            const isSelected = selected === icon;
+            return '<button class="template-icon-option' + (isSelected ? ' is-selected' : '') + '" type="button" data-icon-picker-select="' + escapeHtml(icon) + '">' +
+                '<span class="mdi mdi-' + escapeHtml(icon) + '" aria-hidden="true"></span>' +
+                '<span>' + escapeHtml(icon) + '</span>' +
+            '</button>';
+        }).join('') : '<div class="template-icon-picker-empty">Немає іконок за цим пошуком.</div>';
+    }
+
+    function openIconPicker(button) {
+        if (!iconPickerModal) {
+            return;
+        }
+        const row = button.closest('[data-header-link]');
+        iconPickerState.path = row ? row.dataset.headerLink : '';
+        iconPickerState.input = row ? row.querySelector('[data-header-link-field="icon"]') : null;
+        const search = iconPickerNode.querySelector('[data-icon-picker-search]');
+        if (search) {
+            search.value = '';
+        }
+        renderIconPicker();
+        iconPickerModal.show();
+        if (search) {
+            setTimeout(function () { search.focus(); }, 180);
+        }
+    }
+
+    function applyPickedIcon(icon) {
+        const item = getMenuItem(iconPickerState.path);
+        const value = mdiIconClass(icon);
+        if (item) {
+            item.icon = value;
+        }
+        if (iconPickerState.input) {
+            iconPickerState.input.value = value;
+        }
+        renderHeader();
+        if (iconPickerModal) {
+            iconPickerModal.hide();
+        }
     }
 
     function isDirty() {
@@ -139,27 +262,42 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function getMenuItem(path) {
-        const parts = String(path || '').split('.').filter(Boolean).map(Number);
+        const parts = String(path || '').split('.').filter(Boolean);
         let items = header.links || [];
         let item = null;
         parts.forEach(function (index) {
-            item = items[index];
+            if (/^c\d+$/.test(index)) {
+                const columnIndex = Number(index.slice(1));
+                const columns = item && Array.isArray(item.columns) ? item.columns : [];
+                const column = columns[columnIndex];
+                items = column && Array.isArray(column.children) ? column.children : [];
+                item = null;
+                return;
+            }
+            item = items[Number(index)];
             items = item && Array.isArray(item.children) ? item.children : [];
         });
         return item;
     }
 
     function removeMenuItem(path) {
-        const parts = String(path || '').split('.').filter(Boolean).map(Number);
+        const parts = String(path || '').split('.').filter(Boolean);
         const index = parts.pop();
         let items = header.links || [];
+        let item = null;
         parts.forEach(function (part) {
-            const item = items[part];
+            if (/^c\d+$/.test(part)) {
+                const column = item && Array.isArray(item.columns) ? item.columns[Number(part.slice(1))] : null;
+                items = column && Array.isArray(column.children) ? column.children : [];
+                item = null;
+                return;
+            }
+            item = items[Number(part)];
             item.children = Array.isArray(item.children) ? item.children : [];
             items = item.children;
         });
-        if (Number.isInteger(index)) {
-            items.splice(index, 1);
+        if (/^\d+$/.test(String(index))) {
+            items.splice(Number(index), 1);
         }
     }
 
@@ -172,28 +310,131 @@ document.addEventListener('DOMContentLoaded', function () {
         parent.children.push(makeMenuItem('', ''));
     }
 
+    function addMenuSection(path) {
+        const section = makeMenuSection('');
+        header.links = Array.isArray(header.links) ? header.links : [];
+        if (!path) {
+            header.links.push(section);
+            return;
+        }
+        const parent = getMenuItem(path);
+        if (!parent) {
+            header.links.push(section);
+            return;
+        }
+        parent.children = Array.isArray(parent.children) ? parent.children : [];
+        parent.children.push(section);
+    }
+
+    function addSectionColumn(path) {
+        const section = getMenuItem(path);
+        if (!section) {
+            return;
+        }
+        section.type = 'section';
+        section.columns = Array.isArray(section.columns) ? section.columns : [];
+        section.columns.push({title: '', children: []});
+    }
+
+    function removeSectionColumn(path, columnIndex) {
+        const section = getMenuItem(path);
+        if (!section || !Array.isArray(section.columns)) {
+            return;
+        }
+        section.columns.splice(columnIndex, 1);
+    }
+
+    function addColumnMenuItem(path, columnIndex) {
+        const section = getMenuItem(path);
+        if (!section) {
+            return;
+        }
+        section.columns = Array.isArray(section.columns) ? section.columns : [];
+        section.columns[columnIndex] = section.columns[columnIndex] || {title: '', children: []};
+        section.columns[columnIndex].children = Array.isArray(section.columns[columnIndex].children) ? section.columns[columnIndex].children : [];
+        section.columns[columnIndex].children.push(makeMenuItem('', ''));
+    }
+
     function menuListForPath(path) {
-        const parts = String(path || '').split('.').filter(Boolean).map(Number);
+        const parts = String(path || '').split('.').filter(Boolean);
         parts.pop();
         let items = header.links || [];
+        let item = null;
         parts.forEach(function (part) {
-            const item = items[part];
+            if (/^c\d+$/.test(part)) {
+                const column = item && Array.isArray(item.columns) ? item.columns[Number(part.slice(1))] : null;
+                items = column && Array.isArray(column.children) ? column.children : [];
+                item = null;
+                return;
+            }
+            item = items[Number(part)];
             item.children = Array.isArray(item.children) ? item.children : [];
             items = item.children;
         });
         return items;
     }
 
+    function menuContainerForPath(path) {
+        const parts = String(path || '').split('.').filter(Boolean);
+        if (!parts.length) {
+            header.links = Array.isArray(header.links) ? header.links : [];
+            return header.links;
+        }
+        let items = header.links || [];
+        let item = null;
+        for (let i = 0; i < parts.length; i += 1) {
+            const part = parts[i];
+            if (/^c\d+$/.test(part)) {
+                const column = item && Array.isArray(item.columns) ? item.columns[Number(part.slice(1))] : null;
+                if (!column) {
+                    return header.links;
+                }
+                column.children = Array.isArray(column.children) ? column.children : [];
+                items = column.children;
+                item = null;
+                continue;
+            }
+            item = items[Number(part)];
+            if (!item) {
+                return header.links;
+            }
+            item.children = Array.isArray(item.children) ? item.children : [];
+            items = item.children;
+        }
+        return items;
+    }
+
     function moveMenuItem(path, direction) {
-        const parts = String(path || '').split('.').filter(Boolean).map(Number);
+        const parts = String(path || '').split('.').filter(Boolean);
         const index = parts.pop();
         const items = menuListForPath(path);
-        const target = Number(index) + direction;
-        if (!Number.isInteger(index) || target < 0 || target >= items.length) {
+        const numericIndex = Number(index);
+        const target = numericIndex + direction;
+        if (!Number.isInteger(numericIndex) || target < 0 || target >= items.length) {
             return;
         }
-        const moved = items.splice(index, 1)[0];
+        const moved = items.splice(numericIndex, 1)[0];
         items.splice(target, 0, moved);
+    }
+
+    function renderSectionColumns(section, path, depth) {
+        const columns = Array.isArray(section.columns) ? section.columns : [];
+        if (!columns.length) {
+            return '';
+        }
+        return '<div class="template-menu-columns">' + columns.map(function (column, columnIndex) {
+            const children = Array.isArray(column.children) ? column.children : [];
+            return '<section class="template-menu-column" data-menu-column="' + columnIndex + '">' +
+                '<div class="template-menu-column-head">' +
+                    '<label>Назва колонки<input data-header-column-field="title" value="' + escapeHtml(column.title || '') + '" placeholder="Необов’язково"></label>' +
+                    '<div class="template-menu-actions">' +
+                        '<button class="button secondary compact" type="button" data-header-column-add-link title="Додати пункт"><span class="mdi mdi-plus"></span></button>' +
+                        '<button class="button danger compact" type="button" data-header-column-remove title="Видалити колонку"><span class="mdi mdi-delete-outline"></span></button>' +
+                    '</div>' +
+                '</div>' +
+                (children.length ? '<div class="template-menu-column-items">' + renderMenuLinks(children, path + '.c' + columnIndex, depth + 1) + '</div>' : '<div class="template-menu-column-empty">Пунктів ще немає.</div>') +
+            '</section>';
+        }).join('') + '</div>';
     }
 
     function renderMenuLinks(items, parentPath, depth) {
@@ -205,17 +446,31 @@ document.addEventListener('DOMContentLoaded', function () {
             const children = Array.isArray(link.children) ? link.children : [];
             const canMoveUp = index > 0;
             const canMoveDown = index < items.length - 1;
+            const type = link.type === 'section' ? 'section' : 'link';
+            const isSection = type === 'section';
             return '<div class="template-menu-node template-menu-depth-' + depth + '" data-header-link="' + path + '">' +
-                '<div class="template-editor-row template-menu-row">' +
+                '<div class="template-editor-row template-menu-row' + (isSection ? ' is-section' : '') + '">' +
+                    '<label>Тип<select data-header-link-field="type">' +
+                        '<option value="link"' + (type === 'link' ? ' selected' : '') + '>Посилання</option>' +
+                        '<option value="section"' + (type === 'section' ? ' selected' : '') + '>Секція</option>' +
+                    '</select></label>' +
                     '<label>Назва<input data-header-link-field="label" value="' + escapeHtml(link.label) + '"></label>' +
-                    '<label>URL<input data-header-link-field="url" value="' + escapeHtml(link.url) + '"></label>' +
+                    '<div class="template-menu-icon-field">' +
+                        '<label>MDI іконка<input data-header-link-field="icon" value="' + escapeHtml(link.icon || '') + '" placeholder="home-outline"></label>' +
+                        '<button class="button secondary compact" type="button" data-header-icon-picker title="Обрати іконку"><span class="mdi mdi-view-grid-plus-outline"></span></button>' +
+                        '<button class="button secondary compact" type="button" data-header-icon-clear title="Очистити іконку"><span class="mdi mdi-close"></span></button>' +
+                    '</div>' +
+                    '<label' + (isSection ? ' class="template-menu-url-muted"' : '') + '>URL<input data-header-link-field="url" value="' + escapeHtml(link.url) + '" ' + (isSection ? 'disabled placeholder="Не використовується"' : '') + '></label>' +
                     '<div class="template-menu-actions">' +
                         '<button class="button secondary compact" type="button" data-header-move-link="-1" title="Підняти" ' + (canMoveUp ? '' : 'disabled') + '><span class="mdi mdi-arrow-up"></span></button>' +
                         '<button class="button secondary compact" type="button" data-header-move-link="1" title="Опустити" ' + (canMoveDown ? '' : 'disabled') + '><span class="mdi mdi-arrow-down"></span></button>' +
                         (depth < 2 ? '<button class="button secondary compact" type="button" data-header-add-child title="Додати підпункт"><span class="mdi mdi-subdirectory-arrow-right"></span></button>' : '') +
+                        (depth < 2 ? '<button class="button secondary compact" type="button" data-header-add-section title="Додати секцію"><span class="mdi mdi-format-list-group"></span></button>' : '') +
+                        (isSection ? '<button class="button secondary compact" type="button" data-header-add-column title="Додати колонку"><span class="mdi mdi-view-column-outline"></span></button>' : '') +
                         '<button class="button danger compact" type="button" data-header-remove-link title="Видалити"><span class="mdi mdi-delete-outline"></span></button>' +
                     '</div>' +
                 '</div>' +
+                (isSection ? renderSectionColumns(link, path, depth) : '') +
                 (children.length ? '<div class="template-menu-children">' + renderMenuLinks(children, path, depth + 1) + '</div>' : '') +
             '</div>';
         }).join('');
@@ -223,7 +478,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function countMenuItems(items) {
         return (items || []).reduce(function (total, item) {
-            return total + 1 + countMenuItems(Array.isArray(item.children) ? item.children : []);
+            const columnItems = (Array.isArray(item.columns) ? item.columns : []).reduce(function (columnTotal, column) {
+                return columnTotal + countMenuItems(Array.isArray(column.children) ? column.children : []);
+            }, 0);
+            return total + 1 + countMenuItems(Array.isArray(item.children) ? item.children : []) + columnItems;
         }, 0);
     }
 
@@ -289,6 +547,14 @@ document.addEventListener('DOMContentLoaded', function () {
             if (item.label) {
                 result.push({path: path, label: (depth ? '— ' : '') + item.label});
             }
+            if (item.type === 'section' && Array.isArray(item.columns)) {
+                item.columns.forEach(function (column, columnIndex) {
+                    result.push({
+                        path: path + '.c' + columnIndex,
+                        label: (depth ? '— ' : '') + 'Колонка: ' + (column.title || 'Без назви')
+                    });
+                });
+            }
             result.push.apply(result, menuTargets(item.children || [], path, depth + 1));
         });
         return result;
@@ -311,18 +577,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const parentSelect = headerEditor.querySelector('[data-menu-parent]');
         const parentPath = parentSelect ? parentSelect.value : '';
         const menuItem = makeMenuItem(item.label, item.url);
-        header.links = Array.isArray(header.links) ? header.links : [];
-        if (parentPath === '') {
-            header.links.push(menuItem);
-            return;
-        }
-        const parent = getMenuItem(parentPath);
-        if (!parent) {
-            header.links.push(menuItem);
-            return;
-        }
-        parent.children = Array.isArray(parent.children) ? parent.children : [];
-        parent.children.push(menuItem);
+        menuContainerForPath(parentPath).push(menuItem);
     }
 
     function menuPickerItemKey(item) {
@@ -639,26 +894,45 @@ document.addEventListener('DOMContentLoaded', function () {
         function renderPreviewLinks(items) {
             return (items || []).map(function (link) {
                 const children = Array.isArray(link.children) ? link.children : [];
-                if (!link.label && !children.length) {
+                const columns = Array.isArray(link.columns) ? link.columns : [];
+                const type = link.type === 'section' ? 'section' : 'link';
+                if (!link.label && !children.length && !columns.length) {
                     return '';
                 }
+                const columnsHtml = columns.length ? '<span class="site-menu-columns">' + columns.map(function (column) {
+                    const columnChildren = Array.isArray(column.children) ? column.children : [];
+                    if (!column.title && !columnChildren.length) {
+                        return '';
+                    }
+                    return '<span class="site-menu-column">' +
+                        (column.title ? '<span class="site-menu-column-title">' + escapeHtml(column.title) + '</span>' : '') +
+                        renderPreviewLinks(columnChildren) +
+                    '</span>';
+                }).join('') + '</span>' : '';
                 return '<span class="site-menu-item">' +
-                    '<a href="' + escapeHtml(previewUrl(link.url)) + '">' + escapeHtml(link.label || 'Пункт') + '</a>' +
-                    (children.length ? '<span class="site-submenu">' + renderPreviewLinks(children) + '</span>' : '') +
+                    (type === 'section'
+                        ? '<span class="site-menu-section"' + ((children.length || columns.length) ? ' tabindex="0"' : '') + '>' + renderMenuLabel(link.label, link.icon, 'Секція') + '</span>'
+                        : '<a href="' + escapeHtml(previewUrl(link.url)) + '">' + renderMenuLabel(link.label, link.icon, 'Пункт') + '</a>') +
+                    ((children.length || columns.length) ? '<span class="site-submenu">' + columnsHtml + renderPreviewLinks(children) + '</span>' : '') +
                 '</span>';
             }).join('');
         }
         (header.links || []).forEach(function (link) {
-            if (link.label && link.url) {
+            if (link.label || (Array.isArray(link.children) && link.children.length) || (Array.isArray(link.columns) && link.columns.length)) {
                 links.push(renderPreviewLinks([link]));
             }
         });
 
-        return '<header class="topbar site-header site-header-' + escapeHtml(header.variant || 'default') + '">' +
+        return '<header class="topbar site-header site-header-' + escapeHtml(header.variant || 'default') + '" data-site-header>' +
             '<div class="container topbar-inner site-header-inner">' +
                 (header.show_brand !== false ? '<a class="brand" href="#">' + escapeHtml(previewContext.institutionName || 'Заклад освіти') + '</a>' : '') +
-                '<nav class="nav site-header-nav" aria-label="Головне меню">' + links.join('') + '</nav>' +
-                (header.cta_label && header.cta_url ? '<a class="button site-header-cta" href="' + escapeHtml(previewUrl(header.cta_url)) + '">' + escapeHtml(header.cta_label) + '</a>' : '') +
+                '<button class="site-menu-toggle" type="button" data-site-menu-toggle aria-expanded="false" aria-controls="templatePreviewMenuPanel">' +
+                    '<span class="site-menu-toggle-bars" aria-hidden="true"></span><span>Меню</span>' +
+                '</button>' +
+                '<div class="site-header-menu-panel" id="templatePreviewMenuPanel" data-site-menu-panel>' +
+                    '<nav class="nav site-header-nav" aria-label="Головне меню">' + links.join('') + '</nav>' +
+                    (header.cta_label && header.cta_url ? '<a class="button site-header-cta" href="' + escapeHtml(previewUrl(header.cta_url)) + '">' + escapeHtml(header.cta_label) + '</a>' : '') +
+                '</div>' +
             '</div>' +
         '</header>';
     }
@@ -704,6 +978,7 @@ document.addEventListener('DOMContentLoaded', function () {
         previewFrame.srcdoc = '<!doctype html><html lang="uk"><head>' +
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
             '<link rel="stylesheet" href="' + escapeHtml(previewContext.bootstrapCss || '') + '">' +
+            '<link rel="stylesheet" href="' + escapeHtml(previewContext.mdiCss || '') + '">' +
             '<link rel="stylesheet" href="' + escapeHtml(previewContext.siteCss || '') + '">' +
             (template.css ? '<link rel="stylesheet" href="' + escapeHtml(template.css) + '">' : '') +
             '</head><body class="site-template-' + escapeHtml(selectedTemplate) + '">' +
@@ -712,6 +987,7 @@ document.addEventListener('DOMContentLoaded', function () {
             '<main><section class="hero"><div class="container hero-inner"><h1>' + escapeHtml(title) + '</h1><p>' + escapeHtml(excerpt) + '</p></div></section>' +
             '<section class="section"><div class="container"><div class="grid grid-3"><article class="card"><p class="meta">Блок</p><h3>Про заклад</h3><p>Тут буде контент головної сторінки.</p></article><article class="card"><p class="meta">Блок</p><h3>Новини</h3><p>Приклад картки для оцінки відступів і кольорів.</p></article><article class="card"><p class="meta">Блок</p><h3>Контакти</h3><p>Додатковий блок для перевірки сітки.</p></article></div></div></section></main>' +
             renderPreviewFooter() +
+            '<script src="' + escapeHtml(previewContext.siteJs || '') + '"></script>' +
             '</body></html>';
     }
 
@@ -766,6 +1042,7 @@ document.addEventListener('DOMContentLoaded', function () {
     headerEditor.addEventListener('input', function (event) {
         const field = event.target.closest('[data-header-field]');
         const linkField = event.target.closest('[data-header-link-field]');
+        const columnField = event.target.closest('[data-header-column-field]');
         if (field) {
             const key = field.dataset.headerField;
             header[key] = field.type === 'checkbox' ? field.checked : field.value;
@@ -777,14 +1054,40 @@ document.addEventListener('DOMContentLoaded', function () {
                 item[linkField.dataset.headerLinkField] = linkField.value;
             }
         }
+        if (columnField) {
+            const row = columnField.closest('[data-header-link]');
+            const columnNode = columnField.closest('[data-menu-column]');
+            const item = getMenuItem(row.dataset.headerLink);
+            const column = item && Array.isArray(item.columns) ? item.columns[Number(columnNode.dataset.menuColumn)] : null;
+            if (column) {
+                column[columnField.dataset.headerColumnField] = columnField.value;
+            }
+        }
         syncLayouts();
     });
     headerEditor.addEventListener('change', function (event) {
         const field = event.target.closest('[data-header-field]');
+        const linkField = event.target.closest('[data-header-link-field]');
         if (field) {
             const key = field.dataset.headerField;
             header[key] = field.type === 'checkbox' ? field.checked : field.value;
             syncLayouts();
+        }
+        if (linkField) {
+            const row = linkField.closest('[data-header-link]');
+            const item = getMenuItem(row.dataset.headerLink);
+            if (item) {
+                item[linkField.dataset.headerLinkField] = linkField.value;
+                if (linkField.dataset.headerLinkField === 'type') {
+                    item.type = item.type === 'section' ? 'section' : 'link';
+                    if (item.type === 'section') {
+                        item.url = '#';
+                    }
+                    renderHeader();
+                    return;
+                }
+                syncLayouts();
+            }
         }
     });
     headerEditor.addEventListener('click', function (event) {
@@ -798,6 +1101,46 @@ document.addEventListener('DOMContentLoaded', function () {
         if (event.target.closest('[data-header-add-link]')) {
             header.links = header.links || [];
             header.links.push(makeMenuItem('', ''));
+            renderHeader();
+        }
+        const iconPickerButton = event.target.closest('[data-header-icon-picker]');
+        if (iconPickerButton) {
+            openIconPicker(iconPickerButton);
+            return;
+        }
+        const iconClear = event.target.closest('[data-header-icon-clear]');
+        if (iconClear) {
+            const row = iconClear.closest('[data-header-link]');
+            const item = getMenuItem(row.dataset.headerLink);
+            if (item) {
+                item.icon = '';
+            }
+            renderHeader();
+            return;
+        }
+        const addSection = event.target.closest('[data-header-add-section]');
+        if (addSection) {
+            const parentNode = addSection.closest('[data-header-link]');
+            addMenuSection(parentNode ? parentNode.dataset.headerLink : '');
+            renderHeader();
+        }
+        const addColumn = event.target.closest('[data-header-add-column]');
+        if (addColumn) {
+            addSectionColumn(addColumn.closest('[data-header-link]').dataset.headerLink);
+            renderHeader();
+        }
+        const addColumnLink = event.target.closest('[data-header-column-add-link]');
+        if (addColumnLink) {
+            const row = addColumnLink.closest('[data-header-link]');
+            const column = addColumnLink.closest('[data-menu-column]');
+            addColumnMenuItem(row.dataset.headerLink, Number(column.dataset.menuColumn));
+            renderHeader();
+        }
+        const removeColumn = event.target.closest('[data-header-column-remove]');
+        if (removeColumn) {
+            const row = removeColumn.closest('[data-header-link]');
+            const column = removeColumn.closest('[data-menu-column]');
+            removeSectionColumn(row.dataset.headerLink, Number(column.dataset.menuColumn));
             renderHeader();
         }
         const addChild = event.target.closest('[data-header-add-child]');
@@ -860,6 +1203,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
+    }
+
+    if (iconPickerNode) {
+        iconPickerNode.addEventListener('input', function (event) {
+            if (event.target.closest('[data-icon-picker-search]')) {
+                renderIconPicker();
+            }
+        });
+        iconPickerNode.addEventListener('click', function (event) {
+            const picked = event.target.closest('[data-icon-picker-select]');
+            if (picked) {
+                applyPickedIcon(picked.dataset.iconPickerSelect || '');
+                return;
+            }
+            if (event.target.closest('[data-icon-picker-clear]')) {
+                applyPickedIcon('');
+            }
+        });
     }
 
     footerEditor.addEventListener('input', function (event) {
@@ -990,5 +1351,12 @@ document.addEventListener('DOMContentLoaded', function () {
     renderFooter();
     baselineLayouts = JSON.stringify(layouts);
     updateSaveStatus();
-    setPreviewMode('desktop');
+    if (window.matchMedia('(max-width: 800px)').matches) {
+        setTemplatePickerCollapsed(true);
+    }
+    setPreviewMode(
+        window.matchMedia('(max-width: 560px)').matches
+            ? 'mobile'
+            : (window.matchMedia('(max-width: 980px)').matches ? 'tablet' : 'desktop')
+    );
 });

@@ -263,19 +263,61 @@ final class SettingsController extends \App\Controllers\AdminBaseController
                 continue;
             }
             $label = trim((string) ($link['label'] ?? ''));
+            $type = (string) ($link['type'] ?? 'link') === 'section' ? 'section' : 'link';
             $url = $this->normalizeUrl(trim((string) ($link['url'] ?? '')));
+            $icon = $this->normalizeMdiIcon((string) ($link['icon'] ?? ''));
             $children = $this->normalizeMenuLinks(is_array($link['children'] ?? null) ? $link['children'] : [], $depth + 1);
-            if (($label === '' || $url === '') && !$children) {
+            $columns = $type === 'section' ? $this->normalizeMenuColumns(is_array($link['columns'] ?? null) ? $link['columns'] : [], $depth + 1) : [];
+            if ($label === '' && !$children && !$columns) {
+                continue;
+            }
+            if ($type === 'link' && $url === '' && !$children && !$columns) {
                 continue;
             }
             $links[] = [
+                'type' => $type,
                 'label' => $this->limitString($label, 80),
-                'url' => $this->limitString($url ?: '#', 240),
+                'url' => $type === 'section' ? '#' : $this->limitString($url ?: '#', 240),
+                'icon' => $icon,
                 'children' => array_slice($children, 0, 12),
+                'columns' => array_slice($columns, 0, 4),
             ];
         }
 
         return array_slice($links, 0, $depth === 0 ? 16 : 12);
+    }
+
+    private function normalizeMenuColumns(array $columns, int $depth): array
+    {
+        $normalized = [];
+        foreach ($columns as $column) {
+            if (!is_array($column)) {
+                continue;
+            }
+            $title = $this->limitString(trim((string) ($column['title'] ?? '')), 80);
+            $children = $this->normalizeMenuLinks(is_array($column['children'] ?? null) ? $column['children'] : [], $depth);
+            if ($title === '' && !$children) {
+                continue;
+            }
+            $normalized[] = [
+                'title' => $title,
+                'children' => array_slice($children, 0, 12),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeMdiIcon(string $icon): string
+    {
+        $icon = trim($icon);
+        $icon = preg_replace('/^mdi\s+/', '', $icon) ?? '';
+        $icon = preg_replace('/^mdi-/', '', $icon) ?? '';
+        if ($icon === '' || !preg_match('/^[a-z0-9-]+$/i', $icon)) {
+            return '';
+        }
+
+        return 'mdi-' . strtolower($icon);
     }
 
     private function templateLinkPicker(): array
