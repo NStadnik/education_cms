@@ -157,7 +157,7 @@ abstract class AdminBaseController extends BaseController
                  left join news_category_links l on l.news_id = n.id
                  left join news_categories c on c.id = l.category_id
                  ' . $newsWhere . '
-                 group by n.id, n.title, n.slug, n.category, n.body, n.status, n.published_at, n.created_at, n.updated_at
+                 group by n.id, n.title, n.slug, n.category, n.image_path, n.body, n.status, n.published_at, n.created_at, n.updated_at
                  order by ' . $newsOrder . '
                  limit ' . $pagination['limit'] . ' offset 0',
                 $params
@@ -1306,6 +1306,20 @@ abstract class AdminBaseController extends BaseController
                 'label' => 'Логотип сайту',
                 'url' => url('/admin/settings'),
             ];
+        }
+        try {
+            $newsImages = $this->db()->fetchAll("select id, title, image_path from news where image_path is not null and image_path <> ''");
+            foreach ($newsImages as $item) {
+                $path = Files::normalize((string) ($item['image_path'] ?? ''));
+                if ($path === '') {
+                    continue;
+                }
+                $references[$path] = [
+                    'label' => 'Головне зображення новини: ' . (string) ($item['title'] ?? ''),
+                    'url' => url('/admin/news/edit?id=' . (string) ($item['id'] ?? '')),
+                ];
+            }
+        } catch (Throwable) {
         }
 
         return $references;

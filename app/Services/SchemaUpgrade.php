@@ -26,6 +26,13 @@ final class SchemaUpgrade
                 $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_category', '1']);
             }
 
+            $newsImageDone = $db->fetch('select value from settings where name = ?', ['schema_news_image']);
+            if (($newsImageDone['value'] ?? '') !== '1') {
+                self::addNewsImageColumn($db);
+                $db->execute('delete from settings where name = ?', ['schema_news_image']);
+                $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_image', '1']);
+            }
+
             $newsCategoriesTableDone = $db->fetch('select value from settings where name = ?', ['schema_news_categories_table']);
             if (($newsCategoriesTableDone['value'] ?? '') !== '1') {
                 self::createNewsCategoriesTable($db);
@@ -75,6 +82,15 @@ final class SchemaUpgrade
         }
 
         $db->pdo()->exec("alter table news add column category varchar(160) not null default 'Загальні'");
+    }
+
+    private static function addNewsImageColumn(Database $db): void
+    {
+        if (self::hasColumn($db, 'news', 'image_path')) {
+            return;
+        }
+
+        $db->pdo()->exec('alter table news add column image_path varchar(255) null after category');
     }
 
     private static function createNewsCategoriesTable(Database $db): void

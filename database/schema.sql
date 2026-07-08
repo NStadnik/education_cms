@@ -31,6 +31,7 @@ create table if not exists news (
     title varchar(220) not null,
     slug varchar(180) not null unique,
     category varchar(160) not null default 'Загальні',
+    image_path varchar(255) null,
     body longtext not null,
     status varchar(40) not null default 'draft',
     published_at varchar(32) null,

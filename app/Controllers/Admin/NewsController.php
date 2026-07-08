@@ -26,7 +26,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
              left join news_category_links l on l.news_id = n.id
              left join news_categories c on c.id = l.category_id
              ' . $where . '
-             group by n.id, n.title, n.slug, n.category, n.body, n.status, n.published_at, n.created_at, n.updated_at
+             group by n.id, n.title, n.slug, n.category, n.image_path, n.body, n.status, n.published_at, n.created_at, n.updated_at
              order by ' . $sort . '
              limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
             $params
@@ -98,19 +98,21 @@ final class NewsController extends \App\Controllers\AdminBaseController
                 $categoryIds = [$this->ensureNewsCategory('Загальні')];
             }
             $primaryCategory = $this->categoryTitleById($categoryIds[0]) ?: 'Загальні';
+            $imagePath = $this->newsImagePath($request, $id);
             $data = [
                 $request->input('title'),
                 $slug,
                 $primaryCategory,
+                $imagePath,
                 $request->input('body'),
                 $request->input('status', 'draft'),
                 $publishedAt,
                 $now,
             ];
             if ($id) {
-                $this->db()->execute('update news set title=?, slug=?, category=?, body=?, status=?, published_at=?, updated_at=? where id=?', [...$data, $id]);
+                $this->db()->execute('update news set title=?, slug=?, category=?, image_path=?, body=?, status=?, published_at=?, updated_at=? where id=?', [...$data, $id]);
             } else {
-                $this->db()->execute('insert into news (title, slug, category, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
+                $this->db()->execute('insert into news (title, slug, category, image_path, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
                 $id = (int) $this->db()->lastInsertId();
             }
             $this->syncNewsCategories($id, $categoryIds);
@@ -420,6 +422,45 @@ final class NewsController extends \App\Controllers\AdminBaseController
         $this->db()->execute('delete from news_category_links where news_id = ?', [$newsId]);
         foreach ($categoryIds as $categoryId) {
             $this->db()->execute('insert into news_category_links (news_id, category_id) values (?, ?)', [$newsId, $categoryId]);
+        }
+    }
+
+    private function newsImagePath(Request $request, int $newsId): ?string
+    {
+        $current = '';
+        if ($newsId > 0) {
+            $row = $this->db()->fetch('select image_path from news where id = ?', [$newsId]);
+            $current = Files::normalize((string) ($row['image_path'] ?? ''));
+        }
+
+        $this->assertNewsImageUpload($request->files['image'] ?? []);
+        $uploaded = Files::upload($request->files['image'] ?? []);
+        if (!$uploaded) {
+            if ((string) $request->input('remove_image', '') === '1') {
+                return null;
+            }
+
+            return $current !== '' ? $current : null;
+        }
+
+        $extension = strtolower(pathinfo($uploaded, PATHINFO_EXTENSION));
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            Files::delete($uploaded);
+            throw new \RuntimeException('Головне зображення має бути JPG, PNG або WebP.');
+        }
+
+        return $uploaded;
+    }
+
+    private function assertNewsImageUpload(array $file): void
+    {
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return;
+        }
+
+        $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            throw new \RuntimeException('Головне зображення має бути JPG, PNG або WebP.');
         }
     }
 

@@ -77,7 +77,7 @@ final class PublicController extends BaseController
                  left join news_category_links l on l.news_id = n.id
                  left join news_categories c on c.id = l.category_id
                  ' . $where . '
-                 group by n.id, n.title, n.slug, n.category, n.body, n.status, n.published_at, n.created_at, n.updated_at
+                 group by n.id, n.title, n.slug, n.category, n.image_path, n.body, n.status, n.published_at, n.created_at, n.updated_at
                  order by n.published_at desc, n.id desc',
                 $params
             ),
@@ -100,7 +100,7 @@ final class PublicController extends BaseController
              left join news_category_links l on l.news_id = n.id
              left join news_categories c on c.id = l.category_id
              where n.slug = ? and n.status = ?
-             group by n.id, n.title, n.slug, n.category, n.body, n.status, n.published_at, n.created_at, n.updated_at',
+             group by n.id, n.title, n.slug, n.category, n.image_path, n.body, n.status, n.published_at, n.created_at, n.updated_at',
             [$params['slug'], 'published']
         );
         if (!$item) {

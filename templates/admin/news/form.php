@@ -15,6 +15,7 @@
     $categorySummary = implode(', ', $selectedCategoryTitles);
     $currentStatus = (string) ($item['status'] ?? 'draft');
     $statusLabel = $currentStatus === 'published' ? 'Опубліковано' : 'Чернетка';
+    $imagePath = \App\Services\Files::normalize((string) ($item['image_path'] ?? ''));
     preg_match_all('/[\p{L}\p{N}]+/u', strip_tags($body), $wordMatches);
     $words = count($wordMatches[0] ?? []);
 ?>
@@ -38,7 +39,7 @@
     <div class="metric"><div><span>Слів</span><strong><?= e((string) $words) ?></strong></div><span class="mdi mdi-format-text metric-icon" aria-hidden="true"></span></div>
 </div>
 
-<form method="post" action="<?= url('/admin/news/save') ?>">
+<form method="post" action="<?= url('/admin/news/save') ?>" enctype="multipart/form-data">
     <?= \App\Core\Csrf::field() ?>
     <input type="hidden" name="id" value="<?= e((string) ($item['id'] ?? '')) ?>">
 
@@ -67,6 +68,28 @@
                 </div>
 
                 <div class="form-grid">
+                    <div class="form-field">
+                        <div class="field-label">Головне зображення</div>
+                        <div class="news-image-picker">
+                            <div class="news-image-preview">
+                                <?php if ($imagePath !== ''): ?>
+                                    <img src="<?= url('/thumb/' . $imagePath . '?w=320&h=180&fit=crop') ?>" alt="">
+                                <?php else: ?>
+                                    <span class="mdi mdi-image-outline" aria-hidden="true"></span>
+                                <?php endif; ?>
+                            </div>
+                            <label>Завантажити зображення
+                                <input type="file" name="image" accept="image/jpeg,image/png,image/webp">
+                            </label>
+                            <?php if ($imagePath !== ''): ?>
+                                <label class="check-row">
+                                    <input type="checkbox" name="remove_image" value="1">
+                                    <span>Прибрати поточне зображення</span>
+                                </label>
+                            <?php endif; ?>
+                            <p class="meta"><?= $imagePath !== '' ? e($imagePath) : 'JPG, PNG або WebP.' ?></p>
+                        </div>
+                    </div>
                     <label>Статус
                         <select name="status">
                             <option value="draft" <?= selected($currentStatus, 'draft') ?>>Чернетка</option>
