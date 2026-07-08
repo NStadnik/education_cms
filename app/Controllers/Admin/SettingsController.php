@@ -34,6 +34,9 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             $this->saveSetting('site_logo', $this->normalizeSiteLogo((string) $request->input('site_logo', '')));
             $this->saveSetting('home_page_id', $this->normalizeHomePageId((int) $request->input('home_page_id', 0)));
             $this->saveSetting('site_template', $this->normalizeSiteTemplate((string) $request->input('site_template', 'official')));
+            $this->saveSetting('site_mode', $this->normalizeSiteMode((string) $request->input('site_mode', 'online')));
+            $this->saveSetting('site_mode_title', $this->limitString(trim((string) $request->input('site_mode_title', '')), 140));
+            $this->saveSetting('site_mode_message', $this->limitString(trim((string) $request->input('site_mode_message', '')), 600));
             $globalFields = json_encode($this->normalizeGlobalFields($request), JSON_UNESCAPED_UNICODE);
             $this->saveSetting('global_fields', $globalFields === false ? '[]' : $globalFields);
 
@@ -196,6 +199,11 @@ final class SettingsController extends \App\Controllers\AdminBaseController
         }
 
         return $siteTemplate;
+    }
+
+    private function normalizeSiteMode(string $siteMode): string
+    {
+        return $this->choice($siteMode, ['online', 'maintenance', 'coming_soon', 'private'], 'online');
     }
 
     private function normalizeHeaderLayout(string $json): array

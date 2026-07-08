@@ -98,6 +98,9 @@ final class Installer
             'institution_name' => $data['institution_name'] ?: 'Заклад освіти',
             'global_fields' => '[]',
             'site_template' => 'official',
+            'site_mode' => 'online',
+            'site_mode_title' => '',
+            'site_mode_message' => '',
         ];
 
         foreach ($settings as $name => $value) {

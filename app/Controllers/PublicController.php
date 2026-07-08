@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Core\Container;
 use App\Core\Debug;
 use App\Core\Request;
 use App\Core\Response;
@@ -20,26 +21,40 @@ final class PublicController extends BaseController
         }
 
         $settings = $this->siteSettings();
+        if ($response = $this->siteModeResponse($settings)) {
+            return $response;
+        }
+
         $homePageId = (int) ($settings['home_page_id'] ?? 0);
         $page = null;
         if ($homePageId > 0) {
             $page = $this->db()->fetch('select * from pages where id = ? and status = ?', [$homePageId, 'published']);
         }
         $page ??= $this->db()->fetch('select * from pages where slug = ? and status = ?', ['home', 'published']);
-        return $this->renderPage($page ?: ['title' => 'Головна', 'blocks_json' => '[]'], true);
+        return $this->renderPage($page ?: ['title' => 'Головна', 'blocks_json' => '[]'], true, $settings);
     }
 
     public function page(Request $request, array $params): Response
     {
+        $settings = $this->siteSettings();
+        if ($response = $this->siteModeResponse($settings)) {
+            return $response;
+        }
+
         $page = $this->db()->fetch('select * from pages where slug = ? and status = ?', [$params['slug'], 'published']);
         if (!$page) {
             return new Response('Not found', 404);
         }
-        return $this->renderPage($page);
+        return $this->renderPage($page, false, $settings);
     }
 
     public function news(Request $request): Response
     {
+        $settings = $this->siteSettings();
+        if ($response = $this->siteModeResponse($settings)) {
+            return $response;
+        }
+
         $category = trim((string) $request->input('category', ''));
         $where = 'where n.status = ?';
         $params = ['published'];
@@ -55,7 +70,7 @@ final class PublicController extends BaseController
 
         return $this->render('public/news', [
             'title' => 'Новини',
-            'settings' => $this->siteSettings(),
+            'settings' => $settings,
             'items' => $this->db()->fetchAll(
                 'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
                  from news n
@@ -74,6 +89,11 @@ final class PublicController extends BaseController
 
     public function newsShow(Request $request, array $params): Response
     {
+        $settings = $this->siteSettings();
+        if ($response = $this->siteModeResponse($settings)) {
+            return $response;
+        }
+
         $item = $this->db()->fetch(
             'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
              from news n
@@ -89,7 +109,7 @@ final class PublicController extends BaseController
 
         return $this->render('public/news-show', [
             'title' => $item['title'],
-            'settings' => $this->siteSettings(),
+            'settings' => $settings,
             'item' => $item,
             'menu' => $this->menu(),
         ]);
@@ -180,9 +200,9 @@ final class PublicController extends BaseController
         ], 'layouts/minimal');
     }
 
-    private function renderPage(array $page, bool $isHomePage = false): Response
+    private function renderPage(array $page, bool $isHomePage = false, ?array $settings = null): Response
     {
-        $settings = $this->siteSettings();
+        $settings ??= $this->siteSettings();
         return $this->render('public/page', [
             'title' => $page['title'],
             'settings' => $settings,
@@ -193,6 +213,68 @@ final class PublicController extends BaseController
             'menu' => $this->menu(),
             'latestNews' => $this->db()->fetchAll('select * from news where status = ? order by published_at desc, id desc limit 3', ['published']),
         ]);
+    }
+
+    private function siteModeResponse(array $settings): ?Response
+    {
+        if (Container::get('auth')->user()) {
+            return null;
+        }
+
+        $mode = (string) ($settings['site_mode'] ?? 'online');
+        if ($mode === 'online') {
+            return null;
+        }
+
+        $modes = [
+            'maintenance' => [
+                'label' => 'Режим обслуговування',
+                'title' => 'Сайт тимчасово на обслуговуванні',
+                'message' => 'Ми оновлюємо сайт і скоро повернемо його до роботи. Дякуємо за розуміння.',
+                'status' => 503,
+                'accent' => 'blue',
+            ],
+            'coming_soon' => [
+                'label' => 'Скоро відкриття',
+                'title' => 'Сайт готується до відкриття',
+                'message' => 'Ми завершуємо підготовку матеріалів. Завітайте трохи пізніше.',
+                'status' => 503,
+                'accent' => 'green',
+            ],
+            'private' => [
+                'label' => 'Закритий доступ',
+                'title' => 'Сайт доступний лише адміністраторам',
+                'message' => 'Публічний доступ тимчасово закрито. Авторизовані користувачі можуть увійти в панель керування.',
+                'status' => 403,
+                'accent' => 'dark',
+            ],
+        ];
+        $config = $modes[$mode] ?? null;
+        if (!$config) {
+            return null;
+        }
+
+        $title = trim((string) ($settings['site_mode_title'] ?? '')) ?: $config['title'];
+        $message = trim((string) ($settings['site_mode_message'] ?? '')) ?: $config['message'];
+        $content = $this->view()->render('public/site-mode', [
+            'title' => $title,
+            'settings' => $settings,
+            'mode' => $mode,
+            'modeLabel' => $config['label'],
+            'modeTitle' => $title,
+            'modeMessage' => $message,
+            'modeAccent' => $config['accent'],
+        ], 'layouts/minimal');
+
+        $headers = [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'no-store, max-age=0',
+        ];
+        if ((int) $config['status'] === 503) {
+            $headers['Retry-After'] = '3600';
+        }
+
+        return new Response($content, (int) $config['status'], $headers);
     }
 
     private function homeHeroVisible(array $settings): bool

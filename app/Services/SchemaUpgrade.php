@@ -50,6 +50,9 @@ final class SchemaUpgrade
             }
 
             self::ensureSetting($db, 'site_template', 'official');
+            self::ensureSetting($db, 'site_mode', 'online');
+            self::ensureSetting($db, 'site_mode_title', '');
+            self::ensureSetting($db, 'site_mode_message', '');
             self::migrateGlobalFields($db);
         } catch (Throwable) {
             // Keep the site bootable; debug.log will still capture hard failures elsewhere.

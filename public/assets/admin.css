@@ -94,6 +94,7 @@
 .global-fields-list { display: grid; gap: 12px; }
 .global-field-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(240px, 2fr) auto; gap: 12px; align-items: end; }
 .global-field-row button { width: 40px; padding-left: 0; padding-right: 0; }
+.site-mode-grid { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(280px, 2fr); gap: 12px; margin-bottom: 12px; }
 .settings-logo-picker { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcff; }
 .settings-logo-preview { display: grid; place-items: center; width: 82px; height: 82px; border: 1px dashed #cbd7ea; border-radius: 8px; background: #fff; overflow: hidden; }
 .settings-logo-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
@@ -247,6 +248,9 @@
 .rich-media-preview .rich-media-block figcaption, .rich-media-preview .rich-gallery-caption { margin-bottom: 8px; font-size: 12px; }
 
 tr[hidden], .accordion-item[hidden] { display: none !important; }
+@media (max-width: 760px) {
+    .site-mode-grid { grid-template-columns: 1fr; }
+}
 .layout, .admin-shell { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
 .sidebar, .admin-sidebar { background: #10233f; color: #fff; padding: 20px; }
 .sidebar a, .admin-sidebar .nav-link { display: block; color: #fff; padding: 9px 10px; border-radius: 6px; }

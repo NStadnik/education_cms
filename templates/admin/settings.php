@@ -27,6 +27,33 @@
     <section class="card admin-form-card">
         <div class="form-section-head">
             <div>
+                <h2>Режим сайту</h2>
+                <p class="meta">Неавторизовані відвідувачі побачать сучасну заглушку. Адміністратори після входу можуть переглядати сайт без обмежень.</p>
+            </div>
+            <?php $siteMode = (string) ($settings['site_mode'] ?? 'online'); ?>
+            <span class="status <?= $siteMode === 'online' ? 'ok' : 'warn' ?>"><?= $siteMode === 'online' ? 'Сайт відкритий' : 'Заглушка активна' ?></span>
+        </div>
+        <div class="site-mode-grid">
+            <label>Публічний доступ
+                <select name="site_mode">
+                    <option value="online" <?= selected($siteMode, 'online') ?>>Звичайний режим</option>
+                    <option value="maintenance" <?= selected($siteMode, 'maintenance') ?>>Режим обслуговування</option>
+                    <option value="coming_soon" <?= selected($siteMode, 'coming_soon') ?>>Скоро відкриття</option>
+                    <option value="private" <?= selected($siteMode, 'private') ?>>Закритий доступ</option>
+                </select>
+            </label>
+            <label>Заголовок заглушки
+                <input name="site_mode_title" value="<?= e($settings['site_mode_title'] ?? '') ?>" placeholder="Автоматичний текст для вибраного режиму">
+            </label>
+        </div>
+        <label>Повідомлення для відвідувачів
+            <textarea name="site_mode_message" rows="4" placeholder="Коротко поясніть, що відбувається і коли сайт буде доступний."><?= e($settings['site_mode_message'] ?? '') ?></textarea>
+        </label>
+    </section>
+
+    <section class="card admin-form-card">
+        <div class="form-section-head">
+            <div>
                 <h2>Головна сторінка</h2>
                 <p class="meta">Виберіть опубліковану сторінку, яка відкриватиметься за адресою сайту.</p>
             </div>
