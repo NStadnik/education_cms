@@ -440,6 +440,14 @@ final class NewsController extends \App\Controllers\AdminBaseController
                 return null;
             }
 
+            $selected = Files::normalize((string) $request->input('image_path', ''));
+            if ($selected !== '') {
+                if ($selected !== $current) {
+                    $this->assertNewsImagePath($selected);
+                }
+                return $selected;
+            }
+
             return $current !== '' ? $current : null;
         }
 
@@ -461,6 +469,14 @@ final class NewsController extends \App\Controllers\AdminBaseController
         $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
         if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) {
             throw new \RuntimeException('Головне зображення має бути JPG, PNG або WebP.');
+        }
+    }
+
+    private function assertNewsImagePath(string $path): void
+    {
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true) || !is_file(base_path('storage/uploads/' . $path))) {
+            throw new \RuntimeException('Оберіть зображення з медіафайлів.');
         }
     }
 

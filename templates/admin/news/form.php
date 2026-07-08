@@ -70,24 +70,29 @@
                 <div class="form-grid">
                     <div class="form-field">
                         <div class="field-label">Головне зображення</div>
-                        <div class="news-image-picker">
-                            <div class="news-image-preview">
+                        <div class="news-image-picker" data-news-image-picker data-picker-url="<?= url('/admin/media/picker') ?>" data-thumb-base="<?= url('/thumb/') ?>">
+                            <input type="hidden" name="image_path" value="<?= e($imagePath) ?>" data-news-image-input>
+                            <input type="hidden" name="remove_image" value="0" data-news-image-remove>
+                            <div class="news-image-preview" data-news-image-preview>
                                 <?php if ($imagePath !== ''): ?>
                                     <img src="<?= url('/thumb/' . $imagePath . '?w=320&h=180&fit=crop') ?>" alt="">
                                 <?php else: ?>
                                     <span class="mdi mdi-image-outline" aria-hidden="true"></span>
                                 <?php endif; ?>
                             </div>
+                            <div class="news-image-name" data-news-image-name><?= $imagePath !== '' ? e($imagePath) : 'Зображення не вибрано' ?></div>
+                            <div class="settings-logo-actions">
+                                <button class="button secondary compact" type="button" data-news-image-open>
+                                    <span class="mdi mdi-image-search-outline" aria-hidden="true"></span><span>Обрати з медіа</span>
+                                </button>
+                                <button class="button secondary compact" type="button" data-news-image-clear <?= $imagePath === '' ? 'hidden' : '' ?>>
+                                    <span class="mdi mdi-close" aria-hidden="true"></span><span>Очистити</span>
+                                </button>
+                            </div>
                             <label>Завантажити зображення
-                                <input type="file" name="image" accept="image/jpeg,image/png,image/webp">
+                                <input type="file" name="image" accept="image/jpeg,image/png,image/webp" data-news-image-file>
                             </label>
-                            <?php if ($imagePath !== ''): ?>
-                                <label class="check-row">
-                                    <input type="checkbox" name="remove_image" value="1">
-                                    <span>Прибрати поточне зображення</span>
-                                </label>
-                            <?php endif; ?>
-                            <p class="meta"><?= $imagePath !== '' ? e($imagePath) : 'JPG, PNG або WebP.' ?></p>
+                            <p class="meta">Оберіть зображення з медіатеки або завантажте нове JPG, PNG чи WebP.</p>
                         </div>
                     </div>
                     <label>Статус
@@ -152,6 +157,36 @@
         </aside>
     </div>
 </form>
+<div class="modal fade" id="newsImagePickerModal" tabindex="-1" aria-labelledby="newsImagePickerTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow mb-1">Медіафайли</p>
+                    <h2 class="modal-title h5" id="newsImagePickerTitle">Обрати головне зображення</h2>
+                    <p class="meta mb-0">Показуються лише зображення з медіатеки.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-logo-modal-tools">
+                    <label class="list-search-field">
+                        <span class="mdi mdi-magnify" aria-hidden="true"></span>
+                        <input type="search" data-news-image-search placeholder="Пошук зображення">
+                    </label>
+                    <span class="list-count-pill" data-news-image-status>Готово</span>
+                </div>
+                <div class="settings-logo-grid" data-news-image-grid></div>
+                <button class="button secondary compact settings-logo-more" type="button" data-news-image-more hidden>
+                    <span class="mdi mdi-chevron-down" aria-hidden="true"></span><span>Показати ще</span>
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="button secondary" data-bs-dismiss="modal"><span class="mdi mdi-close" aria-hidden="true"></span><span>Закрити</span></button>
+            </div>
+        </div>
+    </div>
+</div>
 <?php if ($isEdit): ?>
     <form id="newsDeleteForm" method="post" action="<?= url('/admin/news/bulk') ?>" data-no-ajax data-delete-confirm="Видалити цю новину?" data-after-success-url="<?= url('/admin/news') ?>">
         <?= \App\Core\Csrf::field() ?>
@@ -159,3 +194,4 @@
         <input type="hidden" name="ids[]" value="<?= e((string) $item['id']) ?>">
     </form>
 <?php endif; ?>
+<script src="<?= url('/assets/admin-news.js') ?>"></script>
