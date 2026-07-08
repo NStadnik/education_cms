@@ -64,7 +64,8 @@
             ? (string) $layout[$prefix . '_background_repeat']
             : 'no-repeat';
         $opacity = max(0, min(80, (int) ($layout[$prefix . '_overlay_opacity'] ?? 35))) / 100;
-        $style = '--site-hero-bg-image: url("' . e(url('/uploads/' . $image)) . '"); --site-hero-bg-position: ' . e($position) . '; --site-hero-bg-size: ' . e($size) . '; --site-hero-bg-repeat: ' . e($repeat) . '; --site-hero-overlay-opacity: ' . e((string) $opacity) . ';';
+        $backgroundUrl = url('/uploads/' . $image);
+        $style = '--site-hero-bg-image: url(' . e($backgroundUrl) . '); --site-hero-bg-position: ' . e($position) . '; --site-hero-bg-size: ' . e($size) . '; --site-hero-bg-repeat: ' . e($repeat) . '; --site-hero-overlay-opacity: ' . e((string) $opacity) . ';';
         $class = ' site-header-hero-has-background' . (!empty($layout[$prefix . '_overlay_enabled']) ? ' site-header-hero-has-overlay' : '');
 
         return ['class' => $class, 'style' => $style];
