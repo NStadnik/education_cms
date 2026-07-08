@@ -6,33 +6,78 @@
                 <h1>Новини</h1>
                 <p class="page-subtitle">Актуальні повідомлення, оголошення та події закладу.</p>
             </div>
-            <span class="status"><?= e((string) count($items)) ?> записів</span>
+            <span class="status" data-news-total-count><?= e((string) ($total ?? count($items))) ?> записів</span>
         </div>
-        <?php if (!empty($categories)): ?>
-            <div class="bulk-actions news-category-filter">
-                <a class="status <?= empty($activeCategory) ? 'ok' : '' ?>" href="<?= url('/news') ?>">Усі</a>
-                <?php foreach ($categories as $category): ?>
-                    <a class="status <?= ($activeCategory ?? '') === $category['category'] ? 'ok' : '' ?>" href="<?= url('/news?category=' . urlencode($category['category'])) ?>">
-                        <?= e($category['category']) ?> · <?= e((string) $category['items_count']) ?>
-                    </a>
-                <?php endforeach; ?>
+        <?php
+            $total = (int) ($total ?? count($items));
+            $limit = max(1, (int) ($limit ?? 9));
+            $page = max(1, (int) ($page ?? 1));
+            $pages = max(1, (int) ceil($total / $limit));
+            $currentPage = min($page, $pages);
+            $loaded = min($total, (($currentPage - 1) * $limit) + count($items));
+            $hasMore = $loaded < $total;
+            $activeCategory = (string) ($activeCategory ?? '');
+            $activeQuery = (string) ($activeQuery ?? '');
+            $newsUrl = static function (?string $category = null, string $search = '', int $targetPage = 1): string {
+                $params = [];
+                if ($category !== null && $category !== '') {
+                    $params['category'] = $category;
+                }
+                if ($search !== '') {
+                    $params['q'] = $search;
+                }
+                if ($targetPage > 1) {
+                    $params['page'] = $targetPage;
+                }
+                return url('/news' . ($params ? '?' . http_build_query($params) : ''));
+            };
+            $pageUrl = static fn (int $targetPage): string => $newsUrl($activeCategory, $activeQuery, $targetPage);
+        ?>
+        <form class="news-filter-panel" method="get" action="<?= url('/news') ?>" data-news-filter-form>
+            <label class="news-search-field">
+                <span class="mdi mdi-magnify" aria-hidden="true"></span>
+                <input type="search" name="q" value="<?= e($activeQuery) ?>" placeholder="Пошук за назвою, текстом або категорією" aria-label="Пошук новин">
+            </label>
+            <label class="news-category-select">
+                <span class="mdi mdi-shape-outline" aria-hidden="true"></span>
+                <select name="category" aria-label="Категорія новин">
+                    <option value="">Усі категорії</option>
+                    <?php foreach ($categories as $category): ?>
+                        <option value="<?= e($category['category']) ?>" <?= selected($activeCategory, (string) $category['category']) ?>>
+                            <?= e($category['category']) ?> · <?= e((string) $category['items_count']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <button class="button" type="submit"><span class="mdi mdi-filter-check-outline" aria-hidden="true"></span><span>Знайти</span></button>
+            <a class="button secondary <?= ($activeQuery === '' && $activeCategory === '') ? 'd-none' : '' ?>" href="<?= url('/news') ?>" data-news-filter-reset><span class="mdi mdi-close" aria-hidden="true"></span><span>Скинути</span></a>
+            <span class="news-filter-count" data-news-filter-count><?= e((string) $total) ?> знайдено</span>
+        </form>
+        <div data-news-category-slot>
+            <?= $this->partial('public/partials/news-categories', [
+                'categories' => $categories,
+                'activeCategory' => $activeCategory,
+                'activeQuery' => $activeQuery,
+                'newsUrl' => $newsUrl,
+            ]) ?>
+        </div>
+        <div class="news-pager-sticky" data-news-pager-slot>
+            <?= $this->partial('public/partials/pager', [
+                'currentPage' => $currentPage,
+                'pages' => $pages,
+                'urlFactory' => $pageUrl,
+                'label' => 'Навігація сторінками новин',
+                'jumpLabel' => 'Сторінка',
+                'class' => 'news-pager',
+            ]) ?>
+        </div>
+        <div class="news-list" data-public-news-list data-list-url="<?= url('/news') ?>" data-list-offset="<?= e((string) $loaded) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= $hasMore ? '1' : '0' ?>" data-list-category="<?= e($activeCategory) ?>" data-list-query="<?= e($activeQuery) ?>">
+            <div class="grid grid-3 news-grid" data-news-grid>
+                <?= $this->partial('public/partials/news-cards', ['items' => $items]) ?>
             </div>
-        <?php endif; ?>
-        <div class="grid grid-3 news-grid">
-            <?php foreach ($items as $item): ?>
-                <article class="card content-card">
-                    <?php if (!empty($item['image_path'])): ?>
-                        <a class="news-card-image" href="<?= url('/news/' . $item['slug']) ?>">
-                            <img src="<?= url('/thumb/' . \App\Services\Files::normalize((string) $item['image_path']) . '?w=720&h=405&fit=crop') ?>" alt="<?= e($item['title']) ?>" loading="lazy">
-                        </a>
-                    <?php endif; ?>
-                    <p class="meta"><?= e($item['category_titles'] ?: ($item['category'] ?? 'Загальні')) ?> · <?= e($item['published_at'] ?? '') ?></p>
-                    <h2><a href="<?= url('/news/' . $item['slug']) ?>"><?= e($item['title']) ?></a></h2>
-                    <p><?= e(excerpt($item['body'], 180)) ?></p>
-                    <a class="read-more" href="<?= url('/news/' . $item['slug']) ?>">Читати</a>
-                </article>
-            <?php endforeach; ?>
-            <?php if (!$items): ?><div class="empty-state">Новини ще не додані.</div><?php endif; ?>
+            <div class="empty-state <?= $items ? 'd-none' : '' ?>" data-news-empty>За цими фільтрами новин не знайдено.</div>
+            <div class="news-list-sentinel" data-news-sentinel></div>
+            <p class="meta news-list-status" data-news-status><?= $hasMore ? 'Прокрутіть нижче, щоб завантажити ще.' : 'Усі новини завантажено.' ?></p>
         </div>
     </div>
 </section>

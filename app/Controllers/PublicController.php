@@ -56,6 +56,9 @@ final class PublicController extends BaseController
         }
 
         $category = trim((string) $request->input('category', ''));
+        $query = trim((string) $request->input('q', ''));
+        $limit = 9;
+        $page = max(1, (int) $request->input('page', 1));
         $where = 'where n.status = ?';
         $params = ['published'];
         if ($category !== '') {
@@ -67,22 +70,99 @@ final class PublicController extends BaseController
             )';
             $params[] = $category;
         }
+        if ($query !== '') {
+            $where .= ' and (
+                n.title like ? or n.body like ? or n.category like ? or exists (
+                    select 1
+                    from news_category_links sl
+                    inner join news_categories sc on sc.id = sl.category_id
+                    where sl.news_id = n.id and sc.title like ?
+                )
+            )';
+            $like = '%' . $query . '%';
+            array_push($params, $like, $like, $like, $like);
+        }
+
+        $total = (int) ($this->db()->fetch(
+            'select count(distinct n.id) as c
+             from news n
+             left join news_category_links l on l.news_id = n.id
+             left join news_categories c on c.id = l.category_id
+             ' . $where,
+            $params
+        )['c'] ?? 0);
+        $pages = max(1, (int) ceil($total / $limit));
+        $hasOffset = array_key_exists('offset', $request->query) || array_key_exists('offset', $request->post);
+        if (!$hasOffset) {
+            $page = min($page, $pages);
+        }
+        $offset = max(0, (int) $request->input('offset', ($page - 1) * $limit));
+
+        $items = $this->db()->fetchAll(
+            'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
+             from news n
+             left join news_category_links l on l.news_id = n.id
+             left join news_categories c on c.id = l.category_id
+             ' . $where . '
+             group by n.id, n.created_by, n.title, n.slug, n.category, n.image_path, n.body, n.status, n.published_at, n.created_at, n.updated_at
+             order by n.published_at desc, n.id desc
+             limit ' . $limit . ' offset ' . $offset,
+            $params
+        );
+        $loaded = $offset + count($items);
+        $currentPage = min(max(1, (int) floor($offset / $limit) + 1), $pages);
+        $newsUrl = static function (?string $urlCategory = null, string $urlQuery = '', int $targetPage = 1): string {
+            $urlParams = [];
+            if ($urlCategory !== null && $urlCategory !== '') {
+                $urlParams['category'] = $urlCategory;
+            }
+            if ($urlQuery !== '') {
+                $urlParams['q'] = $urlQuery;
+            }
+            if ($targetPage > 1) {
+                $urlParams['page'] = $targetPage;
+            }
+            return url('/news' . ($urlParams ? '?' . http_build_query($urlParams) : ''));
+        };
+        $pageUrl = static fn (int $targetPage): string => $newsUrl($category, $query, $targetPage);
+        $categories = $this->newsCategories();
+
+        if (strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest') {
+            return $this->json([
+                'ok' => true,
+                'html' => $this->view()->partial('public/partials/news-cards', ['items' => $items]),
+                'pager_html' => $this->view()->partial('public/partials/pager', [
+                    'currentPage' => $currentPage,
+                    'pages' => $pages,
+                    'urlFactory' => $pageUrl,
+                    'label' => 'Навігація сторінками новин',
+                    'jumpLabel' => 'Сторінка',
+                    'class' => 'news-pager',
+                ]),
+                'categories_html' => $this->view()->partial('public/partials/news-categories', [
+                    'categories' => $categories,
+                    'activeCategory' => $category,
+                    'activeQuery' => $query,
+                    'newsUrl' => $newsUrl,
+                ]),
+                'total' => $total,
+                'category' => $category,
+                'query' => $query,
+                'next_offset' => $loaded,
+                'has_more' => $loaded < $total,
+            ]);
+        }
 
         return $this->render('public/news', [
             'title' => 'Новини',
             'settings' => $settings,
-            'items' => $this->db()->fetchAll(
-                'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
-                 from news n
-                 left join news_category_links l on l.news_id = n.id
-                 left join news_categories c on c.id = l.category_id
-                 ' . $where . '
-                 group by n.id, n.title, n.slug, n.category, n.image_path, n.body, n.status, n.published_at, n.created_at, n.updated_at
-                 order by n.published_at desc, n.id desc',
-                $params
-            ),
-            'categories' => $this->newsCategories(),
+            'items' => $items,
+            'total' => $total,
+            'limit' => $limit,
+            'page' => $page,
+            'categories' => $categories,
             'activeCategory' => $category,
+            'activeQuery' => $query,
             'menu' => $this->menu(),
         ]);
     }
