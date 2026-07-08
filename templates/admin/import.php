@@ -51,6 +51,18 @@
         </div>
     </section>
 
+    <section class="card admin-form-card">
+        <div class="form-section-head">
+            <div>
+                <h2>Дублі</h2>
+                <p class="meta">Перевірка шукає записи за slug: знайдені оновлює, відсутні додає.</p>
+            </div>
+        </div>
+        <div class="source-options">
+            <label class="check-row"><input type="checkbox" name="import_check_duplicates" value="1" checked> Перевіряти на дублі</label>
+        </div>
+    </section>
+
     <section class="card admin-form-card" data-file-source>
         <div class="form-section-head">
             <div>
@@ -78,7 +90,7 @@
         <div class="form-section-head">
             <div>
                 <h2>WordPress база</h2>
-                <p class="meta">Підключення читає WordPress дописи, сторінки, рубрики та прив'язки до них.</p>
+                <p class="meta">Підключення читає WordPress дописи, сторінки, рубрики, меню та прив'язки до них.</p>
             </div>
         </div>
         <div class="wp-import-layout">
@@ -131,6 +143,12 @@
                         <span class="mdi mdi-newspaper-variant-outline" aria-hidden="true"></span>
                         <strong>Тільки матеріали</strong>
                         <small>Створити новини та сторінки без файлів</small>
+                    </label>
+                    <label class="wp-scope-option">
+                        <input type="radio" name="wp_import_scope" value="menu" data-wp-scope>
+                        <span class="mdi mdi-menu" aria-hidden="true"></span>
+                        <strong>Тільки меню</strong>
+                        <small>Перенести WordPress меню та mega menu</small>
                     </label>
                 </div>
             </div>
@@ -186,7 +204,7 @@
                 <div class="grid grid-3">
                     <label>Файлів за пакет<input type="number" name="wp_media_limit" value="1000" min="1" max="5000"></label>
                 </div>
-                <label class="check-row" data-wp-media-toggle><input type="checkbox" name="wp_import_media" value="1" checked> Завантажити файли та замінити старі адреси в публікаціях</label>
+                <label class="check-row" data-wp-media-toggle><input type="checkbox" name="wp_import_media" value="1" checked> Завантажити файли, перенести головні зображення та замінити старі адреси в публікаціях</label>
             </div>
 
             <div class="wp-import-panel compact">

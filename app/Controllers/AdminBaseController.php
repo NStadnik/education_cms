@@ -9,6 +9,7 @@ use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Files;
+use App\Services\MediaMetadata;
 use App\Services\SiteThemes;
 use Throwable;
 
@@ -18,13 +19,21 @@ abstract class AdminBaseController extends BaseController
     protected const IMPORT_TITLE_LIMIT = 220;
 
     protected array $lastImportStats = [];
+    protected array $lastWordPressMediaPaths = [];
 
     protected function guard(?string $permission = null): void
     {
         Container::get('auth')->require();
         if ($permission && !Container::get('auth')->can($permission)) {
-            http_response_code(403);
-            exit('Forbidden');
+            if ($this->isAjaxRequest()) {
+                (new Response(json_encode(['ok' => false, 'message' => 'Доступ заборонено.'], JSON_UNESCAPED_UNICODE), 403, [
+                    'Content-Type' => 'application/json; charset=UTF-8',
+                ]))->send();
+                exit;
+            }
+
+            ErrorController::response(403)->send();
+            exit;
         }
     }
 
@@ -313,7 +322,7 @@ abstract class AdminBaseController extends BaseController
             'news' => [
                 'name' => 'Новини',
                 'description' => 'Створює новини з назвою, текстом, статусом і датою публікації.',
-                'columns' => 'title, body, slug, status, published_at',
+                'columns' => 'title, body, slug, status, published_at, image_path',
             ],
             'pages' => [
                 'name' => 'Сторінки',
@@ -327,8 +336,8 @@ abstract class AdminBaseController extends BaseController
             ],
             'wordpress' => [
                 'name' => 'WordPress',
-                'description' => 'Імпортує WordPress дописи, сторінки, рубрики та привʼязки до рубрик.',
-                'columns' => 'post_title, post_content, post_name, post_type, post_status, post_date, categories',
+                'description' => 'Імпортує WordPress дописи, сторінки, рубрики, медіа, головні зображення та builder-контент.',
+                'columns' => 'post_title, post_content, post_name, post_type, post_status, post_date, _thumbnail_id, _elementor_data, nimble, categories',
             ],
         ];
     }
@@ -417,42 +426,70 @@ abstract class AdminBaseController extends BaseController
         $offset = $preview ? 0 : max(0, (int) $request->input('db_offset', 0));
         [$where, $params] = $this->wordPressPostsWhere($request);
 
-        $countStmt = $pdo->prepare("select count(*) as c from {$table} where {$where}");
+        $countStmt = $pdo->prepare("select count(*) as c from {$table} p where {$where}");
         $countStmt->execute($params);
         $total = (int) ($countStmt->fetch(\PDO::FETCH_ASSOC)['c'] ?? 0);
 
         $mediaMap = [];
+        $mediaPaths = [];
         if (!$preview && $this->shouldImportWordPressMedia($request)) {
             $mediaMap = $this->importWordPressMedia($pdo, $prefix, $request, !$request->input('wp_media_replace_only'));
+            $mediaPaths = $this->lastWordPressMediaPaths;
         }
 
         $stmt = $pdo->prepare(
-            "select ID, post_title, post_name, post_content, post_excerpt, post_type, post_status, post_date
-             from {$table}
+            "select p.ID, p.post_title, p.post_name, p.post_content, p.post_excerpt, p.post_type, p.post_status, p.post_date,
+                    pm.meta_value as thumbnail_id
+             from {$table} p
+             left join {$prefix}postmeta pm on pm.post_id = p.ID and pm.meta_key = '_thumbnail_id'
              where {$where}
-             order by post_date desc, ID desc
+             order by p.post_date desc, p.ID desc
              limit {$limit} offset {$offset}"
         );
         $stmt->execute($params);
 
         $posts = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $thumbnailIds = array_values(array_unique(array_filter(array_map(static fn (array $row): int => (int) ($row['thumbnail_id'] ?? 0), $posts))));
+        $missingThumbnailIds = array_values(array_diff($thumbnailIds, array_keys($mediaPaths)));
+        if (!$preview && $missingThumbnailIds) {
+            $mediaPaths += $this->wordPressMediaPathsForAttachments(
+                $pdo,
+                $prefix,
+                $missingThumbnailIds,
+                $request,
+                $this->shouldImportWordPressMedia($request) && !$request->input('wp_media_replace_only')
+            );
+        }
         $wpCategories = $this->wordPressCategoriesForPosts($pdo, $prefix, array_map(static fn (array $row): int => (int) $row['ID'], $posts));
+        $builderMeta = $this->wordPressBuilderMeta($pdo, $prefix, array_map(static fn (array $row): int => (int) $row['ID'], $posts));
 
         $rows = [];
         foreach ($posts as $row) {
             $status = (($row['post_status'] ?? '') === 'publish') ? 'published' : 'draft';
             $body = (string) ($row['post_content'] ?? '');
+            if (($row['post_type'] ?? '') === 'page') {
+                $builderBody = $this->wordPressBuilderContent($builderMeta[(int) ($row['ID'] ?? 0)] ?? []);
+                if ($builderBody !== '') {
+                    $body = trim($body) !== '' ? trim($body) . "\n\n" . $builderBody : $builderBody;
+                }
+            }
             if ($mediaMap) {
                 $body = str_replace(array_keys($mediaMap), array_values($mediaMap), $body);
             }
+            if (!$preview && $body !== '' && $this->shouldImportWordPressMedia($request)) {
+                $body = $this->replaceWordPressContentMediaUrls($body, $request);
+            }
             $categories = $wpCategories[(int) ($row['ID'] ?? 0)] ?? [];
             $categoryNames = array_map(static fn (array $category): string => (string) $category['title'], $categories);
+            $thumbnailId = (int) ($row['thumbnail_id'] ?? 0);
 
             $rows[] = [
                 '_import_target' => (($row['post_type'] ?? '') === 'page') ? 'pages' : 'news',
                 '_wp_categories' => $categories,
+                '_wp_legacy_slug' => $this->limitSlug($this->slug((string) ($row['post_name'] ?? '')), 180),
+                'image_path' => $thumbnailId > 0 ? (string) ($mediaPaths[$thumbnailId] ?? '') : '',
                 'title' => (string) ($row['post_title'] ?? ''),
-                'slug' => (string) ($row['post_name'] ?? ''),
+                'slug' => $this->wordPressSlug((string) ($row['post_name'] ?? '')),
                 'body' => $body,
                 'excerpt' => (string) ($row['post_excerpt'] ?? ''),
                 'status' => $status,
@@ -472,6 +509,242 @@ abstract class AdminBaseController extends BaseController
         ]);
 
         return $rows;
+    }
+
+    protected function wordPressBuilderMeta(\PDO $pdo, string $prefix, array $postIds): array
+    {
+        $postIds = array_values(array_unique(array_filter(array_map('intval', $postIds))));
+        if (!$postIds) {
+            return [];
+        }
+
+        $metaTable = $prefix . 'postmeta';
+        $placeholders = implode(',', array_fill(0, count($postIds), '?'));
+        $stmt = $pdo->prepare(
+            "select post_id, meta_key, meta_value
+             from {$metaTable}
+             where post_id in ({$placeholders})
+               and (meta_key = '_elementor_data' or meta_key like '%nimble%')"
+        );
+        $stmt->execute($postIds);
+
+        $meta = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $postId = (int) ($row['post_id'] ?? 0);
+            $key = (string) ($row['meta_key'] ?? '');
+            if (!$postId || $key === '') {
+                continue;
+            }
+            $meta[$postId][$key] = (string) ($row['meta_value'] ?? '');
+        }
+
+        return $meta;
+    }
+
+    protected function wordPressBuilderContent(array $meta): string
+    {
+        $parts = [];
+        foreach ($meta as $key => $value) {
+            $value = trim((string) $value);
+            if ($value === '') {
+                continue;
+            }
+
+            if ($key === '_elementor_data') {
+                $parts[] = $this->elementorContent($value);
+                continue;
+            }
+
+            if (stripos((string) $key, 'nimble') !== false) {
+                $parts[] = $this->genericBuilderContent($value);
+            }
+        }
+
+        return $this->joinImportedBuilderParts($parts);
+    }
+
+    protected function elementorContent(string $json): string
+    {
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            return '';
+        }
+
+        $parts = [];
+        $this->collectElementorContent($data, $parts);
+        return $this->joinImportedBuilderParts($parts);
+    }
+
+    protected function collectElementorContent(array $nodes, array &$parts): void
+    {
+        $contentKeys = [
+            'title',
+            'editor',
+            'text',
+            'caption',
+            'description',
+            'button_text',
+            'html',
+            'shortcode',
+        ];
+
+        foreach ($nodes as $node) {
+            if (!is_array($node)) {
+                continue;
+            }
+
+            $widgetType = (string) ($node['widgetType'] ?? '');
+            $settings = is_array($node['settings'] ?? null) ? $node['settings'] : [];
+            if ($settings) {
+                foreach ($contentKeys as $contentKey) {
+                    if (!isset($settings[$contentKey]) || !is_scalar($settings[$contentKey])) {
+                        continue;
+                    }
+                    $parts[] = $this->cleanImportedBuilderText((string) $settings[$contentKey], $contentKey);
+                }
+                $this->collectGenericBuilderContent($settings, $parts);
+
+                if ($widgetType === 'image' && isset($settings['image']['url']) && is_scalar($settings['image']['url'])) {
+                    $url = trim((string) $settings['image']['url']);
+                    if ($url !== '') {
+                        $caption = isset($settings['caption']) && is_scalar($settings['caption']) ? (string) $settings['caption'] : '';
+                        $parts[] = '<p><img src="' . e($url) . '" alt="' . e(strip_tags($caption)) . '"></p>';
+                    }
+                }
+            }
+
+            if (!empty($node['elements']) && is_array($node['elements'])) {
+                $this->collectElementorContent($node['elements'], $parts);
+            }
+        }
+    }
+
+    protected function genericBuilderContent(string $value): string
+    {
+        $decoded = $this->decodeWordPressBuilderValue($value);
+        if (is_array($decoded)) {
+            $parts = [];
+            $this->collectGenericBuilderContent($decoded, $parts);
+            return $this->joinImportedBuilderParts($parts);
+        }
+
+        return $this->cleanImportedBuilderText($value);
+    }
+
+    protected function decodeWordPressBuilderValue(string $value): mixed
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        if (str_starts_with($trimmed, '[') || str_starts_with($trimmed, '{')) {
+            $json = json_decode($trimmed, true);
+            if (is_array($json)) {
+                return $json;
+            }
+        }
+
+        if (preg_match('/^[aOsibd]:/i', $trimmed) === 1) {
+            $data = @unserialize($trimmed, ['allowed_classes' => false]);
+            if (is_array($data)) {
+                return $data;
+            }
+        }
+
+        return $trimmed;
+    }
+
+    protected function collectGenericBuilderContent(array $data, array &$parts, string $parentKey = ''): void
+    {
+        $contentKeys = [
+            'content',
+            'text',
+            'html',
+            'editor',
+            'title',
+            'heading',
+            'label',
+            'subtitle',
+            'description',
+            'body',
+            'caption',
+            'button_text',
+            'link_text',
+        ];
+
+        foreach ($data as $key => $value) {
+            $key = is_scalar($key) ? strtolower((string) $key) : '';
+            if (is_array($value)) {
+                $this->collectGenericBuilderContent($value, $parts, $key);
+                continue;
+            }
+
+            if (!is_scalar($value)) {
+                continue;
+            }
+
+            $text = trim((string) $value);
+            if ($text === '') {
+                continue;
+            }
+
+            $isContentKey = in_array($key, $contentKeys, true)
+                || str_contains($key, 'content')
+                || str_contains($key, 'text')
+                || str_contains($key, 'title')
+                || str_contains($key, 'html');
+            if (!$isContentKey || str_contains($key, 'color') || str_contains($key, 'style') || str_contains($key, 'class')) {
+                continue;
+            }
+
+            $parts[] = $this->cleanImportedBuilderText($text, $key ?: $parentKey);
+        }
+    }
+
+    protected function cleanImportedBuilderText(string $text, string $key = ''): string
+    {
+        $text = trim(html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        if ($text === '' || preg_match('/^\s*(default|none|null|false|true)\s*$/i', $text)) {
+            return '';
+        }
+
+        if ($key === 'shortcode' && str_starts_with($text, '[')) {
+            return '';
+        }
+
+        if ($text !== strip_tags($text)) {
+            return trim($text);
+        }
+
+        if (preg_match('/^https?:\/\//i', $text)) {
+            return '';
+        }
+
+        return '<p>' . nl2br(e($text), false) . '</p>';
+    }
+
+    protected function joinImportedBuilderParts(array $parts): string
+    {
+        $clean = [];
+        $seen = [];
+        foreach ($parts as $part) {
+            $part = trim((string) $part);
+            if ($part === '') {
+                continue;
+            }
+
+            $key = preg_replace('/\s+/', ' ', strip_tags($part)) ?: $part;
+            $key = function_exists('mb_strtolower') ? mb_strtolower($key, 'UTF-8') : strtolower($key);
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $clean[] = $part;
+        }
+
+        return implode("\n\n", $clean);
     }
 
     protected function wordPressCategoriesForPosts(\PDO $pdo, string $prefix, array $postIds): array
@@ -503,7 +776,7 @@ abstract class AdminBaseController extends BaseController
                 'term_id' => $termId,
                 'taxonomy_id' => $taxonomyId,
                 'title' => (string) ($category['name'] ?? ''),
-                'slug' => (string) ($category['slug'] ?? ''),
+                'slug' => $this->wordPressSlug((string) ($category['slug'] ?? '')),
                 'parent_term_id' => (int) ($category['parent'] ?? 0),
             ];
             $taxonomyToTermId[$taxonomyId] = $termId;
@@ -573,33 +846,59 @@ abstract class AdminBaseController extends BaseController
             $postType = 'any';
         }
 
-        $where = $postType === 'any' ? "post_type in ('post', 'page')" : 'post_type = ?';
+        $where = $postType === 'any' ? "p.post_type in ('post', 'page')" : 'p.post_type = ?';
         $params = $postType === 'any' ? [] : [$postType];
         if ($status !== 'any') {
-            $where .= ' and post_status = ?';
+            $where .= ' and p.post_status = ?';
             $params[] = $status;
         }
 
         $search = trim((string) $request->input('wp_search', ''));
         if ($search !== '') {
-            $where .= ' and (post_title like ? or post_content like ? or post_name like ?)';
+            $where .= ' and (p.post_title like ? or p.post_content like ? or p.post_name like ?)';
             $like = '%' . $search . '%';
             array_push($params, $like, $like, $like);
         }
 
         $dateFrom = trim((string) $request->input('wp_date_from', ''));
         if ($dateFrom !== '') {
-            $where .= ' and post_date >= ?';
+            $where .= ' and p.post_date >= ?';
             $params[] = $dateFrom . ' 00:00:00';
         }
 
         $dateTo = trim((string) $request->input('wp_date_to', ''));
         if ($dateTo !== '') {
-            $where .= ' and post_date <= ?';
+            $where .= ' and p.post_date <= ?';
             $params[] = $dateTo . ' 23:59:59';
         }
 
         return [$where, $params];
+    }
+
+    protected function wordPressSlug(string $slug): string
+    {
+        $slug = trim($slug);
+        if ($slug === '') {
+            return '';
+        }
+
+        $decoded = rawurldecode($slug);
+        if ($decoded !== $slug) {
+            return $decoded;
+        }
+
+        $parts = explode('-', $slug);
+        if (count($parts) > 1 && count(array_filter($parts, static fn (string $part): bool => preg_match('/^[a-f0-9]{2}$/i', $part) === 1)) === count($parts)) {
+            $bytes = '';
+            foreach ($parts as $part) {
+                $bytes .= chr(hexdec($part));
+            }
+            if (preg_match('//u', $bytes) === 1) {
+                return $bytes;
+            }
+        }
+
+        return $slug;
     }
 
     protected function shouldImportWordPressMedia(Request $request): bool
@@ -630,15 +929,18 @@ abstract class AdminBaseController extends BaseController
         $maxLimit = $download ? 5000 : 50000;
         $limitInput = $request->input('wp_media_map_limit', $request->input('wp_media_limit', 1000));
         $limit = max(1, min($maxLimit, (int) $limitInput));
+        $this->lastWordPressMediaPaths = [];
 
         $countStmt = $pdo->query("select count(*) as c from {$postsTable} where post_type = 'attachment'");
         $total = (int) ($countStmt->fetch(\PDO::FETCH_ASSOC)['c'] ?? 0);
 
         $stmt = $pdo->prepare(
-            "select p.ID, p.guid, p.post_title, p.post_name, p.post_mime_type, m.meta_value as attached_file, mm.meta_value as attachment_metadata
+            "select p.ID, p.guid, p.post_title, p.post_name, p.post_mime_type, p.post_excerpt, p.post_content,
+                    m.meta_value as attached_file, mm.meta_value as attachment_metadata, alt.meta_value as alt_text
              from {$postsTable} p
              left join {$metaTable} m on m.post_id = p.ID and m.meta_key = '_wp_attached_file'
              left join {$metaTable} mm on mm.post_id = p.ID and mm.meta_key = '_wp_attachment_metadata'
+             left join {$metaTable} alt on alt.post_id = p.ID and alt.meta_key = '_wp_attachment_image_alt'
              where p.post_type = 'attachment'
              order by p.ID asc
              limit {$limit} offset {$offset}"
@@ -662,6 +964,8 @@ abstract class AdminBaseController extends BaseController
                 continue;
             }
             $saved++;
+            $this->lastWordPressMediaPaths[(int) ($attachment['ID'] ?? 0)] = $savedPath;
+            $this->saveImportedWordPressMediaMetadata($savedPath, $attachment);
 
             $newUrl = url('/uploads/' . $savedPath);
             foreach ($this->wordPressMediaAliases($relativeSource, $sourceUrl, $siteUrl, (string) ($attachment['attachment_metadata'] ?? ''), (string) ($attachment['post_name'] ?? ''), (int) ($attachment['ID'] ?? 0)) as $alias) {
@@ -682,6 +986,393 @@ abstract class AdminBaseController extends BaseController
         return $map;
     }
 
+    protected function wordPressMediaPathsForAttachments(\PDO $pdo, string $prefix, array $attachmentIds, Request $request, bool $download): array
+    {
+        $attachmentIds = array_values(array_unique(array_filter(array_map('intval', $attachmentIds))));
+        if (!$attachmentIds) {
+            return [];
+        }
+
+        $postsTable = $prefix . 'posts';
+        $metaTable = $prefix . 'postmeta';
+        $siteUrl = rtrim(trim((string) $request->input('wp_site_url', '')), '/');
+        $uploadsPath = rtrim(trim((string) $request->input('wp_uploads_path', '')), '/\\');
+        $placeholders = implode(',', array_fill(0, count($attachmentIds), '?'));
+        $stmt = $pdo->prepare(
+            "select p.ID, p.guid, p.post_title, p.post_excerpt, p.post_content,
+                    m.meta_value as attached_file, alt.meta_value as alt_text
+             from {$postsTable} p
+             left join {$metaTable} m on m.post_id = p.ID and m.meta_key = '_wp_attached_file'
+             left join {$metaTable} alt on alt.post_id = p.ID and alt.meta_key = '_wp_attachment_image_alt'
+             where p.post_type = 'attachment' and p.ID in ({$placeholders})"
+        );
+        $stmt->execute($attachmentIds);
+
+        $paths = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $attachment) {
+            $id = (int) ($attachment['ID'] ?? 0);
+            $relativeSource = trim((string) ($attachment['attached_file'] ?? ''), '/');
+            $sourceUrl = trim((string) ($attachment['guid'] ?? ''));
+            $source = $this->wordPressMediaSource($relativeSource, $sourceUrl, $siteUrl, $uploadsPath);
+            if (!$id || $source === '') {
+                continue;
+            }
+
+            $savedPath = $this->saveImportedMedia($source, $relativeSource, $sourceUrl, $id, $download);
+            if ($savedPath !== '') {
+                $paths[$id] = $savedPath;
+                $this->saveImportedWordPressMediaMetadata($savedPath, $attachment);
+            }
+        }
+
+        return $paths;
+    }
+
+    protected function saveImportedWordPressMediaMetadata(string $path, array $attachment): void
+    {
+        $path = Files::normalize($path);
+        if ($path === '') {
+            return;
+        }
+
+        $imported = $this->wordPressMediaMetadataFromAttachment($attachment);
+        if (implode('', $imported) === '') {
+            return;
+        }
+
+        try {
+            $current = MediaMetadata::get($path);
+            foreach ($imported as $key => $value) {
+                if ($value !== '') {
+                    $current[$key] = $value;
+                }
+            }
+
+            MediaMetadata::save($path, $current);
+        } catch (Throwable) {
+            return;
+        }
+    }
+
+    protected function wordPressMediaMetadataFromAttachment(array $attachment): array
+    {
+        return MediaMetadata::normalizeEntry([
+            'title' => $this->cleanWordPressMediaMetadata((string) ($attachment['post_title'] ?? '')),
+            'alt_text' => $this->cleanWordPressMediaMetadata((string) ($attachment['alt_text'] ?? '')),
+            'caption' => $this->cleanWordPressMediaMetadata((string) ($attachment['post_excerpt'] ?? '')),
+            'description' => $this->cleanWordPressMediaMetadata((string) ($attachment['post_content'] ?? ''), 1000),
+        ]);
+    }
+
+    protected function cleanWordPressMediaMetadata(string $value, int $limit = 160): string
+    {
+        $value = trim(html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $value = $limit > 160
+            ? (preg_replace("/[ \t\r]+/", ' ', $value) ?? '')
+            : (preg_replace('/\s+/', ' ', $value) ?? '');
+        if (function_exists('mb_substr')) {
+            return mb_substr($value, 0, $limit, 'UTF-8');
+        }
+
+        return substr($value, 0, $limit);
+    }
+
+    protected function importWordPressMenus(Request $request, string $mode = 'create'): array
+    {
+        $pdo = $this->externalImportPdo($request);
+        $prefix = $this->sanitizeDbIdentifier((string) $request->input('db_prefix', 'wp_'));
+        $menus = $this->wordPressMenus($pdo, $prefix);
+        if (!$menus) {
+            return ['menus_imported' => 0, 'menu_items_imported' => 0];
+        }
+
+        $settings = $this->siteSettings();
+        $templateKey = preg_replace('/[^a-z0-9_-]/i', '', (string) ($settings['site_template'] ?? 'official')) ?: 'official';
+        $theme = SiteThemes::get($templateKey);
+        $template = (string) ($theme['key'] ?? $templateKey);
+        $layouts = json_decode((string) ($settings['site_template_layouts'] ?? ''), true);
+        $layouts = is_array($layouts) ? $layouts : [];
+        $layout = is_array($layouts[$template] ?? null) ? $layouts[$template] : [];
+        $header = is_array($layout['header'] ?? null) ? $layout['header'] : [];
+
+        $menuValues = array_values($menus);
+        $header['links'] = $menuValues[0]['links'] ?? [];
+        if (!empty($menuValues[1]['links'])) {
+            $header['secondary_enabled'] = true;
+            $header['secondary_links'] = $menuValues[1]['links'];
+        } elseif ($mode !== 'update') {
+            $header['secondary_links'] = [];
+        }
+
+        $layout['header'] = array_replace([
+            'variant' => 'default',
+            'show_brand' => true,
+            'mobile_variant' => 'drawer',
+            'mobile_source' => 'main',
+            'mobile_label' => 'Меню',
+            'mobile_show_brand' => true,
+            'mobile_show_cta' => true,
+        ], $header);
+        $layout['footer'] = is_array($layout['footer'] ?? null) ? $layout['footer'] : [];
+        $layouts[$template] = $layout;
+
+        $encoded = json_encode($layouts, JSON_UNESCAPED_UNICODE);
+        $this->saveSetting('site_template_layouts', $encoded === false ? '{}' : $encoded);
+
+        return [
+            'menus_imported' => count($menus),
+            'menu_items_imported' => array_sum(array_map(static fn (array $menu): int => (int) ($menu['count'] ?? 0), $menus)),
+        ];
+    }
+
+    protected function wordPressMenus(\PDO $pdo, string $prefix): array
+    {
+        $postsTable = $prefix . 'posts';
+        $termsTable = $prefix . 'terms';
+        $taxonomyTable = $prefix . 'term_taxonomy';
+        $relationshipsTable = $prefix . 'term_relationships';
+        $metaTable = $prefix . 'postmeta';
+        $rows = $pdo->query(
+            "select tt.term_taxonomy_id, t.name as menu_name, t.slug as menu_slug,
+                    p.ID, p.post_title, p.menu_order
+             from {$termsTable} t
+             inner join {$taxonomyTable} tt on tt.term_id = t.term_id and tt.taxonomy = 'nav_menu'
+             inner join {$relationshipsTable} tr on tr.term_taxonomy_id = tt.term_taxonomy_id
+             inner join {$postsTable} p on p.ID = tr.object_id and p.post_type = 'nav_menu_item'
+             where p.post_status in ('publish', 'draft')
+             order by tt.term_taxonomy_id asc, p.menu_order asc, p.ID asc"
+        )->fetchAll(\PDO::FETCH_ASSOC);
+        if (!$rows) {
+            return [];
+        }
+
+        $itemIds = array_map(static fn (array $row): int => (int) $row['ID'], $rows);
+        $meta = $this->wordPressPostMeta($pdo, $metaTable, $itemIds);
+        $objectIds = [];
+        foreach ($itemIds as $itemId) {
+            $objectId = (int) ($meta[$itemId]['_menu_item_object_id'] ?? 0);
+            if ($objectId > 0) {
+                $objectIds[] = $objectId;
+            }
+        }
+        $objects = $this->wordPressMenuObjects($pdo, $prefix, $objectIds);
+
+        $menus = [];
+        foreach ($rows as $row) {
+            $itemId = (int) ($row['ID'] ?? 0);
+            $menuId = (int) ($row['term_taxonomy_id'] ?? 0);
+            if (!$itemId || !$menuId) {
+                continue;
+            }
+            $menuMeta = $meta[$itemId] ?? [];
+            $objectId = (int) ($menuMeta['_menu_item_object_id'] ?? 0);
+            $objectKey = (string) ($menuMeta['_menu_item_object'] ?? '') . ':' . $objectId;
+            $item = [
+                'id' => $itemId,
+                'parent_id' => (int) ($menuMeta['_menu_item_menu_item_parent'] ?? 0),
+                'label' => $this->wpImportLimitString((string) ($row['post_title'] ?? ''), 80),
+                'url' => $this->wordPressMenuItemUrl($menuMeta, $objects[$objectKey] ?? $objects['id:' . $objectId] ?? null),
+                'children' => [],
+            ];
+            if ($item['label'] === '') {
+                $item['label'] = $this->wpImportLimitString((string) (($objects[$objectKey]['title'] ?? $objects['id:' . $objectId]['title'] ?? '') ?: 'Пункт меню'), 80);
+            }
+            $menus[$menuId]['name'] = (string) ($row['menu_name'] ?? '');
+            $menus[$menuId]['items'][$itemId] = $item;
+        }
+
+        $result = [];
+        foreach ($menus as $menuId => $menu) {
+            $items = $menu['items'] ?? [];
+            foreach ($items as $itemId => $item) {
+                $parentId = (int) ($item['parent_id'] ?? 0);
+                if ($parentId > 0 && isset($items[$parentId])) {
+                    $items[$parentId]['children'][] = $itemId;
+                }
+            }
+            $links = [];
+            foreach ($items as $itemId => $item) {
+                if ((int) ($item['parent_id'] ?? 0) === 0) {
+                    $links[] = $this->wordPressMenuLink($itemId, $items);
+                }
+            }
+            $result[$menuId] = [
+                'name' => (string) ($menu['name'] ?? ''),
+                'links' => array_slice(array_values(array_filter($links)), 0, 16),
+                'count' => count($items),
+            ];
+        }
+
+        return $result;
+    }
+
+    protected function wordPressPostMeta(\PDO $pdo, string $metaTable, array $postIds): array
+    {
+        $postIds = array_values(array_unique(array_filter(array_map('intval', $postIds))));
+        if (!$postIds) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($postIds), '?'));
+        $stmt = $pdo->prepare("select post_id, meta_key, meta_value from {$metaTable} where post_id in ({$placeholders})");
+        $stmt->execute($postIds);
+        $meta = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $meta[(int) $row['post_id']][(string) $row['meta_key']] = (string) $row['meta_value'];
+        }
+        return $meta;
+    }
+
+    protected function wordPressMenuObjects(\PDO $pdo, string $prefix, array $objectIds): array
+    {
+        $objectIds = array_values(array_unique(array_filter(array_map('intval', $objectIds))));
+        if (!$objectIds) {
+            return [];
+        }
+        $postsTable = $prefix . 'posts';
+        $termsTable = $prefix . 'terms';
+        $placeholders = implode(',', array_fill(0, count($objectIds), '?'));
+        $objects = [];
+        $stmt = $pdo->prepare("select ID, post_title, post_name, post_type from {$postsTable} where ID in ({$placeholders})");
+        $stmt->execute($objectIds);
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $postId = (int) $row['ID'];
+            $postType = (string) ($row['post_type'] ?? '');
+            $object = [
+                'kind' => 'post',
+                'type' => $postType,
+                'title' => (string) ($row['post_title'] ?? ''),
+                'slug' => $this->wordPressSlug((string) ($row['post_name'] ?? '')),
+            ];
+            $objects[$postType . ':' . $postId] = $object;
+            $objects['id:' . $postId] = $object;
+        }
+        $stmt = $pdo->prepare("select term_id, name, slug from {$termsTable} where term_id in ({$placeholders})");
+        $stmt->execute($objectIds);
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $termId = (int) $row['term_id'];
+            $object = [
+                'kind' => 'term',
+                'type' => 'category',
+                'title' => (string) ($row['name'] ?? ''),
+                'slug' => $this->wordPressSlug((string) ($row['slug'] ?? '')),
+            ];
+            $objects['category:' . $termId] = $object;
+            $objects['id:' . $termId] ??= $object;
+        }
+        return $objects;
+    }
+
+    protected function wordPressMenuItemUrl(array $meta, ?array $object): string
+    {
+        $type = (string) ($meta['_menu_item_type'] ?? '');
+        if ($type === 'custom') {
+            return $this->wpImportUrl((string) ($meta['_menu_item_url'] ?? '#'));
+        }
+        if (!$object) {
+            return '#';
+        }
+        if (($object['kind'] ?? '') === 'term') {
+            return url('/news?category=' . rawurlencode((string) ($object['title'] ?? '')));
+        }
+        $slug = (string) ($object['slug'] ?? '');
+        if (($object['type'] ?? '') === 'page') {
+            return $slug === 'home' ? url('/') : url('/page/' . $slug);
+        }
+        if (($object['type'] ?? '') === 'post') {
+            return url('/news/' . $slug);
+        }
+        return '#';
+    }
+
+    protected function wordPressMenuLink(int $itemId, array $items): ?array
+    {
+        if (!isset($items[$itemId])) {
+            return null;
+        }
+        $item = $items[$itemId];
+        $childIds = is_array($item['children'] ?? null) ? $item['children'] : [];
+        $childLinks = [];
+        foreach ($childIds as $childId) {
+            $child = $this->wordPressMenuLink((int) $childId, $items);
+            if ($child) {
+                $childLinks[] = $child;
+            }
+        }
+        $hasGrandchildren = false;
+        foreach ($childIds as $childId) {
+            if (!empty($items[(int) $childId]['children'])) {
+                $hasGrandchildren = true;
+                break;
+            }
+        }
+        $link = [
+            'type' => 'link',
+            'label' => $this->wpImportLimitString((string) ($item['label'] ?? ''), 80),
+            'url' => $this->wpImportUrl((string) ($item['url'] ?? '#')),
+            'icon' => '',
+            'children' => [],
+            'columns' => [],
+        ];
+        if (!$hasGrandchildren) {
+            $link['children'] = array_slice($childLinks, 0, 12);
+            return $link;
+        }
+
+        $link['type'] = 'section';
+        $link['url'] = '#';
+        $columns = [];
+        foreach ($childIds as $childId) {
+            if (empty($items[(int) $childId])) {
+                continue;
+            }
+            $childItem = $items[(int) $childId];
+            $columnChildren = [];
+            if ((string) ($childItem['url'] ?? '#') !== '#') {
+                $columnChildren[] = [
+                    'type' => 'link',
+                    'label' => $this->wpImportLimitString((string) ($childItem['label'] ?? ''), 80),
+                    'url' => $this->wpImportUrl((string) ($childItem['url'] ?? '#')),
+                    'icon' => '',
+                    'children' => [],
+                    'columns' => [],
+                ];
+            }
+            foreach (($childItem['children'] ?? []) as $grandchildId) {
+                $grandchild = $this->wordPressMenuLink((int) $grandchildId, $items);
+                if ($grandchild) {
+                    $columnChildren[] = $grandchild;
+                }
+            }
+            $columns[] = [
+                'title' => $this->wpImportLimitString((string) ($childItem['label'] ?? ''), 80),
+                'children' => array_slice($columnChildren, 0, 12),
+            ];
+        }
+        $link['columns'] = array_slice($columns, 0, 4);
+        return $link;
+    }
+
+    protected function wpImportLimitString(string $value, int $limit): string
+    {
+        $value = trim($value);
+        if (function_exists('mb_substr')) {
+            return trim(mb_substr($value, 0, $limit, 'UTF-8'));
+        }
+        return trim(substr($value, 0, $limit));
+    }
+
+    protected function wpImportUrl(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '#';
+        }
+        if (str_starts_with($url, '/') || preg_match('/^https?:\/\//i', $url) || str_starts_with($url, '#')) {
+            return $this->wpImportLimitString($url, 240);
+        }
+        return '#';
+    }
+
     protected function wordPressMediaSource(string $relativeSource, string $sourceUrl, string $siteUrl, string $uploadsPath): string
     {
         if ($uploadsPath !== '' && $relativeSource !== '') {
@@ -700,6 +1391,84 @@ abstract class AdminBaseController extends BaseController
         }
 
         return '';
+    }
+
+    protected function replaceWordPressContentMediaUrls(string $content, Request $request): string
+    {
+        $urls = $this->wordPressContentMediaUrls($content);
+        if (!$urls) {
+            return $content;
+        }
+
+        $siteUrl = rtrim(trim((string) $request->input('wp_site_url', '')), '/');
+        $uploadsPath = rtrim(trim((string) $request->input('wp_uploads_path', '')), '/\\');
+        $replacements = [];
+        foreach ($urls as $url) {
+            $relative = $this->wordPressUploadsRelativeFromUrl($url);
+            if ($relative === '') {
+                continue;
+            }
+
+            $sourceUrl = str_starts_with($url, '//') ? 'https:' . $url : $url;
+            $source = $this->wordPressMediaSource($relative, $sourceUrl, $siteUrl, $uploadsPath);
+            if ($source === '') {
+                continue;
+            }
+
+            $savedPath = $this->saveImportedMedia($source, $relative, $sourceUrl, $this->wordPressContentMediaId($relative));
+            if ($savedPath === '') {
+                continue;
+            }
+
+            $newUrl = url('/uploads/' . $savedPath);
+            $replacements[$url] = $newUrl;
+            $decodedUrl = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($decodedUrl !== $url) {
+                $replacements[$decodedUrl] = $newUrl;
+            }
+            $encodedUrl = htmlspecialchars($decodedUrl, ENT_QUOTES, 'UTF-8');
+            if ($encodedUrl !== $url && $encodedUrl !== $decodedUrl) {
+                $replacements[$encodedUrl] = $newUrl;
+            }
+        }
+
+        return $replacements ? str_replace(array_keys($replacements), array_values($replacements), $content) : $content;
+    }
+
+    protected function wordPressContentMediaUrls(string $content): array
+    {
+        preg_match_all('#(?:https?:)?//[^"\'\s<>]+/wp-content/uploads/[^"\'\s<>]+|/wp-content/uploads/[^"\'\s<>]+#i', $content, $matches);
+        $urls = [];
+        foreach ($matches[0] ?? [] as $url) {
+            $url = trim(html_entity_decode((string) $url, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $url = rtrim($url, " \t\n\r\0\x0B'\"),.;");
+            if ($url !== '') {
+                $urls[$url] = true;
+            }
+        }
+
+        return array_keys($urls);
+    }
+
+    protected function wordPressUploadsRelativeFromUrl(string $url): string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') {
+            $path = $url;
+        }
+
+        $marker = '/wp-content/uploads/';
+        $position = stripos($path, $marker);
+        if ($position === false) {
+            return '';
+        }
+
+        return Files::normalize(rawurldecode(substr($path, $position + strlen($marker))));
+    }
+
+    protected function wordPressContentMediaId(string $relative): int
+    {
+        return (int) (sprintf('%u', crc32($relative)) ?: 0);
     }
 
     protected function saveImportedMedia(string $source, string $relativeSource, string $sourceUrl, int $id, bool $download = true): string
@@ -723,13 +1492,26 @@ abstract class AdminBaseController extends BaseController
             return '';
         }
 
-        $context = stream_context_create(['http' => ['timeout' => 15], 'https' => ['timeout' => 15]]);
-        $contents = is_file($source) ? file_get_contents($source) : @file_get_contents($source, false, $context);
-        if ($contents === false || $contents === '') {
+        $context = stream_context_create(['http' => ['timeout' => 30], 'https' => ['timeout' => 30]]);
+        $sourceStream = is_file($source) ? @fopen($source, 'rb') : @fopen($source, 'rb', false, $context);
+        if (!$sourceStream) {
             return '';
         }
 
-        file_put_contents($target, $contents);
+        $targetStream = @fopen($target, 'wb');
+        if (!$targetStream) {
+            fclose($sourceStream);
+            return '';
+        }
+
+        $bytes = stream_copy_to_stream($sourceStream, $targetStream);
+        fclose($sourceStream);
+        fclose($targetStream);
+        if ($bytes === false || $bytes <= 0) {
+            @unlink($target);
+            return '';
+        }
+
         return $targetRelative;
     }
 
@@ -938,18 +1720,24 @@ abstract class AdminBaseController extends BaseController
         return trim($key, '_');
     }
 
-    protected function importRows(string $type, array $rows): int
+    protected function importRows(string $type, array $rows, string $mode = 'create'): int
     {
+        $mode = $this->importMode($mode);
         return match ($type) {
-            'news' => $this->importNewsRows($rows),
-            'pages' => $this->importPageRows($rows),
-            'global_fields' => $this->importGlobalFieldRows($rows),
-            'wordpress' => $this->importWordPressRows($rows),
+            'news' => $this->importNewsRows($rows, $mode),
+            'pages' => $this->importPageRows($rows, $mode),
+            'global_fields' => $this->importGlobalFieldRows($rows, $mode),
+            'wordpress' => $this->importWordPressRows($rows, $mode),
             default => 0,
         };
     }
 
-    protected function importWordPressRows(array $rows): int
+    protected function importMode(string $mode): string
+    {
+        return in_array($mode, ['create', 'update', 'upsert'], true) ? $mode : 'create';
+    }
+
+    protected function importWordPressRows(array $rows, string $mode = 'create'): int
     {
         $created = 0;
         $pageRows = [];
@@ -963,16 +1751,36 @@ abstract class AdminBaseController extends BaseController
         }
 
         if ($newsRows) {
-            $created += $this->importNewsRows($newsRows);
+            $created += $this->importNewsRows($newsRows, $mode);
         }
         if ($pageRows) {
-            $created += $this->importPageRows($pageRows);
+            $created += $this->importPageRows($pageRows, $mode);
         }
 
         return $created;
     }
 
-    protected function importNewsRows(array $rows): int
+    protected function importLegacySlug(array $row): string
+    {
+        $legacy = trim((string) ($row['_wp_legacy_slug'] ?? ''));
+        return $legacy !== '' ? $this->limitSlug($this->slug($legacy), 180) : '';
+    }
+
+    protected function importExistingBySlug(string $table, string $slug, string $legacySlug = ''): ?array
+    {
+        if (!in_array($table, ['news', 'pages'], true)) {
+            return null;
+        }
+
+        $existing = $this->db()->fetch("select id from {$table} where slug = ? limit 1", [$slug]);
+        if ($existing || $legacySlug === '' || $legacySlug === $slug) {
+            return $existing ?: null;
+        }
+
+        return $this->db()->fetch("select id from {$table} where slug = ? limit 1", [$legacySlug]) ?: null;
+    }
+
+    protected function importNewsRows(array $rows, string $mode = 'create'): int
     {
         $created = 0;
         $now = date('c');
@@ -983,6 +1791,15 @@ abstract class AdminBaseController extends BaseController
             }
             $slugSource = $this->importValue($row, ['slug', 'адреса']) ?: $title;
             $title = $this->importTitle($title);
+            $slug = $this->limitSlug($this->slug($slugSource), 180) ?: $this->limitSlug($this->slug($title), 180);
+            if ($slug === '') {
+                continue;
+            }
+            $legacySlug = $this->importLegacySlug($row);
+            $existing = $mode !== 'create' ? $this->importExistingBySlug('news', $slug, $legacySlug) : null;
+            if ($mode === 'update' && !$existing) {
+                continue;
+            }
 
             $status = $this->importStatus($this->importValue($row, ['status', 'статус']), 'draft');
             $publishedAt = $this->importValue($row, ['published_at', 'дата_публікації', 'дата']);
@@ -992,21 +1809,39 @@ abstract class AdminBaseController extends BaseController
             $categoryPayloads = $this->importNewsCategoryPayloads($row);
             $category = (string) ($categoryPayloads[0]['title'] ?? 'Загальні');
             $categoryIds = $this->ensureImportedNewsCategories($categoryPayloads, $now);
+            $imagePath = Files::normalize($this->importValue($row, ['image_path', 'featured_image', 'main_image', 'головне_зображення']));
+            if ($imagePath !== '' && !$this->isImportImagePath($imagePath)) {
+                $imagePath = '';
+            }
+            if ($existing && $imagePath === '') {
+                $current = $this->db()->fetch('select image_path from news where id = ? limit 1', [(int) ($existing['id'] ?? 0)]);
+                $imagePath = Files::normalize((string) ($current['image_path'] ?? ''));
+            }
 
-            $this->db()->execute(
-                'insert into news (title, slug, category, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)',
-                [
-                    $title,
-                    $this->uniqueSlug('news', $slugSource),
-                    $category,
-                    $this->importValue($row, ['body', 'text', 'контент', 'текст', 'опис']),
-                    $status,
-                    $publishedAt ?: null,
-                    $now,
-                    $now,
-                ]
-            );
-            $newsId = (int) $this->db()->lastInsertId();
+            $data = [
+                $title,
+                $category,
+                $imagePath !== '' ? $imagePath : null,
+                $this->importValue($row, ['body', 'text', 'контент', 'текст', 'опис']),
+                $status,
+                $publishedAt ?: null,
+                $now,
+            ];
+
+            if ($existing) {
+                $newsId = (int) ($existing['id'] ?? 0);
+                $this->db()->execute(
+                    'update news set title=?, slug=?, category=?, image_path=?, body=?, status=?, published_at=?, updated_at=? where id=?',
+                    [$title, $slug, $category, $imagePath !== '' ? $imagePath : null, $data[3], $status, $publishedAt ?: null, $now, $newsId]
+                );
+                $this->db()->execute('delete from news_category_links where news_id = ?', [$newsId]);
+            } else {
+                $this->db()->execute(
+                    'insert into news (title, slug, category, image_path, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [$title, $this->uniqueSlug('news', $slugSource), $category, $imagePath !== '' ? $imagePath : null, $data[3], $status, $publishedAt ?: null, $now, $now]
+                );
+                $newsId = (int) $this->db()->lastInsertId();
+            }
             foreach ($categoryIds as $categoryId) {
                 $this->db()->execute('insert into news_category_links (news_id, category_id) values (?, ?)', [$newsId, $categoryId]);
             }
@@ -1014,6 +1849,13 @@ abstract class AdminBaseController extends BaseController
         }
 
         return $created;
+    }
+
+    protected function isImportImagePath(string $path): bool
+    {
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        return in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)
+            && is_file(base_path('storage/uploads/' . $path));
     }
 
     protected function importNewsCategoryPayloads(array $row): array
@@ -1107,7 +1949,7 @@ abstract class AdminBaseController extends BaseController
         return (int) $this->db()->lastInsertId();
     }
 
-    protected function importPageRows(array $rows): int
+    protected function importPageRows(array $rows, string $mode = 'create'): int
     {
         $created = 0;
         $now = date('c');
@@ -1118,35 +1960,51 @@ abstract class AdminBaseController extends BaseController
             }
             $slugSource = $this->importValue($row, ['slug', 'адреса']) ?: $title;
             $title = $this->importTitle($title);
+            $slug = $this->limitSlug($this->slug($slugSource), 180) ?: $this->limitSlug($this->slug($title), 180);
+            if ($slug === '') {
+                continue;
+            }
+            $legacySlug = $this->importLegacySlug($row);
+            $existing = $mode !== 'create' ? $this->importExistingBySlug('pages', $slug, $legacySlug) : null;
+            if ($mode === 'update' && !$existing) {
+                continue;
+            }
 
             $template = $this->importValue($row, ['template', 'шаблон']) ?: 'default';
             if (!array_key_exists($template, $this->pageTemplates())) {
                 $template = 'default';
             }
             $body = $this->importValue($row, ['body', 'blocks_text', 'text', 'контент', 'текст', 'опис']);
-            $blocks = json_encode($this->blocksFromText($body), JSON_UNESCAPED_UNICODE);
+            $blocks = json_encode($this->blocksFromText($body, false), JSON_UNESCAPED_UNICODE);
 
-            $this->db()->execute(
-                'insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [
-                    $title,
-                    $this->uniqueSlug('pages', $slugSource),
-                    $this->importValue($row, ['excerpt', 'анонс', 'короткий_опис']),
-                    $template,
-                    $blocks === false ? '[]' : $blocks,
-                    $this->importStatus($this->importValue($row, ['status', 'статус']), 'draft'),
-                    (int) ($this->importValue($row, ['sort_order', 'порядок']) ?: 0),
-                    $now,
-                    $now,
-                ]
-            );
+            $data = [
+                $title,
+                $this->importValue($row, ['excerpt', 'анонс', 'короткий_опис']),
+                $template,
+                $blocks === false ? '[]' : $blocks,
+                $this->importStatus($this->importValue($row, ['status', 'статус']), 'draft'),
+                (int) ($this->importValue($row, ['sort_order', 'порядок']) ?: 0),
+                $now,
+            ];
+
+            if ($existing) {
+                $this->db()->execute(
+                    'update pages set title=?, slug=?, excerpt=?, template=?, blocks_json=?, status=?, sort_order=?, updated_at=? where id=?',
+                    [$title, $slug, $data[1], $template, $data[3], $data[4], $data[5], $now, (int) ($existing['id'] ?? 0)]
+                );
+            } else {
+                $this->db()->execute(
+                    'insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [$title, $this->uniqueSlug('pages', $slugSource), $data[1], $template, $data[3], $data[4], $data[5], $now, $now]
+                );
+            }
             $created++;
         }
 
         return $created;
     }
 
-    protected function importGlobalFieldRows(array $rows): int
+    protected function importGlobalFieldRows(array $rows, string $mode = 'create'): int
     {
         $fields = $this->globalFields();
         $created = 0;
@@ -1157,13 +2015,41 @@ abstract class AdminBaseController extends BaseController
                 continue;
             }
 
-            $fields[] = ['label' => $label !== '' ? $label : 'Поле', 'value' => $value];
+            $label = $label !== '' ? $label : 'Поле';
+            if ($mode !== 'create') {
+                $index = $this->globalFieldIndex($fields, $label);
+                if ($mode === 'update' && $index === null) {
+                    continue;
+                }
+                if ($index !== null) {
+                    $fields[$index]['value'] = $value;
+                } else {
+                    $fields[] = ['label' => $label, 'value' => $value];
+                }
+            } else {
+                $fields[] = ['label' => $label, 'value' => $value];
+            }
             $created++;
         }
 
         $encodedFields = json_encode($fields, JSON_UNESCAPED_UNICODE);
         $this->saveSetting('global_fields', $encodedFields === false ? '[]' : $encodedFields);
         return $created;
+    }
+
+    protected function globalFieldIndex(array $fields, string $label): ?int
+    {
+        $needle = function_exists('mb_strtolower') ? mb_strtolower(trim($label), 'UTF-8') : strtolower(trim($label));
+        foreach ($fields as $index => $field) {
+            $current = function_exists('mb_strtolower')
+                ? mb_strtolower(trim((string) ($field['label'] ?? '')), 'UTF-8')
+                : strtolower(trim((string) ($field['label'] ?? '')));
+            if ($current === $needle) {
+                return (int) $index;
+            }
+        }
+
+        return null;
     }
 
     protected function importPreviewSummary(string $type, array $rows): array
@@ -1431,7 +2317,7 @@ abstract class AdminBaseController extends BaseController
 
     protected function slug(string $value): string
     {
-        $value = strtolower(trim($value));
+        $value = function_exists('mb_strtolower') ? mb_strtolower(trim($value), 'UTF-8') : strtolower(trim($value));
         $value = preg_replace('/[^a-z0-9а-яіїєґ]+/u', '-', $value);
         $value = trim($value ?: 'item', '-');
         if (function_exists('mb_substr')) {
@@ -1440,23 +2326,44 @@ abstract class AdminBaseController extends BaseController
         return trim(substr($value, 0, 170), '-');
     }
 
-    protected function blocksFromText(string $text): array
+    protected function blocksFromText(string $text, bool $splitPlainTextTitles = true): array
     {
+        $text = trim($text);
         if ($text !== strip_tags($text)) {
-            $title = 'Текст';
+            $title = '';
             if (preg_match('/<h[1-4][^>]*>(.*?)<\/h[1-4]>/is', $text, $match)) {
                 $title = trim(strip_tags($match[1])) ?: $title;
             }
 
-            return [['type' => 'text', 'title' => $title, 'text' => trim($text)]];
+            return [['type' => 'text', 'title' => $title, 'text' => $text]];
+        }
+
+        if (!$splitPlainTextTitles) {
+            return $text !== ''
+                ? [['type' => 'text', 'title' => '', 'text' => $this->plainTextToHtml($text)]]
+                : [];
         }
 
         $blocks = [];
-        foreach (preg_split('/\R{2,}/', trim($text)) ?: [] as $part) {
+        foreach (preg_split('/\R{2,}/', $text) ?: [] as $part) {
             $lines = preg_split('/\R/', trim($part)) ?: [];
             $title = array_shift($lines) ?: 'Текст';
             $blocks[] = ['type' => 'text', 'title' => $title, 'text' => implode("\n", $lines)];
         }
-        return $blocks ?: [['type' => 'text', 'title' => 'Текст', 'text' => '']];
+        return $blocks ?: [['type' => 'text', 'title' => '', 'text' => '']];
+    }
+
+    protected function plainTextToHtml(string $text): string
+    {
+        $paragraphs = preg_split('/\R{2,}/', trim($text)) ?: [];
+        $html = [];
+        foreach ($paragraphs as $paragraph) {
+            $paragraph = trim($paragraph);
+            if ($paragraph !== '') {
+                $html[] = '<p>' . nl2br(e($paragraph), false) . '</p>';
+            }
+        }
+
+        return implode("\n", $html);
     }
 }

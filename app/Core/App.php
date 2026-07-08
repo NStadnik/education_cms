@@ -12,10 +12,12 @@ use App\Controllers\Admin\PagesController;
 use App\Controllers\Admin\SettingsController;
 use App\Controllers\Admin\UpdatesController;
 use App\Controllers\Admin\UsersController;
+use App\Controllers\ErrorController;
 use App\Controllers\InstallController;
 use App\Controllers\PublicController;
 use App\Services\Installer;
 use App\Services\SchemaUpgrade;
+use Throwable;
 
 final class App
 {
@@ -71,7 +73,21 @@ final class App
 
     public function handle(Request $request): Response
     {
-        return $this->router->dispatch($request);
+        try {
+            return $this->router->dispatch($request);
+        } catch (Throwable $exception) {
+            if (Debug::enabled($this->basePath)) {
+                throw $exception;
+            }
+
+            if (strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest') {
+                return new Response(json_encode(['ok' => false, 'message' => 'Помилка сервера.'], JSON_UNESCAPED_UNICODE), 500, [
+                    'Content-Type' => 'application/json; charset=UTF-8',
+                ]);
+            }
+
+            return ErrorController::response(500);
+        }
     }
 
     private function routes(): void

@@ -35,6 +35,22 @@ final class ImportController extends \App\Controllers\AdminBaseController
             if (!array_key_exists($type, $this->importOptions())) {
                 throw new \RuntimeException('Невідомий тип імпорту.');
             }
+            $importMode = $this->requestImportMode($request);
+
+            if ($type === 'wordpress' && ($request->input('wp_menu_only') || (string) $request->input('wp_import_scope', 'all') === 'menu')) {
+                $stats = $this->importWordPressMenus($request, $importMode);
+                $result = [
+                    'ok' => true,
+                    'message' => 'Меню WordPress імпортовано.',
+                    'created' => (int) ($stats['menu_items_imported'] ?? 0),
+                    'total' => (int) ($stats['menus_imported'] ?? 0),
+                    'stats' => $stats,
+                    'next_offset' => 0,
+                    'has_more' => false,
+                ];
+
+                return $this->json($result);
+            }
 
             if ($type === 'wordpress' && ($request->input('wp_media_only') || (string) $request->input('wp_import_scope', 'all') === 'media')) {
                 $stats = $this->runWordPressMediaBatch($request);
@@ -70,10 +86,10 @@ final class ImportController extends \App\Controllers\AdminBaseController
 
             $this->db()->pdo()->beginTransaction();
             $transactionStarted = true;
-            $created = $this->importRows($type, $rows);
+            $created = $this->importRows($type, $rows, $importMode);
             $this->db()->pdo()->commit();
             $transactionStarted = false;
-            $this->audit('import', $type, null, 'created: ' . $created);
+            $this->audit('import', $type, null, 'processed: ' . $created);
 
             $result = [
                 'ok' => true,
@@ -113,6 +129,16 @@ final class ImportController extends \App\Controllers\AdminBaseController
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function requestImportMode(Request $request): string
+    {
+        if ($request->input('import_check_duplicates')) {
+            return 'upsert';
+        }
+
+        $mode = (string) $request->input('import_mode', 'create');
+        return in_array($mode, ['create', 'update', 'upsert'], true) ? $mode : 'create';
     }
 
     public function importPreview(Request $request): Response

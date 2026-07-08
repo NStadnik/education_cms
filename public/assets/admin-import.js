@@ -109,7 +109,7 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         const stagePercent = safeTotal > 0 ? safeDone / safeTotal : 0;
         const percent = percentBase + (stagePercent * percentRange);
         const countText = safeDone + ' / ' + (safeTotal || safeDone);
-        const createdText = created !== undefined ? ', створено ' + created : '';
+        const createdText = created !== undefined ? ', ' + (stage === 'media' ? 'імпортовано' : mutationLabel()) + ' ' + created : '';
         if (stage === 'media') {
             showProgress({
                 title: 'Імпорт WordPress',
@@ -242,7 +242,13 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
                 body: body,
                 headers: {'X-Requested-With': 'XMLHttpRequest'}
             });
-            const data = await response.json();
+            const text = await response.text();
+            let data = null;
+            try {
+                data = JSON.parse(text);
+            } catch (error) {
+                throw new Error(text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || 'Сервер повернув неочікувану відповідь.');
+            }
             if (!response.ok || !data.ok) {
                 throw new Error(data.message || 'Не вдалося виконати імпорт.');
             }
@@ -262,6 +268,22 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         return checked ? checked.value : 'all';
     }
 
+    function importMode() {
+        const duplicateCheck = fieldByName('import_check_duplicates');
+        if (duplicateCheck) {
+            return duplicateCheck.checked ? 'upsert' : 'create';
+        }
+        const checked = checkedField('import_mode');
+        return checked ? checked.value : 'create';
+    }
+
+    function mutationLabel() {
+        if (importMode() === 'upsert') {
+            return 'оброблено';
+        }
+        return importMode() === 'update' ? 'оновлено' : 'створено';
+    }
+
     function setGroupDisabled(group, disabled) {
         if (!group) {
             return;
@@ -275,20 +297,21 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         const scope = importScope();
         const mediaOnly = scope === 'media';
         const postsOnly = scope === 'posts';
+        const menuOnly = scope === 'menu';
         if (wpPostFields) {
-            wpPostFields.hidden = mediaOnly;
-            setGroupDisabled(wpPostFields, mediaOnly);
+            wpPostFields.hidden = mediaOnly || menuOnly;
+            setGroupDisabled(wpPostFields, mediaOnly || menuOnly);
         }
         if (wpMediaFields) {
-            wpMediaFields.hidden = postsOnly;
-            setGroupDisabled(wpMediaFields, postsOnly);
+            wpMediaFields.hidden = postsOnly || menuOnly;
+            setGroupDisabled(wpMediaFields, postsOnly || menuOnly);
         }
         if (wpMediaToggle) {
             wpMediaToggle.hidden = scope !== 'all';
             setGroupDisabled(wpMediaToggle, scope !== 'all');
         }
         dbPreviewButtons.forEach(function (button) {
-            button.hidden = mediaOnly;
+            button.hidden = mediaOnly || menuOnly;
         });
     }
 
@@ -300,7 +323,8 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
 
     function progressText(stage, done, total, created) {
         const totalText = total > 0 ? total : done;
-        return stage + ': ' + done + ' / ' + totalText + (created !== undefined ? ', створено ' + created : '');
+        const label = stage.indexOf('Файли') === 0 ? 'імпортовано' : mutationLabel();
+        return stage + ': ' + done + ' / ' + totalText + (created !== undefined ? ', ' + label + ' ' + created : '');
     }
 
     async function preview(button) {
@@ -319,8 +343,8 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         resetProgress();
         const scope = importScope();
         const mediaCheckbox = fieldByName('wp_import_media');
-        const importMedia = scope === 'media' || (scope !== 'posts' && !!(mediaCheckbox && mediaCheckbox.checked));
-        const importPosts = scope !== 'media';
+        const importMedia = scope === 'media' || (scope !== 'posts' && scope !== 'menu' && !!(mediaCheckbox && mediaCheckbox.checked));
+        const importPosts = scope !== 'media' && scope !== 'menu';
         const mediaRange = importMedia && importPosts ? 45 : (importMedia ? 100 : 0);
         const postsBase = importMedia && importPosts ? 45 : 0;
         const postsRange = importPosts ? (importMedia ? 55 : 100) : 0;
@@ -394,13 +418,13 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
             }
         }
 
-        setMessage('Імпорт завершено: створено ' + createdTotal + ' із ' + postTotal + ' матеріалів' + (importMedia ? ', файлів оброблено ' + mediaImported + '.' : '.'), false);
+        setMessage('Імпорт завершено: ' + mutationLabel() + ' ' + createdTotal + ' із ' + postTotal + ' матеріалів' + (importMedia ? ', файлів оброблено ' + mediaImported : '') + '.', false);
         showProgress({
             title: 'Імпорт завершено',
             detail: 'WordPress імпорт виконано.',
             percent: 100,
             mediaText: importMedia ? (mediaImported + ' із ' + mediaTotal + ' файлів') : 'Не імпортувались',
-            postsText: createdTotal + ' із ' + postTotal + ' матеріалів',
+            postsText: mutationLabel() + ' ' + createdTotal + ' із ' + postTotal + ' матеріалів',
             mediaState: importMedia ? 'is-done' : 'is-muted',
             postsState: 'is-done'
         });
@@ -412,17 +436,20 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
     async function run(button) {
         try {
             resetProgress();
-            if (isStepImportEnabled()) {
+            const scope = importScope();
+            if (isStepImportEnabled() && scope !== 'menu') {
                 await runStepImport(button);
                 return;
             }
-            const scope = importScope();
             const extra = {};
             if (activeSource() === 'database' && scope === 'media') {
                 extra.wp_media_only = '1';
             }
             if (activeSource() === 'database' && scope === 'posts') {
                 extra.wp_import_media = '0';
+            }
+            if (activeSource() === 'database' && scope === 'menu') {
+                extra.wp_menu_only = '1';
             }
             const data = await requestImport(form.action, button, 'Імпорт...', extra);
             if (activeSource() === 'database' && scope === 'media') {
@@ -437,14 +464,27 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
                     mediaState: 'is-done',
                     postsState: 'is-muted'
                 });
-            } else {
-                setMessage('Імпорт завершено: створено ' + data.created + ' із ' + data.total + ' записів.', false);
+            } else if (activeSource() === 'database' && scope === 'menu') {
+                const stats = data.stats || {};
+                const menuItems = parseInt(stats.menu_items_imported || data.created || 0, 10);
+                setMessage('Імпорт меню завершено: перенесено ' + menuItems + ' пунктів.', false);
                 showProgress({
                     title: 'Імпорт завершено',
-                    detail: 'Записи створено.',
+                    detail: 'WordPress меню перенесено у шаблон.',
+                    percent: 100,
+                    mediaText: 'Не імпортувались',
+                    postsText: menuItems + ' пунктів меню',
+                    mediaState: 'is-muted',
+                    postsState: 'is-done'
+                });
+            } else {
+                setMessage('Імпорт завершено: ' + mutationLabel() + ' ' + data.created + ' із ' + data.total + ' записів.', false);
+                showProgress({
+                    title: 'Імпорт завершено',
+                    detail: importMode() === 'upsert' ? 'Дублі перевірено, записи оновлено або створено.' : 'Записи створено.',
                     percent: 100,
                     mediaText: activeSource() === 'database' && scope === 'posts' ? 'Не імпортувались' : 'Готово',
-                    postsText: data.created + ' із ' + data.total + ' записів',
+                    postsText: mutationLabel() + ' ' + data.created + ' із ' + data.total + ' записів',
                     mediaState: activeSource() === 'database' && scope === 'posts' ? 'is-muted' : 'is-done',
                     postsState: 'is-done'
                 });

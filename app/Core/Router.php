@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use App\Controllers\ErrorController;
+
 final class Router
 {
     private array $routes = [];
@@ -31,7 +33,7 @@ final class Router
             return $controller->$method($request, $params);
         }
 
-        return new Response('Not found', 404);
+        return ErrorController::response(404);
     }
 
     private function add(string $method, string $path, array $handler): void
@@ -54,13 +56,13 @@ final class Router
             if (preg_match('/^\{(.+)\}$/', $part, $m)) {
                 $name = $m[1];
                 if ($name === 'path') {
-                    $params[$name] = implode('/', array_slice($pathParts, $i));
+                    $params[$name] = $this->decodeParam(implode('/', array_slice($pathParts, $i)));
                     return $params;
                 }
                 if (!isset($pathParts[$i])) {
                     return null;
                 }
-                $params[$name] = $pathParts[$i];
+                $params[$name] = $this->decodeParam($pathParts[$i]);
             } elseif (($pathParts[$i] ?? null) !== $part) {
                 return null;
             }
@@ -68,5 +70,10 @@ final class Router
         }
 
         return $i === count($pathParts) ? $params : null;
+    }
+
+    private function decodeParam(string $value): string
+    {
+        return rawurldecode($value);
     }
 }

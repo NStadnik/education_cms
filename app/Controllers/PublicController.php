@@ -43,7 +43,7 @@ final class PublicController extends BaseController
 
         $page = $this->db()->fetch('select * from pages where slug = ? and status = ?', [$params['slug'], 'published']);
         if (!$page) {
-            return new Response('Not found', 404);
+            return ErrorController::response(404);
         }
         return $this->renderPage($page, false, $settings);
     }
@@ -104,7 +104,7 @@ final class PublicController extends BaseController
             [$params['slug'], 'published']
         );
         if (!$item) {
-            return new Response('Not found', 404);
+            return ErrorController::response(404);
         }
 
         return $this->render('public/news-show', [
@@ -133,7 +133,7 @@ final class PublicController extends BaseController
         $path = str_replace(['..', '\\'], '', $params['path']);
         $file = base_path('storage/uploads/' . $path);
         if (!is_file($file)) {
-            return new Response('Not found', 404);
+            return ErrorController::response(404);
         }
 
         $type = mime_content_type($file) ?: 'application/octet-stream';
@@ -167,7 +167,7 @@ final class PublicController extends BaseController
         $path = str_replace(['..', '\\'], '', $params['path']);
         $file = base_path('public/assets/' . $path);
         if (!is_file($file)) {
-            return new Response('Not found', 404);
+            return ErrorController::response(404);
         }
 
         $types = [
@@ -190,7 +190,7 @@ final class PublicController extends BaseController
     public function debug(): Response
     {
         if (!Debug::enabled(base_path())) {
-            return new Response('Not found', 404);
+            return ErrorController::response(404);
         }
 
         return $this->render('debug/show', [

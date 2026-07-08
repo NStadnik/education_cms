@@ -75,7 +75,9 @@
     <section class="section">
         <div class="container">
             <article class="card content-card">
-                <h2><?= e($block['title'] ?? $page['title']) ?></h2>
+                <?php if (trim((string) ($block['title'] ?? '')) !== ''): ?>
+                    <h2><?= e((string) $block['title']) ?></h2>
+                <?php endif; ?>
                 <div class="rich-content"><?= safe_html($block['text'] ?? '') ?></div>
             </article>
         </div>
