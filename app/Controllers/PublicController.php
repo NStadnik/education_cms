@@ -148,6 +148,8 @@ final class PublicController extends BaseController
                 'total' => $total,
                 'category' => $category,
                 'query' => $query,
+                'current_page' => $currentPage,
+                'page_url' => $pageUrl($currentPage),
                 'next_offset' => $loaded,
                 'has_more' => $loaded < $total,
             ]);

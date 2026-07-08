@@ -5,9 +5,10 @@
     $jumpLabel = (string) ($jumpLabel ?? 'Сторінка');
     $class = trim('site-pager ' . (string) ($class ?? ''));
     $urlFactory = $urlFactory ?? static fn (int $page): string => '#';
+    $showAll = (bool) ($showAll ?? true);
     $window = max(1, (int) ($window ?? 2));
-    $windowStart = max(1, $currentPage - $window);
-    $windowEnd = min($pages, $currentPage + $window);
+    $windowStart = $showAll ? 1 : max(1, $currentPage - $window);
+    $windowEnd = $showAll ? $pages : min($pages, $currentPage + $window);
 ?>
 <?php if ($pages > 1): ?>
     <nav class="<?= e($class) ?>" aria-label="<?= e($label) ?>">
@@ -15,14 +16,14 @@
             <span class="mdi mdi-chevron-left" aria-hidden="true"></span>
         </a>
         <div class="site-pager-pages">
-            <?php if ($windowStart > 1): ?>
+            <?php if (!$showAll && $windowStart > 1): ?>
                 <a href="<?= e($urlFactory(1)) ?>">1</a>
                 <?php if ($windowStart > 2): ?><span aria-hidden="true">...</span><?php endif; ?>
             <?php endif; ?>
             <?php for ($i = $windowStart; $i <= $windowEnd; $i++): ?>
                 <a class="<?= $i === $currentPage ? 'is-active' : '' ?>" href="<?= e($urlFactory($i)) ?>" <?= $i === $currentPage ? 'aria-current="page"' : '' ?>><?= e((string) $i) ?></a>
             <?php endfor; ?>
-            <?php if ($windowEnd < $pages): ?>
+            <?php if (!$showAll && $windowEnd < $pages): ?>
                 <?php if ($windowEnd < $pages - 1): ?><span aria-hidden="true">...</span><?php endif; ?>
                 <a href="<?= e($urlFactory($pages)) ?>"><?= e((string) $pages) ?></a>
             <?php endif; ?>

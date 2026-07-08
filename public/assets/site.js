@@ -45,6 +45,8 @@ document.addEventListener('DOMContentLoaded', function () {
         let loading = false;
         let activeRequest = null;
         let searchTimer = null;
+        let scrollFrame = null;
+        let visiblePage = null;
 
         function setStatus(message) {
             if (status) {
@@ -89,7 +91,144 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
+        function pageFromUrl(url) {
+            const parsed = new URL(url, window.location.origin);
+            return Math.max(1, Number(parsed.searchParams.get('page') || '1') || 1);
+        }
+
+        function currentPageUrl() {
+            const select = pagerSlot ? pagerSlot.querySelector('[data-page-jump]') : null;
+            const selected = select ? select.options[select.selectedIndex] : null;
+            if (selected && selected.value) {
+                return selected.value;
+            }
+            return window.location.href;
+        }
+
+        function assignCardsPage(cards, page, pageUrl) {
+            cards.forEach(function (card) {
+                card.dataset.newsPage = String(page);
+                card.dataset.newsPageUrl = pageUrl;
+            });
+        }
+
+        function syncPagerPage(page, pageUrl, replaceUrl) {
+            if (!pagerSlot || !page) {
+                return;
+            }
+
+            pagerSlot.querySelectorAll('.site-pager-pages a').forEach(function (link) {
+                const linkPage = pageFromUrl(link.href);
+                const active = linkPage === page;
+                link.classList.toggle('is-active', active);
+                if (active) {
+                    link.setAttribute('aria-current', 'page');
+                    link.scrollIntoView({block: 'nearest', inline: 'center'});
+                } else {
+                    link.removeAttribute('aria-current');
+                }
+            });
+
+            const select = pagerSlot.querySelector('[data-page-jump]');
+            if (select) {
+                const option = Array.from(select.options).find(function (item) {
+                    return pageFromUrl(item.value) === page;
+                });
+                if (option) {
+                    select.value = option.value;
+                }
+            }
+
+            const previous = pagerSlot.querySelector('.site-pager-control:first-child');
+            const next = pagerSlot.querySelector('.site-pager-control:last-of-type');
+            if (previous && select) {
+                const prevOption = Array.from(select.options).find(function (item) {
+                    return pageFromUrl(item.value) === Math.max(1, page - 1);
+                });
+                if (prevOption) {
+                    previous.href = prevOption.value;
+                }
+                previous.classList.toggle('is-disabled', page <= 1);
+                previous.toggleAttribute('aria-disabled', page <= 1);
+                previous.tabIndex = page <= 1 ? -1 : 0;
+            }
+            if (next && select) {
+                const maxPage = select.options.length;
+                const nextOption = Array.from(select.options).find(function (item) {
+                    return pageFromUrl(item.value) === Math.min(maxPage, page + 1);
+                });
+                if (nextOption) {
+                    next.href = nextOption.value;
+                }
+                next.classList.toggle('is-disabled', page >= maxPage);
+                next.toggleAttribute('aria-disabled', page >= maxPage);
+                next.tabIndex = page >= maxPage ? -1 : 0;
+            }
+
+            if (replaceUrl && pageUrl) {
+                window.history.replaceState({}, '', pageUrl);
+            }
+        }
+
+        function syncVisiblePage() {
+            scrollFrame = null;
+            const cards = Array.from(grid.querySelectorAll('[data-news-page]'));
+            if (!cards.length) {
+                return;
+            }
+
+            const targetY = window.innerHeight * 0.42;
+            let bestCard = null;
+            let bestDistance = Infinity;
+            cards.forEach(function (card) {
+                const rect = card.getBoundingClientRect();
+                if (rect.bottom < 0 || rect.top > window.innerHeight) {
+                    return;
+                }
+
+                const middle = rect.top + rect.height / 2;
+                const distance = Math.abs(middle - targetY);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestCard = card;
+                }
+            });
+
+            if (!bestCard) {
+                return;
+            }
+
+            const page = Number(bestCard.dataset.newsPage || '1') || 1;
+            if (page === visiblePage) {
+                return;
+            }
+
+            visiblePage = page;
+            syncPagerPage(page, bestCard.dataset.newsPageUrl || '', true);
+        }
+
+        function scheduleVisiblePageSync() {
+            if (scrollFrame !== null) {
+                return;
+            }
+            scrollFrame = window.requestAnimationFrame(syncVisiblePage);
+        }
+
+        function scrollToLoadedPage(url) {
+            const page = pageFromUrl(url);
+            const card = grid.querySelector('[data-news-page="' + String(page) + '"]');
+            if (!card) {
+                return false;
+            }
+
+            visiblePage = page;
+            syncPagerPage(page, url.toString(), true);
+            card.scrollIntoView({block: 'start', behavior: 'smooth'});
+            return true;
+        }
+
         function updateList(data, append) {
+            const oldCount = grid.children.length;
             if (append) {
                 grid.insertAdjacentHTML('beforeend', data.html || '');
             } else {
@@ -109,8 +248,15 @@ document.addEventListener('DOMContentLoaded', function () {
             if (empty) {
                 empty.classList.toggle('d-none', grid.children.length > 0);
             }
-            if (!append && pagerSlot) {
+            if (pagerSlot) {
                 pagerSlot.innerHTML = data.pager_html || '';
+            }
+            if (data.current_page) {
+                const pageUrl = data.page_url || currentPageUrl();
+                const cards = append ? Array.from(grid.children).slice(oldCount) : Array.from(grid.children);
+                assignCardsPage(cards, Number(data.current_page), pageUrl);
+                visiblePage = Number(data.current_page);
+                syncPagerPage(Number(data.current_page), pageUrl, false);
             }
             if (!append && categorySlot) {
                 categorySlot.innerHTML = data.categories_html || '';
@@ -167,10 +313,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 updateList(data, append);
                 if (!append) {
                     syncForm(requestUrl);
-                    if (pushState) {
-                        requestUrl.searchParams.delete('limit');
-                        window.history.pushState({}, '', requestUrl.toString());
-                    }
+                }
+                if (append && data.page_url) {
+                    window.history.replaceState({}, '', data.page_url);
+                } else if (!append && pushState) {
+                    requestUrl.searchParams.delete('limit');
+                    window.history.pushState({}, '', requestUrl.toString());
                 }
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -195,6 +343,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }, {rootMargin: '360px'});
 
         observer.observe(sentinel);
+        assignCardsPage(Array.from(grid.children), pageFromUrl(window.location.href), window.location.href);
+        visiblePage = pageFromUrl(window.location.href);
+        window.addEventListener('scroll', scheduleVisiblePageSync, {passive: true});
 
         if (form) {
             form.addEventListener('submit', function (event) {
@@ -237,7 +388,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             event.preventDefault();
-            loadNews(new URL(link.href, window.location.origin), false, true);
+            const targetUrl = new URL(link.href, window.location.origin);
+            if (link.closest('[data-news-pager-slot]') && scrollToLoadedPage(targetUrl)) {
+                return;
+            }
+            loadNews(targetUrl, false, true);
         });
 
         root.addEventListener('change', function (event) {
@@ -246,7 +401,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            loadNews(new URL(select.value, window.location.origin), false, true);
+            const targetUrl = new URL(select.value, window.location.origin);
+            if (scrollToLoadedPage(targetUrl)) {
+                return;
+            }
+            loadNews(targetUrl, false, true);
         });
     });
 
