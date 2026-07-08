@@ -953,7 +953,10 @@ document.addEventListener('DOMContentLoaded', function () {
                             '<button class="button secondary compact" type="button" data-header-icon-picker title="Обрати іконку"><span class="mdi mdi-view-grid-plus-outline"></span></button>' +
                             '<button class="button secondary compact" type="button" data-header-icon-clear title="Очистити іконку"><span class="mdi mdi-close"></span></button>' +
                         '</div>' +
-                        '<label' + (isSection ? ' class="template-menu-url-muted"' : '') + '>URL<input data-header-link-field="url" value="' + escapeHtml(link.url) + '" ' + (isSection ? 'disabled placeholder="Не використовується"' : '') + '></label>' +
+                        '<div class="field-with-action' + (isSection ? ' template-menu-url-muted' : '') + '">' +
+                            '<label>URL<input data-header-link-field="url" value="' + escapeHtml(link.url) + '" ' + (isSection ? 'disabled placeholder="Не використовується"' : '') + '></label>' +
+                            (isSection ? '' : '<button class="button secondary compact icon-button" type="button" data-header-link-url-picker title="Обрати посилання"><span class="mdi mdi-link-plus"></span></button>') +
+                        '</div>' +
                     '</div>' +
                     (isSection ? renderSectionColumns(link, path, depth, query, issuesOnly, duplicateUrls) : '') +
                     (hasVisibleChildren ? '<div class="template-menu-children">' + renderMenuLinks(children, path, depth + 1, query, issuesOnly, duplicateUrls) + '</div>' : '') +
@@ -1604,6 +1607,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function openMenuPicker() {
+        if (window.AdminLinkPicker) {
+            window.AdminLinkPicker.open({
+                multiple: true,
+                title: 'Обрати посилання',
+                hint: 'Пункт буде додано у ' + menuParentLabel() + '.',
+                onSelect: function (items) {
+                    (Array.isArray(items) ? items : [items]).forEach(addPickedMenuItem);
+                    renderHeader();
+                }
+            });
+            return;
+        }
         if (!menuPickerModal) {
             return;
         }
@@ -1620,6 +1635,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 search.focus();
             }, 180);
         }
+    }
+
+    function openHeaderUrlPicker(field) {
+        if (!window.AdminLinkPicker || !field) {
+            return;
+        }
+        window.AdminLinkPicker.open({
+            title: 'Обрати посилання',
+            hint: 'Вибране посилання буде вставлено в URL-поле.',
+            onSelect: function (item) {
+                field.value = item.url || '';
+                field.dispatchEvent(new Event('input', {bubbles: true}));
+            }
+        });
     }
 
     function resetMenuPicker() {
@@ -2551,7 +2580,22 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     headerEditor.addEventListener('click', function (event) {
         if (event.target.closest('[data-menu-picker-open]')) {
+            event.preventDefault();
             openMenuPicker();
+            return;
+        }
+        const headerUrlPicker = event.target.closest('[data-header-url-picker]');
+        if (headerUrlPicker) {
+            event.preventDefault();
+            openHeaderUrlPicker(headerEditor.querySelector('[data-header-field="' + cssEscape(headerUrlPicker.dataset.headerUrlPicker || '') + '"]'));
+            return;
+        }
+        const linkUrlPicker = event.target.closest('[data-header-link-url-picker]');
+        if (linkUrlPicker) {
+            event.preventDefault();
+            const row = linkUrlPicker.closest('[data-header-link]');
+            openHeaderUrlPicker(row ? row.querySelector('[data-header-link-field="url"]') : null);
+            return;
         }
         const heroBackgroundOpen = event.target.closest('[data-hero-background-open]');
         if (heroBackgroundOpen) {

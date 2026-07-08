@@ -62,6 +62,7 @@ final class MediaController extends \App\Controllers\AdminBaseController
                 'size_label' => (string) ($item['size_label'] ?? ''),
                 'is_image' => !empty($item['is_image']),
                 'url' => url('/uploads/' . (string) ($item['path'] ?? '')),
+                'thumb_url' => !empty($item['is_image']) ? url('/thumb/' . (string) ($item['path'] ?? '') . '?w=360&h=240&fit=crop') : '',
             ];
         }, $list['items']);
 

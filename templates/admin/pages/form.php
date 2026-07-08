@@ -45,6 +45,20 @@
                         $cardImage = trim((string) ($card['image'] ?? ''));
                         $buttonText = trim((string) ($card['button_text'] ?? ''));
                         $buttonUrl = trim((string) ($card['button_url'] ?? ''));
+                        $cardLinks = [];
+                        foreach (($card['links'] ?? []) as $link) {
+                            if (!is_array($link)) {
+                                continue;
+                            }
+                            $label = trim((string) ($link['label'] ?? $link['text'] ?? $link['title'] ?? ''));
+                            $href = trim((string) ($link['url'] ?? $link['href'] ?? ''));
+                            if ($label !== '' && $href !== '') {
+                                $cardLinks[] = ['label' => $label, 'url' => $href];
+                            }
+                        }
+                        if (!$cardLinks && $buttonText !== '' && $buttonUrl !== '') {
+                            $cardLinks[] = ['label' => $buttonText, 'url' => $buttonUrl];
+                        }
                         if ($cardImage !== '') {
                             $cardParts[] = '<p><img src="' . e($cardImage) . '" alt="' . e($cardTitle) . '"></p>';
                         }
@@ -54,8 +68,10 @@
                         if ($cardText !== '') {
                             $cardParts[] = $textToHtml($cardText);
                         }
-                        if ($buttonText !== '' && $buttonUrl !== '') {
-                            $cardParts[] = '<p><a href="' . e($buttonUrl) . '">' . e($buttonText) . '</a></p>';
+                        if ($cardLinks) {
+                            $cardParts[] = '<p>' . implode('<br>', array_map(static function (array $link): string {
+                                return '<a href="' . e($link['url']) . '">' . e($link['label']) . '</a>';
+                            }, $cardLinks)) . '</p>';
                         }
                         if ($cardParts) {
                             $sectionParts[] = implode("\n", $cardParts);
@@ -277,7 +293,7 @@
 </div>
 
 <div class="modal fade" id="layoutCardModal" tabindex="-1" aria-labelledby="layoutCardModalTitle" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable layout-card-modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <div>
@@ -301,18 +317,15 @@
                                 <button type="button" data-card-template-quick="stat"><span class="mdi mdi-chart-box-outline" aria-hidden="true"></span><strong>Цифра</strong><small>Показник</small></button>
                                 <button type="button" data-card-template-quick="quote"><span class="mdi mdi-format-quote-close" aria-hidden="true"></span><strong>Цитата</strong><small>Відгук або думка</small></button>
                                 <button type="button" data-card-template-quick="contact"><span class="mdi mdi-card-account-phone-outline" aria-hidden="true"></span><strong>Контакти</strong><small>Телефон і email</small></button>
+                                <button type="button" data-card-template-quick="announcement"><span class="mdi mdi-bullhorn-variant-outline" aria-hidden="true"></span><strong>Оголошення</strong><small>Важлива інформація</small></button>
+                                <button type="button" data-card-template-quick="document"><span class="mdi mdi-file-document-outline" aria-hidden="true"></span><strong>Документ</strong><small>Посилання на файл</small></button>
+                                <button type="button" data-card-template-quick="schedule"><span class="mdi mdi-calendar-clock" aria-hidden="true"></span><strong>Розклад</strong><small>Час або події</small></button>
+                                <button type="button" data-card-template-quick="faq"><span class="mdi mdi-help-circle-outline" aria-hidden="true"></span><strong>FAQ</strong><small>Питання й відповідь</small></button>
+                                <button type="button" data-card-template-quick="step"><span class="mdi mdi-format-list-numbered" aria-hidden="true"></span><strong>Крок</strong><small>Етап процесу</small></button>
+                                <button type="button" data-card-template-quick="download"><span class="mdi mdi-download-box-outline" aria-hidden="true"></span><strong>Завантаження</strong><small>Матеріал або файл</small></button>
+                                <button type="button" data-card-template-quick="person"><span class="mdi mdi-account-tie-outline" aria-hidden="true"></span><strong>Особа</strong><small>Контакт відповідального</small></button>
+                                <button type="button" data-card-template-quick="warning"><span class="mdi mdi-alert-outline" aria-hidden="true"></span><strong>Увага</strong><small>Попередження</small></button>
                             </div>
-                            <label class="layout-card-template-select">Стандартний шаблон
-                                <select data-card-modal-template>
-                                    <option value="">Обрати шаблон</option>
-                                    <option value="feature">Інформаційна картка</option>
-                                    <option value="media">Медіа-картка</option>
-                                    <option value="cta">Заклик до дії</option>
-                                    <option value="stat">Показник / цифра</option>
-                                    <option value="quote">Цитата</option>
-                                    <option value="contact">Контакти</option>
-                                </select>
-                            </label>
                         </div>
                         <div class="layout-card-modal-wide layout-card-modal-stats" aria-live="polite">
                             <span><span class="mdi mdi-palette-outline" aria-hidden="true"></span><strong data-card-modal-stat-style>Картка</strong></span>
@@ -336,9 +349,22 @@
                         <label>Заголовок
                             <input data-card-modal-field="title" required placeholder="Заголовок картки">
                         </label>
-                        <label class="layout-card-modal-wide layout-card-rich-text">Текст
-                            <textarea data-card-modal-field="text" data-tinymce-editor rows="6" required placeholder="Основний текст картки"></textarea>
-                        </label>
+                        <div class="layout-card-modal-wide layout-card-rich-text">
+                            <label>Текст
+                                <textarea data-card-modal-field="text" data-tinymce-editor rows="6" required placeholder="Основний текст картки"></textarea>
+                            </label>
+                            <div class="layout-card-text-tools" aria-label="Швидке форматування тексту картки">
+                                <button class="button secondary compact" type="button" data-card-text-list="ul">
+                                    <span class="mdi mdi-format-list-bulleted" aria-hidden="true"></span><span>Список</span>
+                                </button>
+                                <button class="button secondary compact" type="button" data-card-text-list="ol">
+                                    <span class="mdi mdi-format-list-numbered" aria-hidden="true"></span><span>Нумерація</span>
+                                </button>
+                                <button class="button secondary compact" type="button" data-card-text-list="documents">
+                                    <span class="mdi mdi-file-document-multiple-outline" aria-hidden="true"></span><span>Список документів</span>
+                                </button>
+                            </div>
+                        </div>
                         <div class="layout-card-modal-wide layout-card-image-field">
                             <label>Зображення
                                 <input data-card-modal-field="image" readonly placeholder="Оберіть з медіафайлів">
@@ -352,12 +378,21 @@
                                 </button>
                             </div>
                         </div>
-                        <label>Текст кнопки
-                            <input data-card-modal-field="button_text" placeholder="Детальніше">
-                        </label>
-                        <label>URL кнопки
-                            <input data-card-modal-field="button_url" placeholder="/page/about">
-                        </label>
+                        <div class="layout-card-modal-wide layout-card-links-editor">
+                            <div class="layout-card-links-head">
+                                <strong>Покликання</strong>
+                                <div>
+                                    <button class="button secondary compact" type="button" data-card-link-library-add>
+                                        <span class="mdi mdi-plus" aria-hidden="true"></span><span>Додати</span>
+                                    </button>
+                                    <button class="button secondary compact" type="button" data-card-link-library-pick>
+                                        <span class="mdi mdi-link-plus" aria-hidden="true"></span><span>Обрати посилання</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="layout-card-link-list" data-card-link-list></div>
+                            <div class="layout-card-link-empty" data-card-link-empty>Додайте одне або кілька покликань для картки.</div>
+                        </div>
                         <div class="layout-card-modal-wide layout-card-image-preview" data-card-image-preview hidden></div>
                     </div>
                     <aside class="layout-card-modal-preview" aria-live="polite">

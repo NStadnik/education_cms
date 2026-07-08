@@ -43,6 +43,42 @@ final class MediaMetadata
         return $entry;
     }
 
+    public static function saveMany(array $items): int
+    {
+        if (!$items) {
+            return 0;
+        }
+
+        $all = self::all();
+        $updated = 0;
+        foreach ($items as $path => $metadata) {
+            $path = Files::normalize((string) $path);
+            if ($path === '' || !is_array($metadata)) {
+                continue;
+            }
+
+            $entry = self::normalizeEntry(array_replace(self::normalizeEntry($all[$path] ?? []), $metadata));
+            if (implode('', $entry) === '') {
+                if (isset($all[$path])) {
+                    unset($all[$path]);
+                    $updated++;
+                }
+                continue;
+            }
+
+            if (($all[$path] ?? null) !== $entry) {
+                $all[$path] = $entry;
+                $updated++;
+            }
+        }
+
+        if ($updated > 0) {
+            self::write($all);
+        }
+
+        return $updated;
+    }
+
     public static function delete(string $path): void
     {
         $path = Files::normalize($path);

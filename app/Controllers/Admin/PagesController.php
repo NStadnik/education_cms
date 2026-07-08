@@ -154,7 +154,12 @@ final class PagesController extends \App\Controllers\AdminBaseController
                         $image = trim((string) ($card['image'] ?? ''));
                         $buttonText = trim((string) ($card['button_text'] ?? ''));
                         $buttonUrl = trim((string) ($card['button_url'] ?? ''));
-                        if ($title === '' && $text === '' && $image === '') {
+                        $links = $this->normalizeCardLinks($card, $buttonText, $buttonUrl);
+                        if ($links) {
+                            $buttonText = $links[0]['label'];
+                            $buttonUrl = $links[0]['url'];
+                        }
+                        if ($title === '' && $text === '' && $image === '' && !$links) {
                             continue;
                         }
 
@@ -166,6 +171,7 @@ final class PagesController extends \App\Controllers\AdminBaseController
                             'image' => $image,
                             'button_text' => $buttonText,
                             'button_url' => $buttonUrl,
+                            'links' => $links,
                         ];
                     }
 
@@ -198,6 +204,52 @@ final class PagesController extends \App\Controllers\AdminBaseController
     private function layoutChoice(string $value, array $allowed, string $fallback): string
     {
         return in_array($value, $allowed, true) ? $value : $fallback;
+    }
+
+    private function normalizeCardLinks(array $card, string $buttonText, string $buttonUrl): array
+    {
+        $links = [];
+        foreach (($card['links'] ?? []) as $link) {
+            if (!is_array($link)) {
+                continue;
+            }
+            $label = trim((string) ($link['label'] ?? $link['text'] ?? $link['title'] ?? ''));
+            $url = trim((string) ($link['url'] ?? $link['href'] ?? ''));
+            if ($label === '' || $url === '') {
+                continue;
+            }
+            $links[] = [
+                'label' => $this->limitCardLinkString($label, 120),
+                'url' => $this->limitCardLinkString($url, 240),
+            ];
+        }
+
+        if ($buttonText !== '' && $buttonUrl !== '') {
+            $exists = false;
+            foreach ($links as $link) {
+                if ($link['label'] === $buttonText && $link['url'] === $buttonUrl) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if (!$exists) {
+                array_unshift($links, [
+                    'label' => $this->limitCardLinkString($buttonText, 120),
+                    'url' => $this->limitCardLinkString($buttonUrl, 240),
+                ]);
+            }
+        }
+
+        return array_slice($links, 0, 12);
+    }
+
+    private function limitCardLinkString(string $value, int $length): string
+    {
+        if (function_exists('mb_substr')) {
+            return mb_substr($value, 0, $length);
+        }
+
+        return substr($value, 0, $length);
     }
 
     public function pagesBulk(Request $request): Response

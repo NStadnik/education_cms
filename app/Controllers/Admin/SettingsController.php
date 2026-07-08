@@ -86,6 +86,22 @@ final class SettingsController extends \App\Controllers\AdminBaseController
     public function templatesLinkPicker(Request $request): Response
     {
         $this->guard('settings.manage');
+        return $this->linkPickerResponse($request);
+    }
+
+    public function adminLinkPicker(Request $request): Response
+    {
+        $this->guard();
+        $auth = Container::get('auth');
+        if (!$auth->can('pages.manage') && !$auth->can('news.manage') && !$auth->can('media.manage') && !$auth->can('settings.manage')) {
+            return $this->json(['ok' => false, 'message' => 'Доступ заборонено.'], 403);
+        }
+
+        return $this->linkPickerResponse($request);
+    }
+
+    private function linkPickerResponse(Request $request): Response
+    {
         $type = (string) $request->input('type', 'pages');
         if (!in_array($type, ['pages', 'categories', 'news', 'media'], true)) {
             return $this->json(['ok' => false, 'message' => 'Невідомий тип посилання.'], 422);
@@ -546,6 +562,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'url' => url('/uploads/' . (string) ($item['path'] ?? '')),
             'meta' => trim((string) ($item['type'] ?? '') . ' · ' . (string) ($item['size_label'] ?? ''), ' ·'),
             'is_image' => !empty($item['is_image']),
+            'thumb_url' => !empty($item['is_image']) ? url('/thumb/' . (string) ($item['path'] ?? '') . '?w=360&h=240&fit=crop') : '',
         ], $slice), $pagination, $total);
     }
 

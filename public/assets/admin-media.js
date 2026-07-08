@@ -4,7 +4,15 @@ const mediaMetadataModalNode = document.getElementById('mediaMetadataModal');
 let mediaPreviewModal = null;
 let mediaMetadataModal = null;
 
+initMediaViewMode();
+
 document.addEventListener('click', function (event) {
+    const viewButton = event.target.closest('[data-media-view]');
+    if (viewButton) {
+        setMediaViewMode(viewButton.dataset.mediaView || 'list', true);
+        return;
+    }
+
     const metadataButton = event.target.closest('[data-media-metadata]');
     if (metadataButton && mediaMetadataModalNode) {
         if (!window.bootstrap || !window.bootstrap.Modal) {
@@ -225,6 +233,28 @@ function setMediaMessage(message, isError) {
     const node = document.querySelector('[data-media-message]');
     node.className = isError ? 'alert mt-3 mb-3' : 'alert alert-success mt-3 mb-3';
     node.textContent = message;
+}
+
+function initMediaViewMode() {
+    const mode = window.localStorage ? (localStorage.getItem('adminMediaViewMode') || 'list') : 'list';
+    setMediaViewMode(mode === 'grid' ? 'grid' : 'list', false);
+}
+
+function setMediaViewMode(mode, persist) {
+    const panel = document.querySelector('[data-infinite-list]');
+    if (!panel) {
+        return;
+    }
+    const normalized = mode === 'grid' ? 'grid' : 'list';
+    panel.dataset.mediaViewMode = normalized;
+    document.querySelectorAll('[data-media-view]').forEach(function (button) {
+        const active = button.dataset.mediaView === normalized;
+        button.classList.toggle('secondary', !active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    if (persist && window.localStorage) {
+        localStorage.setItem('adminMediaViewMode', normalized);
+    }
 }
 
 function escapeHtml(value) {

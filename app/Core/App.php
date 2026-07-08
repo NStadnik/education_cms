@@ -8,6 +8,7 @@ use App\Controllers\AdminController;
 use App\Controllers\Admin\ImportController;
 use App\Controllers\Admin\MediaController;
 use App\Controllers\Admin\NewsController;
+use App\Controllers\Admin\OptimizerController;
 use App\Controllers\Admin\PagesController;
 use App\Controllers\Admin\SettingsController;
 use App\Controllers\Admin\UpdatesController;
@@ -97,6 +98,7 @@ final class App
         $adminPages = PagesController::class;
         $adminNews = NewsController::class;
         $adminMedia = MediaController::class;
+        $adminOptimizer = OptimizerController::class;
         $adminUsers = UsersController::class;
         $adminSettings = SettingsController::class;
         $adminImport = ImportController::class;
@@ -138,6 +140,8 @@ final class App
         $this->router->post('/admin/media/metadata', [$adminMedia, 'mediaMetadataSave']);
         $this->router->post('/admin/media/delete', [$adminMedia, 'mediaDelete']);
         $this->router->post('/admin/media/bulk', [$adminMedia, 'mediaBulk']);
+        $this->router->get('/admin/optimizer', [$adminOptimizer, 'index']);
+        $this->router->post('/admin/optimizer/media-folders/apply', [$adminOptimizer, 'applyMediaFolders']);
         $this->router->get('/admin/users', [$adminUsers, 'users']);
         $this->router->get('/admin/users/roles', [$adminUsers, 'roles']);
         $this->router->get('/admin/users/roles/edit', [$adminUsers, 'roleForm']);
@@ -146,6 +150,7 @@ final class App
         $this->router->post('/admin/users/roles/save', [$adminUsers, 'rolesSave']);
         $this->router->post('/admin/users/roles/delete', [$adminUsers, 'roleDelete']);
         $this->router->post('/admin/users/bulk', [$adminUsers, 'usersBulk']);
+        $this->router->get('/admin/link-picker', [$adminSettings, 'adminLinkPicker']);
         $this->router->get('/admin/templates', [$adminSettings, 'templates']);
         $this->router->get('/admin/templates/link-picker', [$adminSettings, 'templatesLinkPicker']);
         $this->router->post('/admin/templates/save', [$adminSettings, 'templatesSave']);

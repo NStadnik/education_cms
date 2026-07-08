@@ -15,7 +15,8 @@
         loading: false,
         searchTimer: null,
         bound: false,
-        bookmark: null
+        bookmark: null,
+        view: 'compact'
     };
 
     function init(root) {
@@ -45,7 +46,7 @@
                 plugins: 'advlist autolink lists link image media table code preview fullscreen searchreplace wordcount quickbars autoresize',
                 toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright | bullist numlist | link table mediaLibrary | code fullscreen preview',
                 toolbar_mode: 'wrap',
-                quickbars_selection_toolbar: 'bold italic | quicklink h2 h3 blockquote',
+                quickbars_selection_toolbar: 'bold italic | bullist numlist | quicklink h2 h3 blockquote',
                 menubar: false,
                 branding: false,
                 promotion: false,
@@ -117,6 +118,7 @@
         modalNode.querySelector('[data-rich-media-mode]').value = 'single';
         modalNode.querySelector('[data-rich-media-align]').value = 'center';
         modalNode.querySelector('[data-rich-media-search]').value = '';
+        setRichMediaView(localStorage.getItem('richMediaViewMode') || 'compact', false);
 
         mediaState.modal = window.bootstrap.Modal.getOrCreateInstance(modalNode);
         mediaState.modal.show();
@@ -148,6 +150,11 @@
             mediaState.selected = new Set();
             mediaState.selectedItems = new Map();
             renderMediaItems();
+        });
+        modalNode.querySelectorAll('[data-rich-media-view]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                setRichMediaView(button.dataset.richMediaView || 'compact', true);
+            });
         });
         modalNode.querySelector('[data-rich-media-insert]').addEventListener('click', insertSelectedMedia);
         modalNode.querySelector('[data-rich-media-upload]').addEventListener('change', uploadMediaFile);
@@ -194,6 +201,7 @@
         const modalNode = document.getElementById('richMediaModal');
         const grid = modalNode.querySelector('[data-rich-media-grid]');
         grid.innerHTML = '';
+        grid.classList.toggle('is-large', mediaState.view === 'large');
 
         mediaState.items.forEach(function (item) {
             const selectedIndex = Array.from(mediaState.selected).indexOf(item.path);
@@ -201,7 +209,7 @@
             card.type = 'button';
             card.className = 'rich-media-card' + (mediaState.selected.has(item.path) ? ' is-selected' : '');
             card.innerHTML = (item.is_image
-                ? '<img src="' + escapeHtml(item.url) + '" alt="">'
+                ? '<img src="' + escapeHtml(item.thumb_url || item.url) + '" alt="">'
                 : '<span class="mdi mdi-file-outline rich-media-file-icon" aria-hidden="true"></span>') +
                 (selectedIndex >= 0 ? '<span class="rich-media-card-check">' + (selectedIndex + 1) + '</span>' : '') +
                 '<span class="rich-media-card-name">' + escapeHtml(item.name) + '</span>' +
@@ -228,6 +236,26 @@
             grid.appendChild(card);
         });
         updateSelectionPreview();
+    }
+
+    function setRichMediaView(mode, persist) {
+        const modalNode = document.getElementById('richMediaModal');
+        const normalized = mode === 'large' ? 'large' : 'compact';
+        mediaState.view = normalized;
+        if (modalNode) {
+            const grid = modalNode.querySelector('[data-rich-media-grid]');
+            if (grid) {
+                grid.classList.toggle('is-large', normalized === 'large');
+            }
+            modalNode.querySelectorAll('[data-rich-media-view]').forEach(function (button) {
+                const active = button.dataset.richMediaView === normalized;
+                button.classList.toggle('secondary', !active);
+                button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+        }
+        if (persist) {
+            localStorage.setItem('richMediaViewMode', normalized);
+        }
     }
 
     function selectedMediaItems() {

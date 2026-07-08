@@ -143,6 +143,8 @@ img { max-width: 100%; height: auto; }
 .page-layout-row + .page-layout-row { margin-top: 1.5rem; }
 .page-layout-card { height: 100%; }
 .page-layout-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; }
+.page-layout-card-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+.page-layout-card-links .read-more { margin-top: 0; }
 .page-layout-card-accent { border-color: rgba(31,111,235,.35); background: #f7fbff; }
 .page-layout-card-plain { border-color: transparent; background: transparent; box-shadow: none; }
 .page-layout-card-feature { border-color: rgba(31,111,235,.22); border-left: 4px solid var(--brand); background: #fbfcff; }

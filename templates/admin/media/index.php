@@ -56,6 +56,10 @@
                 <option value="<?= e((string) $folderName) ?>" <?= selected($folder ?? '', (string) $folderName) ?>><?= e((string) $folderName) ?></option>
             <?php endforeach; ?>
         </select>
+        <div class="admin-view-switch" role="group" aria-label="Режим перегляду медіафайлів">
+            <button class="button secondary compact" type="button" data-media-view="list" title="Список"><span class="mdi mdi-format-list-bulleted" aria-hidden="true"></span></button>
+            <button class="button secondary compact" type="button" data-media-view="grid" title="Великі превʼю"><span class="mdi mdi-view-grid-outline" aria-hidden="true"></span></button>
+        </div>
         <div class="bulk-actions">
             <select name="bulk_action" form="mediaBulkForm" aria-label="Групова дія">
                 <option value="">Групова дія</option>

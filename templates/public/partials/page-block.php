@@ -60,8 +60,28 @@
                                     <?php endif; ?>
                                     <?php if (!empty($card['title'])): ?><h3><?= e($card['title']) ?></h3><?php endif; ?>
                                     <?php if (!empty($card['text'])): ?><div class="rich-content"><?= safe_html($card['text']) ?></div><?php endif; ?>
-                                    <?php if (!empty($card['button_text']) && !empty($card['button_url'])): ?>
-                                        <a class="button read-more" href="<?= e((string) $card['button_url']) ?>"><?= e((string) $card['button_text']) ?></a>
+                                    <?php
+                                        $cardLinks = [];
+                                        foreach (($card['links'] ?? []) as $link) {
+                                            if (!is_array($link)) {
+                                                continue;
+                                            }
+                                            $label = trim((string) ($link['label'] ?? $link['text'] ?? $link['title'] ?? ''));
+                                            $href = trim((string) ($link['url'] ?? $link['href'] ?? ''));
+                                            if ($label !== '' && $href !== '') {
+                                                $cardLinks[] = ['label' => $label, 'url' => $href];
+                                            }
+                                        }
+                                        if (!$cardLinks && !empty($card['button_text']) && !empty($card['button_url'])) {
+                                            $cardLinks[] = ['label' => (string) $card['button_text'], 'url' => (string) $card['button_url']];
+                                        }
+                                    ?>
+                                    <?php if ($cardLinks): ?>
+                                        <div class="page-layout-card-links">
+                                            <?php foreach ($cardLinks as $link): ?>
+                                                <a class="button read-more" href="<?= e($link['url']) ?>"><?= e($link['label']) ?></a>
+                                            <?php endforeach; ?>
+                                        </div>
                                     <?php endif; ?>
                                 </article>
                             <?php endforeach; ?>

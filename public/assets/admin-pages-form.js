@@ -70,6 +70,70 @@ document.addEventListener('DOMContentLoaded', function () {
             image: '',
             button_text: 'Написати',
             button_url: 'mailto:info@example.com'
+        },
+        announcement: {
+            style: 'accent',
+            title: 'Важливе оголошення',
+            text: '<p>Коротко опишіть важливу інформацію, терміни або умови, на які потрібно звернути увагу.</p>',
+            image: '',
+            button_text: 'Докладніше',
+            button_url: '#'
+        },
+        document: {
+            style: 'feature',
+            title: 'Документ',
+            text: '<p>Додайте назву документа, коротке пояснення та посилання на файл або сторінку з деталями.</p>',
+            image: '',
+            button_text: 'Відкрити документ',
+            button_url: '#'
+        },
+        schedule: {
+            style: 'plain',
+            title: 'Розклад',
+            text: '<p><strong>Понеділок:</strong> додайте час або подію<br><strong>Вівторок:</strong> додайте час або подію</p>',
+            image: '',
+            button_text: '',
+            button_url: ''
+        },
+        faq: {
+            style: 'default',
+            title: 'Питання та відповідь',
+            text: '<p><strong>Питання:</strong> сформулюйте часте питання.<br><strong>Відповідь:</strong> додайте коротку й зрозумілу відповідь.</p>',
+            image: '',
+            button_text: '',
+            button_url: ''
+        },
+        step: {
+            style: 'feature',
+            title: 'Крок 1',
+            text: '<p>Опишіть перший крок процесу: що потрібно зробити, підготувати або перевірити.</p>',
+            image: '',
+            button_text: '',
+            button_url: ''
+        },
+        download: {
+            style: 'media',
+            title: 'Матеріал для завантаження',
+            text: '<p>Опишіть файл або корисний матеріал, який відвідувач може відкрити чи завантажити.</p>',
+            image: '',
+            button_text: 'Завантажити',
+            button_url: '#'
+        },
+        person: {
+            style: 'contact',
+            title: 'Відповідальна особа',
+            text: '<p><strong>Імʼя Прізвище</strong><br>Посада або роль<br>Email: name@example.com</p>',
+            image: '',
+            button_text: 'Звʼязатися',
+            button_url: 'mailto:name@example.com'
+        },
+        warning: {
+            style: 'accent',
+            title: 'Зверніть увагу',
+            text: '<p>Додайте попередження, умову або коротку інструкцію, яку важливо прочитати перед дією.</p>',
+            image: '',
+            button_text: '',
+            button_url: ''
         }
     };
     let cardModalState = null;
@@ -318,18 +382,42 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function normalizeCard(card) {
+        const links = normalizeCardLinks(card);
+        const primaryLink = links[0] || null;
         return {
             style: cardStyles.includes(card.style) ? card.style : 'default',
             title: card.title || '',
             text: card.text || '',
             image: card.image || '',
-            button_text: card.button_text || '',
-            button_url: card.button_url || ''
+            button_text: primaryLink ? primaryLink.label : (card.button_text || ''),
+            button_url: primaryLink ? primaryLink.url : (card.button_url || ''),
+            links: links
         };
     }
 
     function emptyCard() {
-        return {style: 'default', title: '', text: '', image: '', button_text: '', button_url: ''};
+        return {style: 'default', title: '', text: '', image: '', button_text: '', button_url: '', links: []};
+    }
+
+    function normalizeCardLinks(card) {
+        const links = [];
+        if (card && Array.isArray(card.links)) {
+            card.links.forEach(function (link) {
+                const label = String(link && (link.label || link.text || link.title) || '').trim();
+                const url = String(link && (link.url || link.href) || '').trim();
+                if (label !== '' && url !== '') {
+                    links.push({label: label, url: url});
+                }
+            });
+        }
+        const buttonText = String(card && card.button_text || '').trim();
+        const buttonUrl = String(card && card.button_url || '').trim();
+        if (buttonText !== '' && buttonUrl !== '' && !links.some(function (link) {
+            return link.label === buttonText && link.url === buttonUrl;
+        })) {
+            links.unshift({label: buttonText, url: buttonUrl});
+        }
+        return links.slice(0, 12);
     }
 
     function column(width) {
@@ -347,6 +435,20 @@ document.addEventListener('DOMContentLoaded', function () {
             return {columns: [column('col-md-8'), column('col-md-4')]};
         }
         return {columns: [column('col-md-12')]};
+    }
+
+    function rowFromPresetPreservingCards(preset, currentRow) {
+        const nextRow = rowFromPreset(preset);
+        const currentColumns = Array.isArray(currentRow && currentRow.columns) ? currentRow.columns : [];
+        currentColumns.forEach(function (currentColumn, columnIndex) {
+            const cards = Array.isArray(currentColumn.cards) ? currentColumn.cards : [];
+            if (!cards.length) {
+                return;
+            }
+            const targetIndex = Math.min(columnIndex, nextRow.columns.length - 1);
+            nextRow.columns[targetIndex].cards = nextRow.columns[targetIndex].cards.concat(cards);
+        });
+        return nextRow;
     }
 
     function escapeHtml(value) {
@@ -448,8 +550,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         const image = String(card.image || '').trim();
                         const title = String(card.title || '').trim();
                         const text = cardTextHtml(card.text);
-                        const buttonText = String(card.button_text || '').trim();
-                        const buttonUrl = String(card.button_url || '').trim();
+                        const links = normalizeCardLinks(card);
 
                         if (image !== '') {
                             cardParts.push('<p><img src="' + escapeHtml(image) + '" alt="' + escapeHtml(title) + '"></p>');
@@ -460,8 +561,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (text !== '') {
                             cardParts.push(text);
                         }
-                        if (buttonText !== '' && buttonUrl !== '') {
-                            cardParts.push('<p><a href="' + escapeHtml(buttonUrl) + '">' + escapeHtml(buttonText) + '</a></p>');
+                        if (links.length) {
+                            cardParts.push('<p>' + links.map(function (link) {
+                                return '<a href="' + escapeHtml(link.url) + '">' + escapeHtml(link.label) + '</a>';
+                            }).join('<br>') + '</p>');
                         }
                         if (cardParts.length) {
                             sectionParts.push(cardParts.join('\n'));
@@ -553,7 +656,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderColumn(sectionIndex, rowIndex, colIndex, col) {
-        return '<div class="layout-editor-column" data-column-index="' + colIndex + '">' +
+        return '<div class="layout-editor-column" data-column-index="' + colIndex + '" data-card-drop-zone>' +
             '<div class="layout-editor-column-head">' +
                 '<strong>' + columnLabel(col.width) + '</strong>' +
                 '<button class="button secondary compact" type="button" data-layout-add-card><span class="mdi mdi-card-plus-outline"></span><span>Картка</span></button>' +
@@ -567,8 +670,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderCard(cardIndex, card) {
         const title = String(card.title || '').trim();
         const image = String(card.image || '').trim();
-        const buttonText = String(card.button_text || '').trim();
-        const buttonUrl = String(card.button_url || '').trim();
+        const links = normalizeCardLinks(card);
         const style = cardStyles.includes(card.style) ? card.style : 'default';
 
         return '<article class="layout-editor-card layout-editor-card-preview page-layout-card page-layout-card-' + escapeHtml(style) + '" data-card-index="' + cardIndex + '" data-drag-kind="card">' +
@@ -585,7 +687,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 (image ? '<img src="' + escapeHtml(mediaThumbUrl(image, 640, 360)) + '" alt="' + escapeHtml(title) + '">' : '') +
                 (title ? '<h3>' + escapeHtml(title) + '</h3>' : '') +
                 '<div class="rich-content">' + cardTextPreview(card.text) + '</div>' +
-                (buttonText && buttonUrl ? '<span class="button compact layout-card-preview-button">' + escapeHtml(buttonText) + '</span>' : '') +
+                renderCardLinkActions(links, 'compact') +
             '</div>' +
         '</article>';
     }
@@ -678,7 +780,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const preset = event.target.closest('[data-layout-row-preset]');
         if (preset && preset.value) {
             const i = indexes(preset);
-            sections[i.section].rows[i.row] = rowFromPreset(preset.value);
+            sections[i.section].rows[i.row] = rowFromPresetPreservingCards(preset.value, sections[i.section].rows[i.row]);
             render();
         }
     });
@@ -723,6 +825,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
+        renderCardLinksEditor(normalizeCardLinks(card || {}));
     }
 
     function readCardModalValues() {
@@ -737,6 +840,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 card[name] = field.value.trim();
             }
         });
+        card.links = readCardLinksEditor();
+        if (card.links.length) {
+            card.button_text = card.links[0].label;
+            card.button_url = card.links[0].url;
+        }
         if (!cardStyles.includes(card.style)) {
             card.style = 'default';
         }
@@ -744,11 +852,74 @@ document.addEventListener('DOMContentLoaded', function () {
         return card;
     }
 
-    function setCardModalTemplate(value) {
-        const templateField = cardModalNode ? cardModalNode.querySelector('[data-card-modal-template]') : null;
-        if (templateField) {
-            templateField.value = value || '';
+    function cardLinkList() {
+        return cardModalNode ? cardModalNode.querySelector('[data-card-link-list]') : null;
+    }
+
+    function readCardLinksEditor() {
+        const list = cardLinkList();
+        if (!list) {
+            return [];
         }
+        return Array.from(list.querySelectorAll('[data-card-link-row]')).map(function (row) {
+            const labelField = row.querySelector('[data-card-link-label]');
+            const urlField = row.querySelector('[data-card-link-url]');
+            return {
+                label: String(labelField ? labelField.value : '').trim(),
+                url: String(urlField ? urlField.value : '').trim()
+            };
+        }).filter(function (link) {
+            return link.label !== '' && link.url !== '';
+        }).slice(0, 12);
+    }
+
+    function renderCardLinksEditor(links) {
+        const list = cardLinkList();
+        const empty = cardModalNode ? cardModalNode.querySelector('[data-card-link-empty]') : null;
+        if (!list) {
+            return;
+        }
+        const normalized = (Array.isArray(links) ? links : []).slice(0, 12);
+        list.innerHTML = normalized.map(function (link, index) {
+            return '<div class="layout-card-link-row" data-card-link-row data-card-link-index="' + index + '">' +
+                '<label>Текст<input data-card-link-label value="' + escapeHtml(link.label || '') + '" placeholder="Детальніше"></label>' +
+                '<label>URL<input data-card-link-url value="' + escapeHtml(link.url || '') + '" placeholder="/page/about"></label>' +
+                '<button class="button secondary compact" type="button" data-card-link-pick title="Обрати посилання"><span class="mdi mdi-link-plus" aria-hidden="true"></span></button>' +
+                '<button class="button danger compact" type="button" data-card-link-remove title="Видалити покликання"><span class="mdi mdi-delete-outline" aria-hidden="true"></span></button>' +
+            '</div>';
+        }).join('');
+        if (empty) {
+            empty.hidden = normalized.length > 0;
+        }
+    }
+
+    function setCardLinksEditor(links) {
+        renderCardLinksEditor(links);
+        setCardModalTemplate('');
+        updateCardModalPreview();
+    }
+
+    function addCardLink(link) {
+        const links = readCardLinksEditor();
+        links.push({
+            label: String(link && (link.cleanLabel || link.label) || '').trim() || 'Посилання',
+            url: String(link && link.url || '').trim()
+        });
+        setCardLinksEditor(links);
+    }
+
+    function renderCardLinkActions(links, sizeClass) {
+        const normalized = Array.isArray(links) ? links : [];
+        if (!normalized.length) {
+            return '';
+        }
+        return '<div class="layout-card-link-actions">' + normalized.map(function (link) {
+            const classes = 'button read-more layout-card-preview-button' + (sizeClass ? ' ' + sizeClass : '');
+            return '<span class="' + classes + '">' + escapeHtml(link.label || link.url) + '</span>';
+        }).join('') + '</div>';
+    }
+
+    function setCardModalTemplate(value) {
         if (cardModalNode) {
             cardModalNode.querySelectorAll('[data-card-template-quick]').forEach(function (button) {
                 button.classList.toggle('is-active', button.dataset.cardTemplateQuick === value);
@@ -777,10 +948,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const title = String(card.title || '').trim();
         const text = String(card.text || '').trim();
         const image = String(card.image || '').trim();
-        const buttonText = String(card.button_text || '').trim();
-        const buttonUrl = String(card.button_url || '').trim();
+        const links = normalizeCardLinks(card);
         const style = cardStyles.includes(card.style) ? card.style : 'default';
-        const hasContent = title !== '' || text !== '' || image !== '' || buttonText !== '';
+        const hasContent = title !== '' || text !== '' || image !== '' || links.length > 0;
 
         updateCardModalStats(card, style);
         updateCardImagePreview(image);
@@ -794,7 +964,7 @@ document.addEventListener('DOMContentLoaded', function () {
             (image ? '<img src="' + escapeHtml(mediaThumbUrl(image, 640, 360)) + '" alt="' + escapeHtml(title) + '">' : '') +
             (title ? '<h3>' + escapeHtml(title) + '</h3>' : '') +
             (text ? '<div class="rich-content">' + cardTextPreview(text) + '</div>' : '') +
-            (buttonText && buttonUrl ? '<span class="button read-more layout-card-preview-button">' + escapeHtml(buttonText) + '</span>' : '');
+            renderCardLinkActions(links, '');
     }
 
     function updateCardModalStats(card, style) {
@@ -818,7 +988,8 @@ document.addEventListener('DOMContentLoaded', function () {
             imageNode.textContent = card.image ? 'Є зображення' : 'Без зображення';
         }
         if (buttonNode) {
-            buttonNode.textContent = card.button_text && card.button_url ? 'Є кнопка' : 'Без кнопки';
+            const linkCount = normalizeCardLinks(card).length;
+            buttonNode.textContent = linkCount ? linkCount + ' ' + plural(linkCount, ['покликання', 'покликання', 'покликань']) : 'Без покликань';
         }
         if (previewLabel) {
             previewLabel.textContent = cardStyleLabel(style);
@@ -877,6 +1048,65 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         imageField.value = value || '';
+        setCardModalTemplate('');
+        updateCardModalPreview();
+    }
+
+    function insertCardTextList(type) {
+        const field = cardModalField('text');
+        if (!field) {
+            return;
+        }
+
+        if (type === 'documents') {
+            if (!window.AdminLinkPicker) {
+                return;
+            }
+            window.AdminLinkPicker.open({
+                multiple: true,
+                type: 'media',
+                title: 'Обрати документи',
+                hint: 'Вибрані медіафайли буде вставлено у текст картки як список покликань.',
+                onSelect: function (items) {
+                    const selected = Array.isArray(items) ? items : [items];
+                    const links = selected.filter(function (item) {
+                        return item && item.url;
+                    });
+                    if (!links.length) {
+                        return;
+                    }
+                    const html = '<ul>' + links.map(function (item) {
+                        const label = item.cleanLabel || item.label || item.url || 'Документ';
+                        return '<li><a href="' + escapeHtml(item.url) + '">' + escapeHtml(label) + '</a></li>';
+                    }).join('') + '</ul>';
+                    insertCardTextHtml(html);
+                }
+            });
+            return;
+        }
+
+        const templates = {
+            ol: '<ol><li>Перший пункт</li><li>Другий пункт</li><li>Третій пункт</li></ol>',
+            ul: '<ul><li>Перший пункт</li><li>Другий пункт</li><li>Третій пункт</li></ul>'
+        };
+        insertCardTextHtml(templates[type] || templates.ul);
+    }
+
+    function insertCardTextHtml(html) {
+        const field = cardModalField('text');
+        if (!field) {
+            return;
+        }
+        const editor = field.id && window.tinymce ? window.tinymce.get(field.id) : null;
+        if (editor) {
+            editor.focus();
+            editor.insertContent(html);
+            editor.save();
+        } else {
+            const separator = String(field.value || '').trim() ? '\n\n' : '';
+            field.value = String(field.value || '') + separator + html;
+        }
+        field.dispatchEvent(new Event('input', {bubbles: true}));
         setCardModalTemplate('');
         updateCardModalPreview();
     }
@@ -1090,11 +1320,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         cardModalNode.addEventListener('change', function (event) {
-            const template = event.target.closest('[data-card-modal-template]');
-            if (template) {
-                applyCardTemplate(template.value);
-                return;
-            }
             if (event.target.closest('[data-card-modal-field]')) {
                 setCardModalTemplate('');
                 updateCardModalPreview();
@@ -1107,6 +1332,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             applyCardTemplate(templateButton.dataset.cardTemplateQuick);
         });
+        cardModalNode.addEventListener('click', function (event) {
+            const listButton = event.target.closest('[data-card-text-list]');
+            if (!listButton) {
+                return;
+            }
+            insertCardTextList(listButton.dataset.cardTextList || 'ul');
+        });
         const saveCardButton = cardModalNode.querySelector('[data-layout-card-save]');
         const openImagePickerButton = cardModalNode.querySelector('[data-card-image-picker-open]');
         const clearImageButton = cardModalNode.querySelector('[data-card-image-clear]');
@@ -1118,6 +1350,80 @@ document.addEventListener('DOMContentLoaded', function () {
                 setCardImage('');
             });
         }
+        cardModalNode.addEventListener('input', function (event) {
+            if (event.target.closest('[data-card-link-label], [data-card-link-url]')) {
+                setCardModalTemplate('');
+                updateCardModalPreview();
+            }
+        });
+        cardModalNode.addEventListener('click', function (event) {
+            const addButton = event.target.closest('[data-card-link-library-add]');
+            if (addButton) {
+                addCardLink({label: '', url: ''});
+                const list = cardLinkList();
+                const last = list ? list.querySelector('[data-card-link-row]:last-child [data-card-link-label]') : null;
+                if (last) {
+                    last.focus();
+                }
+                return;
+            }
+
+            const pickAllButton = event.target.closest('[data-card-link-library-pick]');
+            if (pickAllButton) {
+                if (!window.AdminLinkPicker) {
+                    return;
+                }
+                window.AdminLinkPicker.open({
+                    multiple: true,
+                    title: 'Обрати посилання',
+                    hint: 'Вибрані посилання буде додано до бібліотеки картки.',
+                    onSelect: function (items) {
+                        (Array.isArray(items) ? items : [items]).forEach(addCardLink);
+                    }
+                });
+                return;
+            }
+
+            const pickRowButton = event.target.closest('[data-card-link-pick]');
+            if (pickRowButton) {
+                const row = pickRowButton.closest('[data-card-link-row]');
+                if (!window.AdminLinkPicker || !row) {
+                    return;
+                }
+                window.AdminLinkPicker.open({
+                    title: 'Обрати посилання',
+                    hint: 'Вибране посилання буде вставлено в цей рядок.',
+                    onSelect: function (item) {
+                        const label = row.querySelector('[data-card-link-label]');
+                        const url = row.querySelector('[data-card-link-url]');
+                        if (label && !String(label.value || '').trim()) {
+                            label.value = item.cleanLabel || item.label || 'Посилання';
+                        }
+                        if (url) {
+                            url.value = item.url || '';
+                        }
+                        setCardModalTemplate('');
+                        updateCardModalPreview();
+                    }
+                });
+                return;
+            }
+
+            const removeButton = event.target.closest('[data-card-link-remove]');
+            if (removeButton) {
+                const row = removeButton.closest('[data-card-link-row]');
+                if (row) {
+                    row.remove();
+                    const empty = cardModalNode.querySelector('[data-card-link-empty]');
+                    const list = cardLinkList();
+                    if (empty && list) {
+                        empty.hidden = Boolean(list.querySelector('[data-card-link-row]'));
+                    }
+                    setCardModalTemplate('');
+                    updateCardModalPreview();
+                }
+            }
+        });
         if (saveCardButton) {
             saveCardButton.addEventListener('click', function () {
                 if (!cardModalState) {
@@ -1303,6 +1609,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     function dragTarget(node) {
+        if (dragState && dragState.kind === 'card') {
+            return node.closest('[data-drag-kind="card"]') || node.closest('[data-card-drop-zone]');
+        }
         if (dragState) {
             return node.closest('[data-drag-kind="' + dragState.kind + '"]');
         }
@@ -1311,18 +1620,35 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function canDrop(target) {
-        if (!dragState || target.dataset.dragKind !== dragState.kind) {
+        if (!dragState) {
             return false;
         }
+        const targetKind = target.dataset.dragKind || (target.hasAttribute('data-card-drop-zone') ? 'column' : '');
         const i = indexes(target);
         if (dragState.kind === 'section') {
+            if (targetKind !== 'section') {
+                return false;
+            }
             return i.section !== dragState.section;
         }
         if (dragState.kind === 'row') {
+            if (targetKind !== 'row') {
+                return false;
+            }
             return i.section === dragState.section && i.row !== dragState.row;
         }
         if (dragState.kind === 'card') {
-            return i.section === dragState.section && i.row === dragState.row && i.column === dragState.column && i.card !== dragState.card;
+            if (i.section !== dragState.section || i.row < 0 || i.column < 0) {
+                return false;
+            }
+            if (targetKind === 'card') {
+                return i.row !== dragState.row || i.column !== dragState.column || i.card !== dragState.card;
+            }
+            if (targetKind === 'column') {
+                const targetCards = sections[i.section].rows[i.row].columns[i.column].cards || [];
+                return i.row !== dragState.row || i.column !== dragState.column || dragState.card !== targetCards.length - 1;
+            }
+            return false;
         }
 
         return false;
@@ -1347,8 +1673,28 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         if (dragState.kind === 'card') {
-            moveInArray(sections[dragState.section].rows[dragState.row].columns[dragState.column].cards, dragState.card, i.card);
+            moveCardToTarget(target, i);
         }
+    }
+
+    function moveCardToTarget(target, targetIndexes) {
+        const sourceCards = sections[dragState.section].rows[dragState.row].columns[dragState.column].cards;
+        const targetCards = sections[targetIndexes.section].rows[targetIndexes.row].columns[targetIndexes.column].cards;
+        const targetKind = target.dataset.dragKind || (target.hasAttribute('data-card-drop-zone') ? 'column' : '');
+        if (sourceCards === targetCards && targetKind === 'card') {
+            moveInArray(sourceCards, dragState.card, targetIndexes.card);
+            return;
+        }
+
+        const moving = sourceCards.splice(dragState.card, 1)[0];
+        if (!moving) {
+            return;
+        }
+        if (targetKind === 'card') {
+            targetCards.splice(Math.max(0, targetIndexes.card), 0, moving);
+            return;
+        }
+        targetCards.push(moving);
     }
 
     const form = builder.closest('form');

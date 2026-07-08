@@ -245,9 +245,14 @@
                         <label>Текст CTA
                             <input data-header-field="cta_label" placeholder="Наприклад: Вступникам">
                         </label>
-                        <label>URL CTA
-                            <input data-header-field="cta_url" placeholder="/page/admission">
-                        </label>
+                        <div class="field-with-action">
+                            <label>URL CTA
+                                <input data-header-field="cta_url" placeholder="/page/admission">
+                            </label>
+                            <button class="button secondary compact icon-button" type="button" data-header-url-picker="cta_url" title="Обрати посилання">
+                                <span class="mdi mdi-link-plus" aria-hidden="true"></span>
+                            </button>
+                        </div>
                     </div>
                     <div class="template-toggle-grid" data-template-tab-panel="menu">
                         <label class="check-row"><input type="checkbox" data-header-field="show_brand"> Показувати бренд</label>
@@ -313,9 +318,14 @@
                                 <label>Текст кнопки
                                     <input data-header-field="hero_button_label" placeholder="Детальніше">
                                 </label>
-                                <label>URL кнопки
-                                    <input data-header-field="hero_button_url" placeholder="/page/about">
-                                </label>
+                                <div class="field-with-action">
+                                    <label>URL кнопки
+                                        <input data-header-field="hero_button_url" placeholder="/page/about">
+                                    </label>
+                                    <button class="button secondary compact icon-button" type="button" data-header-url-picker="hero_button_url" title="Обрати посилання">
+                                        <span class="mdi mdi-link-plus" aria-hidden="true"></span>
+                                    </button>
+                                </div>
                             </div>
                             <div class="template-hero-background" data-hero-background-controls="hero">
                                 <div class="template-subeditor-head">
@@ -408,9 +418,14 @@
                                 <label>Текст кнопки
                                     <input data-header-field="home_hero_button_label" placeholder="Детальніше">
                                 </label>
-                                <label>URL кнопки
-                                    <input data-header-field="home_hero_button_url" placeholder="/page/about">
-                                </label>
+                                <div class="field-with-action">
+                                    <label>URL кнопки
+                                        <input data-header-field="home_hero_button_url" placeholder="/page/about">
+                                    </label>
+                                    <button class="button secondary compact icon-button" type="button" data-header-url-picker="home_hero_button_url" title="Обрати посилання">
+                                        <span class="mdi mdi-link-plus" aria-hidden="true"></span>
+                                    </button>
+                                </div>
                             </div>
                             <div class="template-hero-background" data-hero-background-controls="home">
                                 <div class="template-subeditor-head">
