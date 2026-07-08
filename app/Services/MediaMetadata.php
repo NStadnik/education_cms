@@ -6,7 +6,7 @@ namespace App\Services;
 
 final class MediaMetadata
 {
-    private const FIELDS = ['folder', 'alt_text', 'title', 'caption', 'description'];
+    private const FIELDS = ['folder', 'alt_text', 'title', 'caption', 'description', 'uploaded_by'];
 
     public static function all(): array
     {
@@ -32,7 +32,7 @@ final class MediaMetadata
         }
 
         $all = self::all();
-        $entry = self::normalizeEntry($metadata);
+        $entry = self::normalizeEntry(array_replace(self::normalizeEntry($all[$path] ?? []), $metadata));
         if (implode('', $entry) === '') {
             unset($all[$path]);
         } else {
@@ -75,6 +75,11 @@ final class MediaMetadata
         $entry = [];
         foreach (self::FIELDS as $field) {
             $value = trim((string) ($metadata[$field] ?? ''));
+            if ($field === 'uploaded_by') {
+                $entry[$field] = (string) max(0, (int) $value);
+                continue;
+            }
+
             $entry[$field] = self::limit($field === 'description' ? $value : preg_replace('/\s+/', ' ', $value), $field === 'description' ? 1000 : 160);
         }
         $entry['folder'] = self::normalizeFolder($entry['folder']);

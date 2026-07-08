@@ -25,8 +25,8 @@ final class UsersController extends \App\Controllers\AdminBaseController
             'title' => 'Профіль',
             'item' => $user,
             'message' => $message,
-            'roleLabels' => Auth::ROLE_LABELS,
-            'rolePermissions' => Auth::rolePermissions(),
+            'roleLabels' => Container::get('auth')->roleLabels(),
+            'rolePermissions' => Container::get('auth')->rolePermissionsForAll(),
             'permissionCatalog' => Auth::PERMISSION_CATALOG,
         ]);
     }
@@ -111,7 +111,7 @@ final class UsersController extends \App\Controllers\AdminBaseController
         $total = (int) ($this->db()->fetch('select count(*) as c from users ' . $where, $params)['c'] ?? 0);
 
         if ($this->isAjaxRequest()) {
-            return $this->listJson('admin/users/rows', ['items' => $items], $pagination, $total);
+            return $this->listJson('admin/users/rows', ['items' => $items, 'roleLabels' => Container::get('auth')->roleLabels()], $pagination, $total);
         }
 
         return $this->admin('admin/users/index', [
@@ -119,6 +119,7 @@ final class UsersController extends \App\Controllers\AdminBaseController
             'items' => $items,
             'total' => $total,
             'limit' => $pagination['limit'],
+            'roleLabels' => Container::get('auth')->roleLabels(),
         ]);
     }
 
@@ -130,8 +131,8 @@ final class UsersController extends \App\Controllers\AdminBaseController
         return $this->admin('admin/users/form', [
             'title' => 'Користувач',
             'item' => $item,
-            'roleLabels' => Auth::ROLE_LABELS,
-            'rolePermissions' => Auth::rolePermissions(),
+            'roleLabels' => Container::get('auth')->roleLabels(),
+            'rolePermissions' => Container::get('auth')->rolePermissionsForAll(),
             'permissionCatalog' => Auth::PERMISSION_CATALOG,
         ]);
     }
@@ -143,10 +144,21 @@ final class UsersController extends \App\Controllers\AdminBaseController
         try {
             $id = (int) $request->input('id', 0);
             $password = (string) $request->input('password', '');
+            $role = (string) $request->input('role', '');
+            $currentUser = Container::get('auth')->user() ?: [];
+            $availableRoles = Container::get('auth')->roleLabels();
+            if ($role === 'super_admin') {
+                if (($currentUser['role'] ?? '') !== 'super_admin') {
+                    throw new \InvalidArgumentException('Призначати системну роль може лише супер адміністратор.');
+                }
+            } elseif (!array_key_exists($role, $availableRoles)) {
+                throw new \InvalidArgumentException('Оберіть коректну роль.');
+            }
+
             if ($id) {
                 $this->db()->execute(
                     'update users set name=?, email=?, role=?, is_active=? where id=?',
-                    [$request->input('name'), $request->input('email'), $request->input('role'), $request->input('is_active') ? 1 : 0, $id]
+                    [$request->input('name'), $request->input('email'), $role, $request->input('is_active') ? 1 : 0, $id]
                 );
                 if ($password !== '') {
                     $this->db()->execute('update users set password_hash=? where id=?', [password_hash($password, PASSWORD_DEFAULT), $id]);
@@ -154,7 +166,7 @@ final class UsersController extends \App\Controllers\AdminBaseController
             } else {
                 $this->db()->execute(
                     'insert into users (name, email, password_hash, role, is_active, created_at) values (?, ?, ?, ?, 1, ?)',
-                    [$request->input('name'), $request->input('email'), password_hash($password, PASSWORD_DEFAULT), $request->input('role'), date('c')]
+                    [$request->input('name'), $request->input('email'), password_hash($password, PASSWORD_DEFAULT), $role, date('c')]
                 );
                 $id = (int) $this->db()->lastInsertId();
             }
@@ -164,6 +176,138 @@ final class UsersController extends \App\Controllers\AdminBaseController
             }
 
             redirect('/admin/users');
+        } catch (Throwable $e) {
+            return $this->ajaxError($request, $e);
+        }
+    }
+
+    public function roles(Request $request): Response
+    {
+        $this->guard('users.manage');
+        $auth = Container::get('auth');
+        $message = (string) ($_SESSION['roles_message'] ?? '');
+        unset($_SESSION['roles_message']);
+
+        return $this->admin('admin/users/roles', [
+            'title' => 'Ролі користувачів',
+            'roles' => $auth->roles(),
+            'systemRoleLabel' => 'Супер адміністратор',
+            'roleUsage' => $this->roleUsage(),
+            'permissionCatalog' => Auth::PERMISSION_CATALOG,
+            'message' => $message,
+        ]);
+    }
+
+    public function roleForm(Request $request): Response
+    {
+        $this->guard('users.manage');
+        $slug = $this->normalizeRoleSlug((string) $request->input('role', ''));
+        $roles = Container::get('auth')->roles();
+        $item = $slug !== '' ? ($roles[$slug] ?? null) : null;
+
+        if ($slug !== '' && !$item) {
+            $_SESSION['roles_message'] = 'Роль не знайдено.';
+            redirect('/admin/users/roles');
+        }
+
+        return $this->admin('admin/users/role-form', [
+            'title' => $slug !== '' ? 'Редагувати роль' : 'Нова роль',
+            'slug' => $slug,
+            'item' => $item,
+            'isEdit' => $slug !== '',
+            'isUsed' => $slug !== '' && (($this->roleUsage()[$slug] ?? 0) > 0),
+            'permissionCatalog' => Auth::PERMISSION_CATALOG,
+        ]);
+    }
+
+    public function rolesSave(Request $request): Response
+    {
+        $this->guard('users.manage');
+        Csrf::verify();
+
+        try {
+            $oldSlug = $this->normalizeRoleSlug((string) $request->input('old_slug', ''));
+            $slug = $this->normalizeRoleSlug((string) $request->input('slug', ''));
+            $label = trim((string) $request->input('label', ''));
+            $permissions = $request->input('permissions', []);
+            if (!is_array($permissions)) {
+                $permissions = [];
+            }
+            if ($slug === '' || $slug === 'super_admin') {
+                throw new \InvalidArgumentException('Вкажіть коректний код ролі.');
+            }
+            if ($label === '') {
+                throw new \InvalidArgumentException('Вкажіть назву ролі.');
+            }
+
+            $roles = Container::get('auth')->roles();
+            $usage = $this->roleUsage();
+            if ($oldSlug !== '' && !isset($roles[$oldSlug])) {
+                throw new \InvalidArgumentException('Роль не знайдено.');
+            }
+            if ($oldSlug !== '' && $oldSlug !== $slug && (($usage[$oldSlug] ?? 0) > 0)) {
+                throw new \InvalidArgumentException('Не можна змінити код ролі, яку призначено користувачам.');
+            }
+            if ($oldSlug !== $slug && isset($roles[$slug])) {
+                throw new \InvalidArgumentException('Роль із таким кодом вже існує.');
+            }
+
+            if ($oldSlug !== '' && $oldSlug !== $slug) {
+                unset($roles[$oldSlug]);
+            }
+            $roles[$slug] = ['label' => $label, 'permissions' => $permissions];
+
+            $this->saveRoleMap($roles);
+            $this->audit('save', 'user_roles');
+
+            if ($this->isAjax($request)) {
+                return $this->json([
+                    'ok' => true,
+                    'message' => 'Роль збережено.',
+                    'role_slug' => $slug,
+                    'role_label' => $label,
+                    'edit_url' => url('/admin/users/roles/edit?role=' . rawurlencode($slug)),
+                ]);
+            }
+
+            $_SESSION['roles_message'] = 'Роль збережено.';
+            redirect('/admin/users/roles');
+        } catch (Throwable $e) {
+            return $this->ajaxError($request, $e);
+        }
+    }
+
+    public function roleDelete(Request $request): Response
+    {
+        $this->guard('users.manage');
+        Csrf::verify();
+
+        try {
+            $slug = $this->normalizeRoleSlug((string) $request->input('role', ''));
+            $roles = Container::get('auth')->roles();
+            if ($slug === '' || !isset($roles[$slug])) {
+                throw new \InvalidArgumentException('Роль не знайдено.');
+            }
+            if (($this->roleUsage()[$slug] ?? 0) > 0) {
+                throw new \InvalidArgumentException('Не можна видалити роль, яку призначено користувачам.');
+            }
+
+            unset($roles[$slug]);
+            $this->saveRoleMap($roles);
+            $this->audit('delete', 'user_roles', null, $slug);
+
+            $_SESSION['roles_message'] = 'Роль видалено.';
+            if ($this->isAjax($request)) {
+                $roles = Container::get('auth')->roles();
+                return $this->json([
+                    'ok' => true,
+                    'message' => 'Роль видалено.',
+                    'html' => $this->roleRowsHtml($roles),
+                    'total' => count($roles),
+                ]);
+            }
+
+            redirect('/admin/users/roles');
         } catch (Throwable $e) {
             return $this->ajaxError($request, $e);
         }
@@ -188,5 +332,49 @@ final class UsersController extends \App\Controllers\AdminBaseController
         }
 
         redirect('/admin/users');
+    }
+
+    private function roleUsage(): array
+    {
+        $rows = $this->db()->fetchAll('select role, count(*) as users_count from users group by role');
+        $usage = [];
+        foreach ($rows as $row) {
+            $usage[(string) $row['role']] = (int) $row['users_count'];
+        }
+
+        return $usage;
+    }
+
+    private function normalizeRoleSlug(string $slug): string
+    {
+        $slug = strtolower(trim($slug));
+        $slug = preg_replace('/[^a-z0-9_]+/', '_', $slug) ?? '';
+        return trim($slug, '_');
+    }
+
+    private function saveRoleMap(array $roles): void
+    {
+        $payload = [];
+        foreach ($roles as $slug => $role) {
+            if (!is_array($role)) {
+                continue;
+            }
+            $payload[] = [
+                'slug' => (string) $slug,
+                'label' => (string) ($role['label'] ?? $slug),
+                'permissions' => is_array($role['permissions'] ?? null) ? $role['permissions'] : [],
+            ];
+        }
+
+        Container::get('auth')->saveRoles($payload);
+    }
+
+    private function roleRowsHtml(?array $roles = null): string
+    {
+        return $this->view()->partial('admin/users/role-rows', [
+            'roles' => $roles ?? Container::get('auth')->roles(),
+            'roleUsage' => $this->roleUsage(),
+            'permissionCatalog' => Auth::PERMISSION_CATALOG,
+        ]);
     }
 }

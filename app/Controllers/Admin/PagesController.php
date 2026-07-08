@@ -15,7 +15,7 @@ final class PagesController extends \App\Controllers\AdminBaseController
 {
     public function pages(Request $request): Response
     {
-        $this->guard();
+        $this->guard('pages.manage');
         $query = trim((string) $request->input('q', ''));
         [$where, $params] = $this->pageListWhere($request, $query);
         $sort = $this->pageListOrder((string) $request->input('sort', 'order_asc'));
@@ -49,9 +49,12 @@ final class PagesController extends \App\Controllers\AdminBaseController
 
     public function pageForm(Request $request): Response
     {
-        $this->guard();
+        $this->guard('pages.manage');
         $id = (int) $request->input('id', 0);
         $item = $id ? $this->db()->fetch('select * from pages where id = ?', [$id]) : null;
+        if ($item && !$this->canManageAllContent() && (int) ($item['created_by'] ?? 0) !== $this->currentUserId()) {
+            return \App\Controllers\ErrorController::response(403);
+        }
         return $this->admin('admin/pages/form', ['title' => 'Сторінка', 'item' => $item, 'templates' => $this->pageTemplates()]);
     }
 
@@ -62,6 +65,10 @@ final class PagesController extends \App\Controllers\AdminBaseController
         try {
             $now = date('c');
             $id = (int) $request->input('id', 0);
+            $existing = $id ? $this->db()->fetch('select id, created_by from pages where id = ?', [$id]) : null;
+            if ($id && (!$existing || (!$this->canManageAllContent() && (int) ($existing['created_by'] ?? 0) !== $this->currentUserId()))) {
+                throw new \RuntimeException('Доступ заборонено.');
+            }
             $editorMode = (string) $request->input('editor_mode', 'simple');
             if ($editorMode === 'simple') {
                 $blocks = $this->blocksFromText((string) $request->input('blocks_text'));
@@ -90,7 +97,7 @@ final class PagesController extends \App\Controllers\AdminBaseController
             if ($id) {
                 $this->db()->execute('update pages set title=?, slug=?, excerpt=?, template=?, blocks_json=?, status=?, sort_order=?, updated_at=? where id=?', [...$data, $id]);
             } else {
-                $this->db()->execute('insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
+                $this->db()->execute('insert into pages (created_by, title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [$this->currentUserId(), ...$data, $now]);
                 $id = (int) $this->db()->lastInsertId();
             }
             $this->audit('save', 'page', $id);
@@ -197,7 +204,7 @@ final class PagesController extends \App\Controllers\AdminBaseController
     {
         $this->guard('pages.manage');
         Csrf::verify();
-        $ids = $this->bulkIds($request);
+        $ids = $this->filterOwnedContentIds('pages', $this->bulkIds($request));
         $action = (string) $request->input('bulk_action', '');
         if ($ids && in_array($action, ['publish', 'draft'], true)) {
             $status = $action === 'publish' ? 'published' : 'draft';
@@ -223,6 +230,12 @@ final class PagesController extends \App\Controllers\AdminBaseController
         if ($query !== '') {
             $clauses[] = '(title like ? or slug like ? or excerpt like ? or status like ?)';
             array_push($params, '%' . $query . '%', '%' . $query . '%', '%' . $query . '%', '%' . $query . '%');
+        }
+
+        [$ownerWhere, $ownerParams] = $this->ownedContentWhere();
+        if ($ownerWhere !== '') {
+            $clauses[] = $ownerWhere;
+            array_push($params, ...$ownerParams);
         }
 
         $status = (string) $request->input('status', '');

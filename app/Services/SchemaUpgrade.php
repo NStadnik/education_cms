@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Auth;
 use App\Core\Database;
 use Throwable;
 
@@ -56,10 +57,18 @@ final class SchemaUpgrade
                 $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_category_links', '1']);
             }
 
+            $ownershipDone = $db->fetch('select value from settings where name = ?', ['schema_content_ownership']);
+            if (($ownershipDone['value'] ?? '') !== '1') {
+                self::addContentOwnershipColumns($db);
+                $db->execute('delete from settings where name = ?', ['schema_content_ownership']);
+                $db->execute('insert into settings (name, value) values (?, ?)', ['schema_content_ownership', '1']);
+            }
+
             self::ensureSetting($db, 'site_template', 'official');
             self::ensureSetting($db, 'site_mode', 'online');
             self::ensureSetting($db, 'site_mode_title', '');
             self::ensureSetting($db, 'site_mode_message', '');
+            self::ensureSetting($db, 'user_roles', json_encode(Auth::defaultRolesConfig(), JSON_UNESCAPED_UNICODE) ?: '{}');
             self::migrateGlobalFields($db);
         } catch (Throwable) {
             // Keep the site bootable; debug.log will still capture hard failures elsewhere.
@@ -131,6 +140,16 @@ final class SchemaUpgrade
                 constraint news_category_links_category_id_foreign foreign key(category_id) references news_categories(id) on delete cascade
             ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci"
         );
+    }
+
+    private static function addContentOwnershipColumns(Database $db): void
+    {
+        if (!self::hasColumn($db, 'pages', 'created_by')) {
+            $db->pdo()->exec('alter table pages add column created_by bigint unsigned null after id');
+        }
+        if (!self::hasColumn($db, 'news', 'created_by')) {
+            $db->pdo()->exec('alter table news add column created_by bigint unsigned null after id');
+        }
     }
 
     private static function seedNewsCategories(Database $db): void

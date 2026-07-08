@@ -85,9 +85,7 @@ final class MediaController extends \App\Controllers\AdminBaseController
                 throw new \RuntimeException('Оберіть файл для завантаження.');
             }
             $folder = MediaMetadata::normalizeFolder((string) $request->input('folder', ''));
-            if ($folder !== '') {
-                MediaMetadata::save($filePath, ['folder' => $folder]);
-            }
+            MediaMetadata::save($filePath, ['folder' => $folder, 'uploaded_by' => (string) $this->currentUserId()]);
 
             $this->audit('upload', 'media', null, $filePath);
             if ($this->isAjax($request)) {
@@ -106,7 +104,7 @@ final class MediaController extends \App\Controllers\AdminBaseController
                 return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
             }
 
-            $allItems = Files::all($this->mediaReferences());
+            $allItems = $this->filterOwnedMediaItems(Files::all($this->mediaReferences()));
             return $this->admin('admin/media/index', [
                 'title' => 'Медіафайли',
                 'items' => array_slice($allItems, 0, self::LIST_LIMIT),
@@ -130,7 +128,8 @@ final class MediaController extends \App\Controllers\AdminBaseController
 
         $path = Files::normalize((string) $request->input('path', ''));
         $references = $this->mediaReferences();
-        if ($path === '' || isset($references[$path])) {
+        $item = $this->mediaItem($path);
+        if ($path === '' || !$item || !$this->canManageMediaItem($item) || isset($references[$path])) {
             if ($this->isAjax($request)) {
                 return $this->json(['ok' => false, 'message' => 'Файл використовується або не знайдений.'], 422);
             }
@@ -167,8 +166,10 @@ final class MediaController extends \App\Controllers\AdminBaseController
 
         if ($paths && $action === 'delete') {
             $references = $this->mediaReferences();
+            $mediaItems = $this->mediaItemsByPath();
             foreach ($paths as $path) {
-                if ($path === '' || isset($references[$path])) {
+                $item = $mediaItems[$path] ?? null;
+                if ($path === '' || !$item || !$this->canManageMediaItem($item) || isset($references[$path])) {
                     continue;
                 }
                 try {
@@ -197,7 +198,8 @@ final class MediaController extends \App\Controllers\AdminBaseController
 
         try {
             $path = Files::normalize((string) $request->input('path', ''));
-            if ($path === '' || !is_file(base_path('storage/uploads/' . $path))) {
+            $item = $this->mediaItem($path);
+            if ($path === '' || !is_file(base_path('storage/uploads/' . $path)) || !$item || !$this->canManageMediaItem($item)) {
                 throw new \InvalidArgumentException('Файл не знайдено.');
             }
 
@@ -223,5 +225,20 @@ final class MediaController extends \App\Controllers\AdminBaseController
         } catch (Throwable $e) {
             return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
         }
+    }
+
+    private function mediaItem(string $path): ?array
+    {
+        return $this->mediaItemsByPath()[$path] ?? null;
+    }
+
+    private function mediaItemsByPath(): array
+    {
+        $items = [];
+        foreach (Files::all($this->mediaReferences()) as $item) {
+            $items[(string) ($item['path'] ?? '')] = $item;
+        }
+
+        return $items;
     }
 }

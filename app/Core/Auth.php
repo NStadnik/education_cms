@@ -10,7 +10,6 @@ final class Auth
         'admin' => 'Адміністратор',
         'editor' => 'Редактор',
         'publisher' => 'Публікатор',
-        'finance_editor' => 'Фінансовий редактор',
         'viewer' => 'Переглядач',
     ];
 
@@ -45,10 +44,10 @@ final class Auth
             'label' => 'Оновлення',
             'description' => 'Перегляд і запуск оновлень системи.',
         ],
-        'finance.manage' => [
-            'group' => 'Дані',
-            'label' => 'Фінанси',
-            'description' => 'Доступ до фінансових матеріалів і службових даних.',
+        'content.manage_all' => [
+            'group' => 'Контент',
+            'label' => 'Чужі матеріали',
+            'description' => 'Редагування та видалення сторінок, новин і медіафайлів інших користувачів.',
         ],
     ];
 
@@ -62,9 +61,93 @@ final class Auth
             'admin' => ['*'],
             'editor' => ['pages.manage', 'news.manage', 'media.manage'],
             'publisher' => ['pages.manage', 'news.manage', 'media.manage'],
-            'finance_editor' => ['media.manage', 'finance.manage'],
             'viewer' => [],
         ];
+    }
+
+    public static function defaultRolesConfig(): array
+    {
+        $roles = [];
+        foreach (self::ROLE_LABELS as $slug => $label) {
+            $roles[$slug] = [
+                'label' => $label,
+                'permissions' => self::rolePermissions()[$slug] ?? [],
+            ];
+        }
+
+        return $roles;
+    }
+
+    public function roles(): array
+    {
+        $stored = $this->db->fetch('select value from settings where name = ?', ['user_roles']);
+        $decoded = json_decode((string) ($stored['value'] ?? ''), true);
+        if (!is_array($decoded) || $decoded === []) {
+            return $this->defaultRoles();
+        }
+
+        $roles = [];
+        foreach ($decoded as $key => $role) {
+            $slug = $this->normalizeRoleSlug((string) $key);
+            if ($slug === '' || $slug === 'super_admin' || !is_array($role)) {
+                continue;
+            }
+
+            $permissions = $role['permissions'] ?? [];
+            if (!is_array($permissions)) {
+                $permissions = [];
+            }
+
+            $roles[$slug] = [
+                'label' => trim((string) ($role['label'] ?? $slug)) ?: $slug,
+                'permissions' => $this->sanitizePermissions($permissions),
+            ];
+        }
+
+        return $roles ?: $this->defaultRoles();
+    }
+
+    public function roleLabels(): array
+    {
+        return array_map(static fn (array $role): string => $role['label'], $this->roles());
+    }
+
+    public function rolePermissionsForAll(): array
+    {
+        return array_map(static fn (array $role): array => $role['permissions'], $this->roles());
+    }
+
+    public function saveRoles(array $roles): void
+    {
+        $clean = [];
+        foreach ($roles as $role) {
+            if (!is_array($role)) {
+                continue;
+            }
+
+            $slug = $this->normalizeRoleSlug((string) ($role['slug'] ?? ''));
+            if ($slug === '' || $slug === 'super_admin') {
+                continue;
+            }
+            if (isset($clean[$slug])) {
+                throw new \InvalidArgumentException('Коди ролей мають бути унікальними.');
+            }
+
+            $label = trim((string) ($role['label'] ?? ''));
+            $permissions = $role['permissions'] ?? [];
+            $clean[$slug] = [
+                'label' => $label !== '' ? $label : $slug,
+                'permissions' => is_array($permissions) ? $this->sanitizePermissions($permissions) : [],
+            ];
+        }
+
+        if ($clean === []) {
+            throw new \InvalidArgumentException('Залиште щонайменше одну роль.');
+        }
+
+        $encoded = json_encode($clean, JSON_UNESCAPED_UNICODE);
+        $this->db->execute('delete from settings where name = ?', ['user_roles']);
+        $this->db->execute('insert into settings (name, value) values (?, ?)', ['user_roles', $encoded === false ? '{}' : $encoded]);
     }
 
     public function user(): ?array
@@ -113,7 +196,28 @@ final class Auth
             return true;
         }
 
-        $allowed = self::rolePermissions()[$user['role']] ?? [];
+        $allowed = $this->rolePermissionsForAll()[$user['role']] ?? [];
         return in_array('*', $allowed, true) || in_array($permission, $allowed, true);
+    }
+
+    private function defaultRoles(): array
+    {
+        return self::defaultRolesConfig();
+    }
+
+    private function sanitizePermissions(array $permissions): array
+    {
+        if (in_array('*', $permissions, true)) {
+            return ['*'];
+        }
+
+        return array_values(array_intersect(array_keys(self::PERMISSION_CATALOG), array_map('strval', $permissions)));
+    }
+
+    private function normalizeRoleSlug(string $slug): string
+    {
+        $slug = strtolower(trim($slug));
+        $slug = preg_replace('/[^a-z0-9_]+/', '_', $slug) ?? '';
+        return trim($slug, '_');
     }
 }

@@ -15,6 +15,7 @@ create table if not exists users (
 
 create table if not exists pages (
     id bigint unsigned primary key auto_increment,
+    created_by bigint unsigned null,
     title varchar(220) not null,
     slug varchar(180) not null unique,
     excerpt text null,
@@ -28,6 +29,7 @@ create table if not exists pages (
 
 create table if not exists news (
     id bigint unsigned primary key auto_increment,
+    created_by bigint unsigned null,
     title varchar(220) not null,
     slug varchar(180) not null unique,
     category varchar(160) not null default 'Загальні',

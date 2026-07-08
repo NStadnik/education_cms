@@ -9,13 +9,14 @@ use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Files;
+use App\Services\MediaMetadata;
 use Throwable;
 
 final class NewsController extends \App\Controllers\AdminBaseController
 {
     public function news(Request $request): Response
     {
-        $this->guard();
+        $this->guard('news.manage');
         $query = trim((string) $request->input('q', ''));
         [$where, $params] = $this->newsListFilters($request, $query);
         $sort = $this->newsListOrder((string) $request->input('sort', 'newest'));
@@ -26,7 +27,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
              left join news_category_links l on l.news_id = n.id
              left join news_categories c on c.id = l.category_id
              ' . $where . '
-             group by n.id, n.title, n.slug, n.category, n.image_path, n.body, n.status, n.published_at, n.created_at, n.updated_at
+             group by n.id, n.created_by, n.title, n.slug, n.category, n.image_path, n.body, n.status, n.published_at, n.created_at, n.updated_at
              order by ' . $sort . '
              limit ' . $pagination['limit'] . ' offset ' . $pagination['offset'],
             $params
@@ -63,9 +64,12 @@ final class NewsController extends \App\Controllers\AdminBaseController
 
     public function newsForm(Request $request): Response
     {
-        $this->guard();
+        $this->guard('news.manage');
         $id = (int) $request->input('id', 0);
         $item = $id ? $this->db()->fetch('select * from news where id = ?', [$id]) : null;
+        if ($item && !$this->canManageAllContent() && (int) ($item['created_by'] ?? 0) !== $this->currentUserId()) {
+            return \App\Controllers\ErrorController::response(403);
+        }
         return $this->admin('admin/news/form', [
             'title' => 'Новина',
             'item' => $item,
@@ -76,7 +80,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
 
     public function newsCategories(Request $request): Response
     {
-        $this->guard();
+        $this->guard('news.manage');
         return $this->admin('admin/news/categories', [
             'title' => 'Категорії новин',
             'categories' => $this->newsCategoriesWithCounts(),
@@ -91,6 +95,10 @@ final class NewsController extends \App\Controllers\AdminBaseController
         try {
             $now = date('c');
             $id = (int) $request->input('id', 0);
+            $existing = $id ? $this->db()->fetch('select id, created_by from news where id = ?', [$id]) : null;
+            if ($id && (!$existing || (!$this->canManageAllContent() && (int) ($existing['created_by'] ?? 0) !== $this->currentUserId()))) {
+                throw new \RuntimeException('Доступ заборонено.');
+            }
             $slug = $this->slug((string) $request->input('slug', $request->input('title')));
             $publishedAt = $request->input('status') === 'published' ? ($request->input('published_at') ?: $now) : null;
             $categoryIds = $this->selectedCategoryIds($request);
@@ -112,7 +120,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
             if ($id) {
                 $this->db()->execute('update news set title=?, slug=?, category=?, image_path=?, body=?, status=?, published_at=?, updated_at=? where id=?', [...$data, $id]);
             } else {
-                $this->db()->execute('insert into news (title, slug, category, image_path, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)', [...$data, $now]);
+                $this->db()->execute('insert into news (created_by, title, slug, category, image_path, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [$this->currentUserId(), ...$data, $now]);
                 $id = (int) $this->db()->lastInsertId();
             }
             $this->syncNewsCategories($id, $categoryIds);
@@ -139,7 +147,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
     {
         $this->guard('news.manage');
         Csrf::verify();
-        $ids = $this->bulkIds($request);
+        $ids = $this->filterOwnedContentIds('news', $this->bulkIds($request));
         $action = (string) $request->input('bulk_action', '');
         if ($ids && in_array($action, ['publish', 'draft'], true)) {
             $status = $action === 'publish' ? 'published' : 'draft';
@@ -456,6 +464,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
             Files::delete($uploaded);
             throw new \RuntimeException('Головне зображення має бути JPG, PNG або WebP.');
         }
+        MediaMetadata::save($uploaded, ['uploaded_by' => (string) $this->currentUserId()]);
 
         return $uploaded;
     }
@@ -478,6 +487,18 @@ final class NewsController extends \App\Controllers\AdminBaseController
         if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true) || !is_file(base_path('storage/uploads/' . $path))) {
             throw new \RuntimeException('Оберіть зображення з медіафайлів.');
         }
+        if (!$this->canManageAllContent()) {
+            $item = null;
+            foreach (Files::all($this->mediaReferences()) as $mediaItem) {
+                if ((string) ($mediaItem['path'] ?? '') === $path) {
+                    $item = $mediaItem;
+                    break;
+                }
+            }
+            if (!$item || !$this->canManageMediaItem($item)) {
+                throw new \RuntimeException('Оберіть власне зображення з медіафайлів.');
+            }
+        }
     }
 
     private function newsListFilters(Request $request, string $query): array
@@ -494,6 +515,12 @@ final class NewsController extends \App\Controllers\AdminBaseController
                 where sl.news_id = n.id and sc.title like ?
             ))';
             array_push($params, $like, $like, $like, $like, $like, $like);
+        }
+
+        [$ownerWhere, $ownerParams] = $this->ownedContentWhere('n');
+        if ($ownerWhere !== '') {
+            $clauses[] = $ownerWhere;
+            array_push($params, ...$ownerParams);
         }
 
         $status = (string) $request->input('status', '');

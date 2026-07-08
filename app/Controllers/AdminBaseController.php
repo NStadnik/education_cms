@@ -104,6 +104,11 @@ abstract class AdminBaseController extends BaseController
                 $clauses[] = '(title like ? or slug like ? or excerpt like ? or status like ?)';
                 array_push($params, '%' . $query . '%', '%' . $query . '%', '%' . $query . '%', '%' . $query . '%');
             }
+            [$ownerWhere, $ownerParams] = $this->ownedContentWhere();
+            if ($ownerWhere !== '') {
+                $clauses[] = $ownerWhere;
+                array_push($params, ...$ownerParams);
+            }
             $status = (string) $request->input('status', '');
             if (in_array($status, ['published', 'draft'], true)) {
                 $clauses[] = 'status = ?';
@@ -137,6 +142,11 @@ abstract class AdminBaseController extends BaseController
                 ))';
                 array_push($params, $like, $like, $like, $like, $like, $like);
             }
+            [$ownerWhere, $ownerParams] = $this->ownedContentWhere('n');
+            if ($ownerWhere !== '') {
+                $clauses[] = $ownerWhere;
+                array_push($params, ...$ownerParams);
+            }
             $status = (string) $request->input('status', '');
             if (in_array($status, ['published', 'draft'], true)) {
                 $clauses[] = 'n.status = ?';
@@ -166,7 +176,7 @@ abstract class AdminBaseController extends BaseController
                  left join news_category_links l on l.news_id = n.id
                  left join news_categories c on c.id = l.category_id
                  ' . $newsWhere . '
-                 group by n.id, n.title, n.slug, n.category, n.image_path, n.body, n.status, n.published_at, n.created_at, n.updated_at
+                 group by n.id, n.created_by, n.title, n.slug, n.category, n.image_path, n.body, n.status, n.published_at, n.created_at, n.updated_at
                  order by ' . $newsOrder . '
                  limit ' . $pagination['limit'] . ' offset 0',
                 $params
@@ -190,7 +200,10 @@ abstract class AdminBaseController extends BaseController
 
         return [
             'ok' => true,
-            'html' => $this->view()->partial($config['template'], ['items' => $items]),
+            'html' => $this->view()->partial($config['template'], [
+                'items' => $items,
+                'roleLabels' => $resource === 'users' ? Container::get('auth')->roleLabels() : [],
+            ]),
             'total' => $total,
             'next_offset' => $loaded,
             'has_more' => $loaded < $total,
@@ -229,8 +242,19 @@ abstract class AdminBaseController extends BaseController
 
     protected function statusStats(string $table): array
     {
-        $total = $this->count($table);
-        $published = (int) ($this->db()->fetch("select count(*) as c from {$table} where status = 'published'")['c'] ?? 0);
+        $where = '';
+        $params = [];
+        if (in_array($table, ['pages', 'news'], true)) {
+            [$ownerWhere, $ownerParams] = $this->ownedContentWhere();
+            if ($ownerWhere !== '') {
+                $where = ' where ' . $ownerWhere;
+                $params = $ownerParams;
+            }
+        }
+
+        $total = (int) ($this->db()->fetch("select count(*) as c from {$table}" . $where, $params)['c'] ?? 0);
+        $publishedWhere = $where === '' ? " where status = 'published'" : $where . " and status = 'published'";
+        $published = (int) ($this->db()->fetch("select count(*) as c from {$table}" . $publishedWhere, $params)['c'] ?? 0);
         return ['total' => $total, 'published' => $published, 'drafts' => $total - $published];
     }
 
@@ -314,6 +338,41 @@ abstract class AdminBaseController extends BaseController
 
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $this->db()->execute("delete from {$table} where id in ({$placeholders})", $ids);
+    }
+
+    protected function currentUserId(): int
+    {
+        return (int) ($_SESSION['user_id'] ?? 0);
+    }
+
+    protected function canManageAllContent(): bool
+    {
+        return Container::get('auth')->can('content.manage_all');
+    }
+
+    protected function ownedContentWhere(string $alias = ''): array
+    {
+        if ($this->canManageAllContent()) {
+            return ['', []];
+        }
+
+        $column = ($alias !== '' ? $alias . '.' : '') . 'created_by';
+        return [$column . ' = ?', [$this->currentUserId()]];
+    }
+
+    protected function filterOwnedContentIds(string $table, array $ids): array
+    {
+        if ($this->canManageAllContent() || !$ids || !in_array($table, ['pages', 'news'], true)) {
+            return $ids;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $rows = $this->db()->fetchAll(
+            "select id from {$table} where id in ({$placeholders}) and created_by = ?",
+            [...$ids, $this->currentUserId()]
+        );
+
+        return array_map(static fn (array $row): int => (int) $row['id'], $rows);
     }
 
     protected function importOptions(): array
@@ -1772,12 +1831,12 @@ abstract class AdminBaseController extends BaseController
             return null;
         }
 
-        $existing = $this->db()->fetch("select id from {$table} where slug = ? limit 1", [$slug]);
+        $existing = $this->db()->fetch("select id, created_by from {$table} where slug = ? limit 1", [$slug]);
         if ($existing || $legacySlug === '' || $legacySlug === $slug) {
             return $existing ?: null;
         }
 
-        return $this->db()->fetch("select id from {$table} where slug = ? limit 1", [$legacySlug]) ?: null;
+        return $this->db()->fetch("select id, created_by from {$table} where slug = ? limit 1", [$legacySlug]) ?: null;
     }
 
     protected function importNewsRows(array $rows, string $mode = 'create'): int
@@ -1797,6 +1856,12 @@ abstract class AdminBaseController extends BaseController
             }
             $legacySlug = $this->importLegacySlug($row);
             $existing = $mode !== 'create' ? $this->importExistingBySlug('news', $slug, $legacySlug) : null;
+            if ($existing && !$this->canManageAllContent() && (int) ($existing['created_by'] ?? 0) !== $this->currentUserId()) {
+                if ($mode === 'update') {
+                    continue;
+                }
+                $existing = null;
+            }
             if ($mode === 'update' && !$existing) {
                 continue;
             }
@@ -1837,8 +1902,8 @@ abstract class AdminBaseController extends BaseController
                 $this->db()->execute('delete from news_category_links where news_id = ?', [$newsId]);
             } else {
                 $this->db()->execute(
-                    'insert into news (title, slug, category, image_path, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    [$title, $this->uniqueSlug('news', $slugSource), $category, $imagePath !== '' ? $imagePath : null, $data[3], $status, $publishedAt ?: null, $now, $now]
+                    'insert into news (created_by, title, slug, category, image_path, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [$this->currentUserId(), $title, $this->uniqueSlug('news', $slugSource), $category, $imagePath !== '' ? $imagePath : null, $data[3], $status, $publishedAt ?: null, $now, $now]
                 );
                 $newsId = (int) $this->db()->lastInsertId();
             }
@@ -1966,6 +2031,12 @@ abstract class AdminBaseController extends BaseController
             }
             $legacySlug = $this->importLegacySlug($row);
             $existing = $mode !== 'create' ? $this->importExistingBySlug('pages', $slug, $legacySlug) : null;
+            if ($existing && !$this->canManageAllContent() && (int) ($existing['created_by'] ?? 0) !== $this->currentUserId()) {
+                if ($mode === 'update') {
+                    continue;
+                }
+                $existing = null;
+            }
             if ($mode === 'update' && !$existing) {
                 continue;
             }
@@ -1994,8 +2065,8 @@ abstract class AdminBaseController extends BaseController
                 );
             } else {
                 $this->db()->execute(
-                    'insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    [$title, $this->uniqueSlug('pages', $slugSource), $data[1], $template, $data[3], $data[4], $data[5], $now, $now]
+                    'insert into pages (created_by, title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [$this->currentUserId(), $title, $this->uniqueSlug('pages', $slugSource), $data[1], $template, $data[3], $data[4], $data[5], $now, $now]
                 );
             }
             $created++;
@@ -2239,6 +2310,7 @@ abstract class AdminBaseController extends BaseController
     protected function mediaListPayload(string $query, array $pagination, string $folder = ''): array
     {
         $allItems = Files::all($this->mediaReferences());
+        $allItems = $this->filterOwnedMediaItems($allItems);
         $folders = \App\Services\MediaMetadata::folders($allItems);
         $filteredItems = $this->filterMedia($allItems, $query);
         $folder = $folder === '__none' ? '__none' : \App\Services\MediaMetadata::normalizeFolder($folder);
@@ -2261,6 +2333,21 @@ abstract class AdminBaseController extends BaseController
             'stats' => $this->mediaStats($allItems),
             'folders' => $folders,
         ];
+    }
+
+    protected function filterOwnedMediaItems(array $items): array
+    {
+        if ($this->canManageAllContent()) {
+            return $items;
+        }
+
+        $userId = $this->currentUserId();
+        return array_values(array_filter($items, static fn (array $item): bool => (int) ($item['uploaded_by'] ?? 0) === $userId));
+    }
+
+    protected function canManageMediaItem(array $item): bool
+    {
+        return $this->canManageAllContent() || (int) ($item['uploaded_by'] ?? 0) === $this->currentUserId();
     }
 
     protected function mediaStats(array $items): array

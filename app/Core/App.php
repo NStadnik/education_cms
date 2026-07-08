@@ -139,8 +139,12 @@ final class App
         $this->router->post('/admin/media/delete', [$adminMedia, 'mediaDelete']);
         $this->router->post('/admin/media/bulk', [$adminMedia, 'mediaBulk']);
         $this->router->get('/admin/users', [$adminUsers, 'users']);
+        $this->router->get('/admin/users/roles', [$adminUsers, 'roles']);
+        $this->router->get('/admin/users/roles/edit', [$adminUsers, 'roleForm']);
         $this->router->get('/admin/users/edit', [$adminUsers, 'userForm']);
         $this->router->post('/admin/users/save', [$adminUsers, 'userSave']);
+        $this->router->post('/admin/users/roles/save', [$adminUsers, 'rolesSave']);
+        $this->router->post('/admin/users/roles/delete', [$adminUsers, 'roleDelete']);
         $this->router->post('/admin/users/bulk', [$adminUsers, 'usersBulk']);
         $this->router->get('/admin/templates', [$adminSettings, 'templates']);
         $this->router->get('/admin/templates/link-picker', [$adminSettings, 'templatesLinkPicker']);

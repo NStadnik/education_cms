@@ -4,10 +4,16 @@
         <h1>Користувачі</h1>
         <p class="page-subtitle">Керуйте обліковими записами, ролями та доступом до адмінпанелі.</p>
     </div>
-    <a class="button" href="<?= url('/admin/users/edit') ?>">
-        <span class="mdi mdi-account-plus-outline" aria-hidden="true"></span>
-        <span>Додати користувача</span>
-    </a>
+    <div class="form-actions">
+        <a class="button secondary" href="<?= url('/admin/users/roles') ?>">
+            <span class="mdi mdi-shield-account-outline" aria-hidden="true"></span>
+            <span>Ролі</span>
+        </a>
+        <a class="button" href="<?= url('/admin/users/edit') ?>">
+            <span class="mdi mdi-account-plus-outline" aria-hidden="true"></span>
+            <span>Додати користувача</span>
+        </a>
+    </div>
 </div>
 <form method="post" action="<?= url('/admin/users/bulk') ?>" data-no-ajax>
 <?= \App\Core\Csrf::field() ?>
@@ -28,7 +34,7 @@
     <div class="table-scroll">
         <table>
             <thead><tr><th><input type="checkbox" data-bulk-check-all aria-label="Вибрати всі"></th><th>Ім'я</th><th>Email</th><th>Роль</th><th>Активний</th><th></th></tr></thead>
-            <tbody id="usersRows"><?= $this->partial('admin/users/rows', ['items' => $items]) ?></tbody>
+            <tbody id="usersRows"><?= $this->partial('admin/users/rows', ['items' => $items, 'roleLabels' => $roleLabels ?? []]) ?></tbody>
         </table>
     </div>
     <div class="empty-state <?= $items ? 'd-none' : '' ?>" data-list-empty>Користувачі не знайдені.</div>

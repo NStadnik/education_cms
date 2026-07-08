@@ -3,9 +3,9 @@
     $roleLabels = is_array($roleLabels ?? null) ? $roleLabels : [];
     $rolePermissions = is_array($rolePermissions ?? null) ? $rolePermissions : [];
     $permissionCatalog = is_array($permissionCatalog ?? null) ? $permissionCatalog : [];
-    $allowed = $rolePermissions[$role] ?? [];
-    $canEverything = in_array('*', $allowed, true);
-    $roleLabel = $roleLabels[$role] ?? $role;
+    $allowed = $role === 'super_admin' ? ['*'] : ($rolePermissions[$role] ?? []);
+    $canEverything = $role === 'super_admin' || in_array('*', $allowed, true);
+    $roleLabel = $roleLabels[$role] ?? ($role === 'super_admin' ? 'Супер адміністратор' : $role);
     $grantedPermissions = [];
     foreach ($permissionCatalog as $permission => $permissionInfo) {
         if ($canEverything || in_array($permission, $allowed, true)) {

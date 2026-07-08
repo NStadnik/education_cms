@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Auth;
 use App\Core\Database;
 use RuntimeException;
 
@@ -101,6 +102,7 @@ final class Installer
             'site_mode' => 'online',
             'site_mode_title' => '',
             'site_mode_message' => '',
+            'user_roles' => json_encode(Auth::defaultRolesConfig(), JSON_UNESCAPED_UNICODE) ?: '{}',
         ];
 
         foreach ($settings as $name => $value) {
@@ -117,12 +119,13 @@ final class Installer
                 $now,
             ]
         );
+        $adminId = (int) $db->lastInsertId();
 
-        $this->seedPages($db, $now);
+        $this->seedPages($db, $now, $adminId);
         $this->seedNewsCategories($db, $now);
     }
 
-    private function seedPages(Database $db, string $now): void
+    private function seedPages(Database $db, string $now, int $adminId): void
     {
         $blocks = json_encode([
             ['type' => 'hero', 'title' => 'Офіційний сайт закладу освіти', 'text' => 'Новини та інформація закладу освіти в одному місці.'],
@@ -130,13 +133,13 @@ final class Installer
         ], JSON_UNESCAPED_UNICODE);
 
         $db->execute(
-            'insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, 0, ?, ?)',
-            ['Головна', 'home', 'Головна сторінка', 'default', $blocks, 'published', $now, $now]
+            'insert into pages (created_by, title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)',
+            [$adminId, 'Головна', 'home', 'Головна сторінка', 'default', $blocks, 'published', $now, $now]
         );
 
         $db->execute(
-            'insert into pages (title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, 10, ?, ?)',
-            ['Про заклад', 'about', 'Коротка інформація про заклад', 'default', json_encode([['type' => 'text', 'title' => 'Про заклад', 'text' => 'Додайте опис, історію та пріоритети закладу освіти.']], JSON_UNESCAPED_UNICODE), 'published', $now, $now]
+            'insert into pages (created_by, title, slug, excerpt, template, blocks_json, status, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, 10, ?, ?)',
+            [$adminId, 'Про заклад', 'about', 'Коротка інформація про заклад', 'default', json_encode([['type' => 'text', 'title' => 'Про заклад', 'text' => 'Додайте опис, історію та пріоритети закладу освіти.']], JSON_UNESCAPED_UNICODE), 'published', $now, $now]
         );
     }
 
