@@ -132,13 +132,20 @@
 .layout-card-image-picker-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-bottom: 12px; }
 .layout-card-image-picker-status { min-width: 190px; text-align: right; }
 .layout-card-image-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.layout-card-image-option { display: grid; gap: 7px; min-height: 188px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--text); text-align: left; cursor: pointer; }
+.layout-card-image-picker-grid.is-loading { opacity: .78; }
+.layout-card-image-picker-loading { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 128px; padding: 18px; border: 1px dashed var(--line); border-radius: 6px; background: #fbfcff; color: var(--muted); text-align: center; }
+.layout-card-image-picker-loading .mdi { color: var(--brand); font-size: 22px; line-height: 1; }
+.layout-card-image-option { display: grid; gap: 7px; min-height: 188px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--text); text-align: left; cursor: pointer; animation: layoutCardImageIn .18s ease both; }
 .layout-card-image-option:hover, .layout-card-image-option.is-selected { border-color: #24364f; box-shadow: 0 0 0 2px rgba(36,54,79,.13); }
 .layout-card-image-option img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 5px; background: #f1f4f9; }
 .layout-card-image-option span, .layout-card-image-option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .layout-card-image-option span { font-weight: 650; }
 .layout-card-image-option small { color: var(--muted); }
 .layout-card-image-picker-empty { grid-column: 1 / -1; padding: 18px; border: 1px dashed var(--line); border-radius: 6px; background: #fbfcff; color: var(--muted); text-align: center; }
+@keyframes layoutCardImageIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 .layout-drag-handle { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 30px; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--muted); cursor: grab; }
 .layout-drag-handle:active { cursor: grabbing; }
 .layout-drag-handle[draggable] { user-select: none; }

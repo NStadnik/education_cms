@@ -77,12 +77,24 @@ document.addEventListener('DOMContentLoaded', function () {
         hero_text: '',
         hero_button_label: '',
         hero_button_url: '',
+        hero_background_image: '',
+        hero_background_position: 'center center',
+        hero_background_size: 'cover',
+        hero_background_repeat: 'no-repeat',
+        hero_overlay_enabled: true,
+        hero_overlay_opacity: '35',
         home_hero_enabled: false,
         home_hero_variant: 'fullscreen',
         home_hero_title: '',
         home_hero_text: '',
         home_hero_button_label: '',
         home_hero_button_url: '',
+        home_hero_background_image: '',
+        home_hero_background_position: 'center center',
+        home_hero_background_size: 'cover',
+        home_hero_background_repeat: 'no-repeat',
+        home_hero_overlay_enabled: true,
+        home_hero_overlay_opacity: '35',
         secondary_enabled: false,
         secondary_variant: 'pills',
         secondary_links: [],
@@ -106,14 +118,18 @@ document.addEventListener('DOMContentLoaded', function () {
     let menuSearchQuery = '';
     let menuIssuesOnly = false;
     let menuIssueCursor = -1;
+    let activeEditorTab = 'menu';
     const expandedMenuNodes = new Set();
     const menuPickerNode = document.getElementById('templateMenuPickerModal');
     const menuPickerModal = menuPickerNode && window.bootstrap ? new window.bootstrap.Modal(menuPickerNode) : null;
     const menuTemplateNode = document.getElementById('templateMenuBlueprintModal');
     const menuTemplateModal = menuTemplateNode && window.bootstrap ? new window.bootstrap.Modal(menuTemplateNode) : null;
+    const heroBackgroundNode = document.getElementById('templateHeroBackgroundModal');
+    let heroBackgroundModal = heroBackgroundNode && window.bootstrap ? new window.bootstrap.Modal(heroBackgroundNode) : null;
     const iconPickerNode = document.getElementById('templateIconPickerModal');
     const iconPickerModal = iconPickerNode && window.bootstrap ? new window.bootstrap.Modal(iconPickerNode) : null;
     const iconPickerState = {path: '', input: null};
+    const heroBackgroundState = {target: 'hero', offset: 0, limit: 30, total: 0, hasMore: false, loading: false, token: 0, searchTimer: null, items: []};
     const menuTemplateState = {kind: 'menu', type: '', target: 'main', payload: null};
     const menuIconOptions = [
         'home-outline', 'home-city-outline', 'view-dashboard-outline', 'menu', 'menu-open', 'apps', 'view-grid-outline',
@@ -165,6 +181,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function setTemplateEditorTab(tab) {
         const activeTab = tab || 'menu';
+        activeEditorTab = activeTab;
         editorTabButtons.forEach(function (button) {
             const active = button.dataset.templateEditorTab === activeTab;
             button.classList.toggle('secondary', !active);
@@ -173,6 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
         editorTabPanels.forEach(function (panel) {
             panel.hidden = panel.dataset.templateTabPanel !== activeTab;
         });
+        renderHomePreview();
     }
 
     function parseJson(value, fallback) {
@@ -200,6 +218,94 @@ document.addEventListener('DOMContentLoaded', function () {
     function previewUrl(value) {
         const url = String(value || '').trim();
         return /^(https?:\/\/|mailto:|tel:|\/|#)/i.test(url) ? url : '#';
+    }
+
+    function uploadUrl(path) {
+        const cleanPath = String(path || '').trim().replace(/^\/+/, '');
+        if (!cleanPath) {
+            return '';
+        }
+        const media = (linkPicker.media || []).find(function (item) {
+            return String(item.path || '') === cleanPath || String(item.url || '') === cleanPath;
+        });
+        if (media && media.url) {
+            return media.url;
+        }
+        return '/uploads/' + cleanPath;
+    }
+
+    function mediaThumbUrl(value, width, height) {
+        let cleanPath = String(value || '').trim();
+        if (!cleanPath) {
+            return '';
+        }
+
+        if (/^https?:\/\//i.test(cleanPath)) {
+            try {
+                const parsed = new URL(cleanPath);
+                if (parsed.origin !== window.location.origin) {
+                    return cleanPath;
+                }
+                cleanPath = parsed.pathname;
+            } catch (error) {
+                return cleanPath;
+            }
+        }
+
+        cleanPath = cleanPath.replace(/^\/+/, '');
+        if (cleanPath.indexOf('uploads/') === 0) {
+            cleanPath = cleanPath.slice(8);
+        }
+        if (cleanPath.indexOf('thumb/') === 0) {
+            cleanPath = cleanPath.slice(6);
+        }
+        cleanPath = cleanPath.split('?')[0];
+
+        if (!cleanPath) {
+            return '';
+        }
+
+        return '/thumb/' + encodeURI(cleanPath) + '?w=' + Number(width || 360) + '&h=' + Number(height || 225) + '&fit=cover';
+    }
+
+    function mediaItemPath(item) {
+        return String((item && item.path) || '').trim();
+    }
+
+    function mediaItemLabel(item) {
+        return String((item && (item.label || item.name || item.path)) || '').trim();
+    }
+
+    function mediaItemIsImage(item) {
+        if (!item) {
+            return false;
+        }
+        if (Object.prototype.hasOwnProperty.call(item, 'is_image')) {
+            return Boolean(item.is_image);
+        }
+        return /\.(jpe?g|png|webp|gif)$/i.test(mediaItemPath(item) || String(item.url || ''));
+    }
+
+    function heroBackgroundFieldName(target) {
+        return target === 'home' ? 'home_hero_background_image' : 'hero_background_image';
+    }
+
+    function heroBackgroundTargetLabel(target) {
+        return target === 'home' ? 'Hero головної сторінки' : 'Hero під хедером';
+    }
+
+    function heroBackgroundMeta(template) {
+        const image = String(template.hero_background_image || '').trim();
+        if (!image) {
+            return {className: '', style: ''};
+        }
+        const position = ['center center', 'center top', 'center bottom', 'left center', 'right center'].includes(template.hero_background_position) ? template.hero_background_position : 'center center';
+        const size = ['cover', 'contain', 'auto'].includes(template.hero_background_size) ? template.hero_background_size : 'cover';
+        const repeat = ['no-repeat', 'repeat', 'repeat-x', 'repeat-y'].includes(template.hero_background_repeat) ? template.hero_background_repeat : 'no-repeat';
+        const opacity = Math.max(0, Math.min(80, Number(template.hero_overlay_opacity || 35))) / 100;
+        const style = '--site-hero-bg-image: url(&quot;' + escapeHtml(uploadUrl(image)) + '&quot;); --site-hero-bg-position: ' + escapeHtml(position) + '; --site-hero-bg-size: ' + escapeHtml(size) + '; --site-hero-bg-repeat: ' + escapeHtml(repeat) + '; --site-hero-overlay-opacity: ' + escapeHtml(String(opacity)) + ';';
+        const className = ' site-header-hero-has-background' + (template.hero_overlay_enabled === false ? '' : ' site-header-hero-has-overlay');
+        return {className: className, style: style};
     }
 
     function makeMenuItem(label, url) {
@@ -1726,7 +1832,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const mobileClass = ' site-mobile-menu-' + escapeHtml(header.mobile_variant || 'drawer');
         const hasHomeHero = Boolean(header.home_hero_enabled && (header.home_hero_title || header.home_hero_text));
-        const heroHtml = header.hero_enabled && !hasHomeHero ? '<section class="site-header-hero site-header-hero-' + escapeHtml(header.hero_variant || 'default') + '">' +
+        const previewingHeaderHero = activeEditorTab === 'hero';
+        const previewingHomeHero = activeEditorTab === 'home-hero';
+        const headerHeroBg = heroBackgroundMeta({
+            hero_background_image: header.hero_background_image || '',
+            hero_background_position: header.hero_background_position || 'center center',
+            hero_background_size: header.hero_background_size || 'cover',
+            hero_background_repeat: header.hero_background_repeat || 'no-repeat',
+            hero_overlay_enabled: header.hero_overlay_enabled !== false,
+            hero_overlay_opacity: header.hero_overlay_opacity || '35'
+        });
+        const showHeaderHero = Boolean(header.hero_enabled && (previewingHeaderHero || (!hasHomeHero && !previewingHomeHero)));
+        const heroHtml = showHeaderHero ? '<section class="site-header-hero site-header-hero-' + escapeHtml(header.hero_variant || 'default') + headerHeroBg.className + '"' + (headerHeroBg.style ? ' style="' + headerHeroBg.style + '"' : '') + '>' +
             '<div class="container site-header-hero-inner">' +
                 '<div>' +
                     (header.hero_title ? '<h1>' + escapeHtml(header.hero_title) + '</h1>' : '') +
@@ -1762,16 +1879,26 @@ document.addEventListener('DOMContentLoaded', function () {
             hero_title: header.home_hero_title || '',
             hero_text: header.home_hero_text || '',
             hero_button_label: header.home_hero_button_label || '',
-            hero_button_url: header.home_hero_button_url || ''
+            hero_button_url: header.home_hero_button_url || '',
+            hero_background_image: header.home_hero_background_image || '',
+            hero_background_position: header.home_hero_background_position || 'center center',
+            hero_background_size: header.home_hero_background_size || 'cover',
+            hero_background_repeat: header.home_hero_background_repeat || 'no-repeat',
+            hero_overlay_enabled: header.home_hero_overlay_enabled !== false,
+            hero_overlay_opacity: header.home_hero_overlay_opacity || '35'
         };
     }
 
     function renderPreviewHomeHero() {
+        if (activeEditorTab === 'hero') {
+            return '';
+        }
         const template = homeHeroTemplate();
         if (!template.hero_enabled || (!template.hero_title && !template.hero_text)) {
             return '';
         }
-        return '<section class="site-home-hero site-header-hero site-header-hero-' + escapeHtml(template.hero_variant || 'fullscreen') + '">' +
+        const homeHeroBg = heroBackgroundMeta(template);
+        return '<section class="site-home-hero site-header-hero site-header-hero-' + escapeHtml(template.hero_variant || 'fullscreen') + homeHeroBg.className + '"' + (homeHeroBg.style ? ' style="' + homeHeroBg.style + '"' : '') + '>' +
             '<div class="container site-header-hero-inner">' +
                 '<div>' +
                     (template.hero_title ? '<h1>' + escapeHtml(template.hero_title) + '</h1>' : '') +
@@ -2050,12 +2177,24 @@ document.addEventListener('DOMContentLoaded', function () {
         headerEditor.querySelector('[data-header-field="hero_text"]').value = header.hero_text || '';
         headerEditor.querySelector('[data-header-field="hero_button_label"]').value = header.hero_button_label || '';
         headerEditor.querySelector('[data-header-field="hero_button_url"]').value = header.hero_button_url || '';
+        headerEditor.querySelector('[data-header-field="hero_background_image"]').value = header.hero_background_image || '';
+        headerEditor.querySelector('[data-header-field="hero_background_position"]').value = header.hero_background_position || 'center center';
+        headerEditor.querySelector('[data-header-field="hero_background_size"]').value = header.hero_background_size || 'cover';
+        headerEditor.querySelector('[data-header-field="hero_background_repeat"]').value = header.hero_background_repeat || 'no-repeat';
+        headerEditor.querySelector('[data-header-field="hero_overlay_enabled"]').checked = header.hero_overlay_enabled !== false;
+        headerEditor.querySelector('[data-header-field="hero_overlay_opacity"]').value = header.hero_overlay_opacity || '35';
         headerEditor.querySelector('[data-header-field="home_hero_enabled"]').checked = Boolean(header.home_hero_enabled);
         headerEditor.querySelector('[data-header-field="home_hero_variant"]').value = header.home_hero_variant || 'fullscreen';
         headerEditor.querySelector('[data-header-field="home_hero_title"]').value = header.home_hero_title || '';
         headerEditor.querySelector('[data-header-field="home_hero_text"]').value = header.home_hero_text || '';
         headerEditor.querySelector('[data-header-field="home_hero_button_label"]').value = header.home_hero_button_label || '';
         headerEditor.querySelector('[data-header-field="home_hero_button_url"]').value = header.home_hero_button_url || '';
+        headerEditor.querySelector('[data-header-field="home_hero_background_image"]').value = header.home_hero_background_image || '';
+        headerEditor.querySelector('[data-header-field="home_hero_background_position"]').value = header.home_hero_background_position || 'center center';
+        headerEditor.querySelector('[data-header-field="home_hero_background_size"]').value = header.home_hero_background_size || 'cover';
+        headerEditor.querySelector('[data-header-field="home_hero_background_repeat"]').value = header.home_hero_background_repeat || 'no-repeat';
+        headerEditor.querySelector('[data-header-field="home_hero_overlay_enabled"]').checked = header.home_hero_overlay_enabled !== false;
+        headerEditor.querySelector('[data-header-field="home_hero_overlay_opacity"]').value = header.home_hero_overlay_opacity || '35';
         headerEditor.querySelector('[data-header-field="secondary_enabled"]').checked = Boolean(header.secondary_enabled);
         headerEditor.querySelector('[data-header-field="secondary_variant"]').value = header.secondary_variant || 'pills';
         headerEditor.querySelector('[data-header-field="mobile_variant"]').value = header.mobile_variant || 'drawer';
@@ -2091,6 +2230,8 @@ document.addEventListener('DOMContentLoaded', function () {
         headerEditor.querySelector('[data-header-links]').innerHTML = hasMenuItems
             ? (hasSearchResults ? renderMenuLinks(header.links || [], '', 0, query, menuIssuesOnly, duplicateUrls) : '<div class="template-empty-state"><span class="mdi mdi-magnify-close" aria-hidden="true"></span><strong>Нічого не знайдено</strong><p>Спробуйте іншу назву, URL або вимкніть фільтр проблем.</p></div>')
             : '<div class="template-empty-state"><span class="mdi mdi-menu-open" aria-hidden="true"></span><strong>Меню ще порожнє</strong><p>Додайте власний пункт або оберіть готове посилання зі сторінок, категорій чи новин.</p></div>';
+        updateHeroBackgroundPreview('hero');
+        updateHeroBackgroundPreview('home');
         renderSecondaryLinks();
         fillMenuParentSelect();
         syncLayouts();
@@ -2130,6 +2271,221 @@ document.addEventListener('DOMContentLoaded', function () {
             '</section>';
         }).join('') : '<div class="template-empty-state"><span class="mdi mdi-page-layout-footer" aria-hidden="true"></span><strong>Колонок ще немає</strong><p>Додайте колонку для контактів, швидких посилань або службової інформації.</p></div>';
         syncLayouts();
+    }
+
+    function findHeroBackgroundMedia(path) {
+        const value = String(path || '').trim();
+        if (!value) {
+            return null;
+        }
+        return (heroBackgroundState.items || []).concat(linkPicker.media || []).find(function (item) {
+            return mediaItemPath(item) === value || String(item.url || '') === value;
+        }) || null;
+    }
+
+    async function loadHeroBackgroundItems(append) {
+        if (!heroBackgroundNode) {
+            return;
+        }
+        if (heroBackgroundState.loading && append) {
+            return;
+        }
+        const grid = heroBackgroundNode.querySelector('[data-hero-background-grid]');
+        const search = heroBackgroundNode.querySelector('[data-hero-background-search]');
+        const status = heroBackgroundNode.querySelector('[data-hero-background-status]');
+        const url = new URL(menuPickerNode ? (menuPickerNode.dataset.linkPickerUrl || '/admin/templates/link-picker') : '/admin/templates/link-picker', window.location.origin);
+        const token = append ? heroBackgroundState.token : ++heroBackgroundState.token;
+        url.searchParams.set('type', 'media');
+        url.searchParams.set('limit', String(heroBackgroundState.limit));
+        url.searchParams.set('offset', append ? String(heroBackgroundState.offset) : '0');
+        if (search && search.value.trim() !== '') {
+            url.searchParams.set('q', search.value.trim());
+        }
+
+        heroBackgroundState.loading = true;
+        if (status) {
+            status.textContent = append ? 'Підвантаження...' : 'Завантаження медіафайлів...';
+        }
+        if (grid) {
+            grid.classList.add('is-loading');
+        }
+        if (grid && !append) {
+            grid.innerHTML = '<div class="template-hero-media-loading"><span class="mdi mdi-loading mdi-spin" aria-hidden="true"></span><span>Завантаження зображень...</span></div>';
+            heroBackgroundState.items = [];
+        }
+
+        try {
+            const response = await fetch(url.toString(), {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.message || 'Не вдалося завантажити медіафайли.');
+            }
+            if (token !== heroBackgroundState.token) {
+                return;
+            }
+
+            const images = (Array.isArray(data.items) ? data.items : []).filter(function (item) {
+                return mediaItemPath(item) && mediaItemIsImage(item);
+            });
+            heroBackgroundState.offset = Number(data.next_offset || 0);
+            heroBackgroundState.total = Number(data.total || 0);
+            heroBackgroundState.hasMore = Boolean(data.has_more);
+
+            if (!images.length && heroBackgroundState.hasMore) {
+                heroBackgroundState.loading = false;
+                await loadHeroBackgroundItems(true);
+                return;
+            }
+
+            appendHeroBackgroundItems(images, heroBackgroundState.items.length, append);
+        } catch (error) {
+            if (status) {
+                status.textContent = error.message || 'Помилка завантаження.';
+            }
+            if (grid) {
+                grid.classList.remove('is-loading');
+                grid.innerHTML = '<div class="template-menu-picker-empty">Не вдалося завантажити зображення.</div>';
+            }
+        } finally {
+            if (token === heroBackgroundState.token) {
+                heroBackgroundState.loading = false;
+                queueHeroBackgroundMoreCheck();
+            }
+        }
+    }
+
+    function maybeLoadMoreHeroBackgroundItems() {
+        if (!heroBackgroundNode || !heroBackgroundState.hasMore || heroBackgroundState.loading) {
+            return;
+        }
+        const heroBackgroundBody = heroBackgroundNode.querySelector('.modal-body');
+        if (!heroBackgroundBody) {
+            return;
+        }
+        const nearBottom = heroBackgroundBody.scrollTop + heroBackgroundBody.clientHeight >= heroBackgroundBody.scrollHeight - 160;
+        if (nearBottom) {
+            loadHeroBackgroundItems(true);
+        }
+    }
+
+    function queueHeroBackgroundMoreCheck() {
+        window.setTimeout(maybeLoadMoreHeroBackgroundItems, 80);
+    }
+
+    function appendHeroBackgroundItems(items, startIndex, append) {
+        if (!heroBackgroundNode) {
+            return;
+        }
+        const grid = heroBackgroundNode.querySelector('[data-hero-background-grid]');
+        const status = heroBackgroundNode.querySelector('[data-hero-background-status]');
+        const selected = String(header[heroBackgroundFieldName(heroBackgroundState.target)] || '');
+        if (!grid) {
+            return;
+        }
+        if (!append || !heroBackgroundState.items.length) {
+            grid.innerHTML = '';
+        }
+        if (!items.length && !heroBackgroundState.items.length) {
+            grid.classList.remove('is-loading');
+            grid.innerHTML = '<div class="template-menu-picker-empty">За цим пошуком немає зображень.</div>';
+            if (status) {
+                status.textContent = 'Нічого не знайдено.';
+            }
+            return;
+        }
+
+        heroBackgroundState.items = heroBackgroundState.items.concat(items);
+        grid.insertAdjacentHTML('beforeend', items.map(function (item, itemIndex) {
+            return renderHeroBackgroundOption(item, selected, startIndex + itemIndex);
+        }).join(''));
+        grid.classList.remove('is-loading');
+        if (status) {
+            status.textContent = heroBackgroundState.hasMore
+                ? 'Показано зображень: ' + heroBackgroundState.items.length + '. Прокрутіть нижче, щоб підвантажити ще.'
+                : 'Знайдено: ' + heroBackgroundState.items.length + '.';
+        }
+        queueHeroBackgroundMoreCheck();
+    }
+
+    function renderHeroBackgroundOption(item, selected, index) {
+        const path = mediaItemPath(item);
+        const label = mediaItemLabel(item) || path;
+        const active = path === selected;
+        return '<button class="template-hero-media-option' + (active ? ' is-selected' : '') + '" type="button" data-hero-background-pick="' + escapeHtml(path) + '" data-hero-background-index="' + index + '" aria-pressed="' + (active ? 'true' : 'false') + '">' +
+            '<span class="template-hero-media-thumb" style="background-image: url(&quot;' + escapeHtml(mediaThumbUrl(path, 360, 225)) + '&quot;)" aria-hidden="true"></span>' +
+            '<strong>' + escapeHtml(label) + '</strong>' +
+            '<small>' + escapeHtml(item.meta || path) + '</small>' +
+        '</button>';
+    }
+
+    function openHeroBackgroundPicker(target) {
+        if (!heroBackgroundNode) {
+            return;
+        }
+        if (!heroBackgroundModal && window.bootstrap && window.bootstrap.Modal) {
+            heroBackgroundModal = window.bootstrap.Modal.getOrCreateInstance(heroBackgroundNode);
+        }
+        if (!heroBackgroundModal) {
+            return;
+        }
+        heroBackgroundState.target = target === 'home' ? 'home' : 'hero';
+        const title = heroBackgroundNode.querySelector('[data-hero-background-title]');
+        if (title) {
+            title.textContent = 'Обрати фон: ' + heroBackgroundTargetLabel(heroBackgroundState.target);
+        }
+        const search = heroBackgroundNode.querySelector('[data-hero-background-search]');
+        if (search) {
+            search.value = '';
+        }
+        const heroBackgroundBody = heroBackgroundNode.querySelector('.modal-body');
+        if (heroBackgroundBody) {
+            heroBackgroundBody.scrollTop = 0;
+        }
+        loadHeroBackgroundItems(false);
+        queueHeroBackgroundMoreCheck();
+        heroBackgroundModal.show();
+        if (search) {
+            setTimeout(function () {
+                search.focus();
+            }, 180);
+        }
+    }
+
+    function setHeroBackground(target, path) {
+        const key = heroBackgroundFieldName(target);
+        header[key] = String(path || '').trim();
+        renderHeader();
+    }
+
+    function updateHeroBackgroundPreview(kind) {
+        const prefix = kind === 'home' ? 'home_hero' : 'hero';
+        const preview = headerEditor.querySelector('[data-hero-background-preview="' + kind + '"]');
+        const summary = headerEditor.querySelector('[data-hero-background-summary="' + kind + '"]');
+        if (!preview) {
+            return;
+        }
+        const image = String(header[prefix + '_background_image'] || '').trim();
+        if (!image) {
+            preview.classList.add('is-empty');
+            preview.textContent = 'Фонове зображення не вибрано';
+            preview.style.backgroundImage = '';
+            if (summary) {
+                summary.classList.remove('has-image');
+                summary.textContent = 'Фонове зображення не вибрано';
+            }
+            return;
+        }
+        const media = findHeroBackgroundMedia(image);
+        preview.classList.remove('is-empty');
+        preview.textContent = '';
+        preview.style.backgroundImage = 'url("' + uploadUrl(image).replace(/"/g, '\\"') + '")';
+        preview.style.backgroundPosition = header[prefix + '_background_position'] || 'center center';
+        preview.style.backgroundSize = header[prefix + '_background_size'] || 'cover';
+        preview.style.backgroundRepeat = header[prefix + '_background_repeat'] || 'no-repeat';
+        if (summary) {
+            summary.classList.add('has-image');
+            summary.textContent = mediaItemLabel(media) || image;
+        }
     }
 
     headerEditor.addEventListener('input', function (event) {
@@ -2196,6 +2552,18 @@ document.addEventListener('DOMContentLoaded', function () {
     headerEditor.addEventListener('click', function (event) {
         if (event.target.closest('[data-menu-picker-open]')) {
             openMenuPicker();
+        }
+        const heroBackgroundOpen = event.target.closest('[data-hero-background-open]');
+        if (heroBackgroundOpen) {
+            event.preventDefault();
+            openHeroBackgroundPicker(heroBackgroundOpen.dataset.heroBackgroundOpen || 'hero');
+            return;
+        }
+        const heroBackgroundClear = event.target.closest('[data-hero-background-clear]');
+        if (heroBackgroundClear) {
+            event.preventDefault();
+            setHeroBackground(heroBackgroundClear.dataset.heroBackgroundClear || 'hero', '');
+            return;
         }
         const libraryOpen = event.target.closest('[data-template-library-open]');
         if (libraryOpen) {
@@ -2417,6 +2785,38 @@ document.addEventListener('DOMContentLoaded', function () {
                 menuTemplateModal.hide();
             }
         });
+    }
+
+    if (heroBackgroundNode) {
+        heroBackgroundNode.addEventListener('input', function (event) {
+            if (event.target.closest('[data-hero-background-search]')) {
+                window.clearTimeout(heroBackgroundState.searchTimer);
+                heroBackgroundState.searchTimer = window.setTimeout(function () {
+                    loadHeroBackgroundItems(false);
+                }, 220);
+            }
+        });
+        heroBackgroundNode.addEventListener('click', function (event) {
+            const picked = event.target.closest('[data-hero-background-pick]');
+            if (picked) {
+                setHeroBackground(heroBackgroundState.target, picked.dataset.heroBackgroundPick || '');
+                if (heroBackgroundModal) {
+                    heroBackgroundModal.hide();
+                }
+                return;
+            }
+            if (event.target.closest('[data-hero-background-modal-clear]')) {
+                setHeroBackground(heroBackgroundState.target, '');
+                if (heroBackgroundModal) {
+                    heroBackgroundModal.hide();
+                }
+            }
+        });
+        const heroBackgroundBody = heroBackgroundNode.querySelector('.modal-body');
+        if (heroBackgroundBody) {
+            heroBackgroundBody.addEventListener('scroll', maybeLoadMoreHeroBackgroundItems, {passive: true});
+        }
+        heroBackgroundNode.addEventListener('scroll', maybeLoadMoreHeroBackgroundItems, true);
     }
 
     if (iconPickerNode) {

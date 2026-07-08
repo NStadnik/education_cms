@@ -211,9 +211,14 @@ table:not(.table) th { background: #f1f4f9; }
 .site-header-cta { min-height: 36px; padding: 7px 12px; white-space: nowrap; }
 .site-mobile-menu-brand { display: none; }
 .site-header-hero { border-bottom: 1px solid var(--line); background: #eef4ff; }
-.site-header-hero-inner { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 38px 0; }
+.site-header-hero-has-background { position: relative; overflow: hidden; color: #fff; background-image: var(--site-hero-bg-image); background-position: var(--site-hero-bg-position, center center); background-size: var(--site-hero-bg-size, cover); background-repeat: var(--site-hero-bg-repeat, no-repeat); }
+.site-header-hero-has-background::before { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.site-header-hero-has-overlay::before { background: rgba(8, 16, 32, var(--site-hero-overlay-opacity, .35)); }
+.site-header-hero-inner { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 38px 0; }
 .site-header-hero h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 46px); line-height: 1.08; letter-spacing: 0; }
 .site-header-hero p { max-width: 720px; margin: 0; color: #344054; font-size: 17px; }
+.site-header-hero-has-background p { color: rgba(255,255,255,.86); }
+.site-header-hero-has-background .button { border-color: #fff; background: #fff; color: #10233f; }
 .site-header-hero-accent { background: #10233f; color: #fff; }
 .site-header-hero-accent p { color: rgba(255,255,255,.78); }
 .site-header-hero-accent .button { border-color: #fff; background: #fff; color: #10233f; }

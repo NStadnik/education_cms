@@ -102,6 +102,27 @@
 .template-subeditor-head > div { display: grid; gap: 3px; min-width: 0; }
 .template-subeditor-head strong { font-size: 15px; }
 .template-subeditor-head span { color: var(--muted); font-size: 13px; line-height: 1.3; }
+.template-hero-background { display: grid; gap: 12px; margin-top: 12px; padding: 12px; border: 1px solid #d6e2f5; border-radius: 8px; background: #f8fbff; }
+.template-hero-image-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.template-hero-image-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 14px; }
+.template-hero-image-summary.has-image { color: var(--text); font-weight: 650; }
+.template-hero-background-preview { min-height: 120px; border: 1px solid var(--line); border-radius: 8px; background: #eef4ff; background-position: center center; background-size: cover; background-repeat: no-repeat; }
+.template-hero-background-preview.is-empty { display: grid; place-items: center; color: var(--muted); font-size: 14px; background-image: none !important; }
+.template-hero-media-picker { display: grid; gap: 12px; }
+.template-hero-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.template-hero-media-grid.is-loading { opacity: .78; }
+.template-hero-media-loading { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 120px; padding: 18px; border: 1px dashed var(--line); border-radius: 8px; background: #fbfcff; color: var(--muted); }
+.template-hero-media-loading .mdi { color: var(--brand); font-size: 22px; line-height: 1; }
+.template-hero-media-option { display: grid !important; gap: 8px !important; min-width: 0; padding: 8px !important; border: 1px solid var(--line) !important; border-radius: 8px !important; background: #fff !important; color: var(--text) !important; text-align: left; animation: templateHeroMediaIn .18s ease both; }
+.template-hero-media-option:hover, .template-hero-media-option.is-selected { border-color: var(--brand) !important; background: #f4f8ff !important; box-shadow: 0 0 0 2px rgba(31,111,235,.12); }
+.template-hero-media-thumb { aspect-ratio: 16 / 10; border-radius: 6px; background: #eef4ff center / cover no-repeat; }
+.template-hero-media-option strong, .template-hero-media-option small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.template-hero-media-option strong { font-size: 13px; line-height: 1.25; }
+.template-hero-media-option small { color: var(--muted); font-size: 12px; line-height: 1.2; }
+@keyframes templateHeroMediaIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 .template-secondary-list { margin-top: 2px; }
 .template-menu-picker { display: grid; gap: 14px; }
 .template-menu-picker-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -270,6 +291,7 @@
     .template-menu-card-head .template-menu-action-list { left: auto; right: 0; min-width: 176px; }
     .template-menu-actions button { width: 100%; min-width: 38px; }
     .template-menu-icon-field { grid-template-columns: minmax(0, 1fr) 38px 38px; }
+    .template-hero-image-field { grid-template-columns: 1fr; }
     .template-menu-children { margin-left: 6px; padding-left: 10px; }
     .template-menu-columns { grid-template-columns: 1fr; margin-left: 6px; padding: 8px; }
     .template-menu-column-head { grid-template-columns: 1fr; }
@@ -305,6 +327,7 @@
     .template-menu-children, .template-menu-columns { margin-left: 0; padding-left: 8px; }
     .template-menu-column { padding: 8px; }
     .template-icon-picker-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+    .template-hero-media-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
     .template-preview-panel .form-section-head { align-items: stretch; flex-direction: column; }
     .template-preview-head-actions { display: grid; grid-template-columns: 1fr; }
     .template-preview-modes { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; }

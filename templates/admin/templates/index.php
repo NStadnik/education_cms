@@ -8,12 +8,30 @@
         'cta_label' => '',
         'cta_url' => '',
         'mobile_source' => 'main',
+        'hero_enabled' => false,
+        'hero_variant' => 'default',
+        'hero_title' => '',
+        'hero_text' => '',
+        'hero_button_label' => '',
+        'hero_button_url' => '',
         'home_hero_enabled' => false,
         'home_hero_variant' => 'fullscreen',
         'home_hero_title' => '',
         'home_hero_text' => '',
         'home_hero_button_label' => '',
         'home_hero_button_url' => '',
+        'hero_background_image' => '',
+        'hero_background_position' => 'center center',
+        'hero_background_size' => 'cover',
+        'hero_background_repeat' => 'no-repeat',
+        'hero_overlay_enabled' => true,
+        'hero_overlay_opacity' => '35',
+        'home_hero_background_image' => '',
+        'home_hero_background_position' => 'center center',
+        'home_hero_background_size' => 'cover',
+        'home_hero_background_repeat' => 'no-repeat',
+        'home_hero_overlay_enabled' => true,
+        'home_hero_overlay_opacity' => '35',
     ];
     $defaultFooterLayout = [
         'variant' => 'default',
@@ -299,6 +317,57 @@
                                     <input data-header-field="hero_button_url" placeholder="/page/about">
                                 </label>
                             </div>
+                            <div class="template-hero-background" data-hero-background-controls="hero">
+                                <div class="template-subeditor-head">
+                                    <div>
+                                        <strong>Фонове зображення</strong>
+                                        <span>Оберіть зображення з медіафайлів і налаштуйте його відображення.</span>
+                                    </div>
+                                    <label class="check-row"><input type="checkbox" data-header-field="hero_overlay_enabled"> Затемнення</label>
+                                </div>
+                                <div class="template-editor-grid template-editor-grid-2">
+                                    <div class="template-hero-image-field template-editor-wide">
+                                        <input type="hidden" data-header-field="hero_background_image">
+                                        <div class="template-hero-image-summary" data-hero-background-summary="hero">Фонове зображення не вибрано</div>
+                                        <div class="template-editor-list-actions">
+                                            <button class="button secondary compact" type="button" data-hero-background-open="hero">
+                                                <span class="mdi mdi-image-search-outline" aria-hidden="true"></span><span>Обрати з медіафайлів</span>
+                                            </button>
+                                            <button class="button secondary compact" type="button" data-hero-background-clear="hero">
+                                                <span class="mdi mdi-close" aria-hidden="true"></span><span>Очистити</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <label>Позиція
+                                        <select data-header-field="hero_background_position">
+                                            <option value="center center">По центру</option>
+                                            <option value="center top">Зверху</option>
+                                            <option value="center bottom">Знизу</option>
+                                            <option value="left center">Ліворуч</option>
+                                            <option value="right center">Праворуч</option>
+                                        </select>
+                                    </label>
+                                    <label>Розмір
+                                        <select data-header-field="hero_background_size">
+                                            <option value="cover">Заповнити</option>
+                                            <option value="contain">Вмістити</option>
+                                            <option value="auto">Оригінальний</option>
+                                        </select>
+                                    </label>
+                                    <label>Повтор
+                                        <select data-header-field="hero_background_repeat">
+                                            <option value="no-repeat">Не повторювати</option>
+                                            <option value="repeat">Повторювати</option>
+                                            <option value="repeat-x">По горизонталі</option>
+                                            <option value="repeat-y">По вертикалі</option>
+                                        </select>
+                                    </label>
+                                    <label>Сила затемнення
+                                        <input type="range" min="0" max="80" step="5" data-header-field="hero_overlay_opacity">
+                                    </label>
+                                </div>
+                                <div class="template-hero-background-preview" data-hero-background-preview="hero"></div>
+                            </div>
                             <div class="template-menu-blueprints template-hero-blueprints" aria-label="Готові шаблони hero">
                                 <div>
                                     <strong>Готові шаблони hero</strong>
@@ -342,6 +411,57 @@
                                 <label>URL кнопки
                                     <input data-header-field="home_hero_button_url" placeholder="/page/about">
                                 </label>
+                            </div>
+                            <div class="template-hero-background" data-hero-background-controls="home">
+                                <div class="template-subeditor-head">
+                                    <div>
+                                        <strong>Фонове зображення</strong>
+                                        <span>Окремий фон для hero головної сторінки.</span>
+                                    </div>
+                                    <label class="check-row"><input type="checkbox" data-header-field="home_hero_overlay_enabled"> Затемнення</label>
+                                </div>
+                                <div class="template-editor-grid template-editor-grid-2">
+                                    <div class="template-hero-image-field template-editor-wide">
+                                        <input type="hidden" data-header-field="home_hero_background_image">
+                                        <div class="template-hero-image-summary" data-hero-background-summary="home">Фонове зображення не вибрано</div>
+                                        <div class="template-editor-list-actions">
+                                            <button class="button secondary compact" type="button" data-hero-background-open="home">
+                                                <span class="mdi mdi-image-search-outline" aria-hidden="true"></span><span>Обрати з медіафайлів</span>
+                                            </button>
+                                            <button class="button secondary compact" type="button" data-hero-background-clear="home">
+                                                <span class="mdi mdi-close" aria-hidden="true"></span><span>Очистити</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <label>Позиція
+                                        <select data-header-field="home_hero_background_position">
+                                            <option value="center center">По центру</option>
+                                            <option value="center top">Зверху</option>
+                                            <option value="center bottom">Знизу</option>
+                                            <option value="left center">Ліворуч</option>
+                                            <option value="right center">Праворуч</option>
+                                        </select>
+                                    </label>
+                                    <label>Розмір
+                                        <select data-header-field="home_hero_background_size">
+                                            <option value="cover">Заповнити</option>
+                                            <option value="contain">Вмістити</option>
+                                            <option value="auto">Оригінальний</option>
+                                        </select>
+                                    </label>
+                                    <label>Повтор
+                                        <select data-header-field="home_hero_background_repeat">
+                                            <option value="no-repeat">Не повторювати</option>
+                                            <option value="repeat">Повторювати</option>
+                                            <option value="repeat-x">По горизонталі</option>
+                                            <option value="repeat-y">По вертикалі</option>
+                                        </select>
+                                    </label>
+                                    <label>Сила затемнення
+                                        <input type="range" min="0" max="80" step="5" data-header-field="home_hero_overlay_opacity">
+                                    </label>
+                                </div>
+                                <div class="template-hero-background-preview" data-hero-background-preview="home"></div>
                             </div>
                             <div class="template-menu-blueprints template-hero-blueprints" aria-label="Готові шаблони hero головної">
                                 <div>
@@ -639,6 +759,36 @@
             <div class="modal-footer">
                 <button type="button" class="button" data-menu-picker-add-selected disabled>
                     <span class="mdi mdi-plus-box-multiple-outline" aria-hidden="true"></span><span data-menu-picker-add-label>Додати вибрані</span>
+                </button>
+                <button type="button" class="button secondary" data-bs-dismiss="modal"><span class="mdi mdi-close" aria-hidden="true"></span><span>Закрити</span></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="templateHeroBackgroundModal" tabindex="-1" aria-labelledby="templateHeroBackgroundTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow mb-1">Фонове зображення</p>
+                    <h2 class="modal-title h5" id="templateHeroBackgroundTitle" data-hero-background-title>Обрати з медіафайлів</h2>
+                    <p class="meta mb-0">Виберіть зображення для hero-блоку. Після вибору можна налаштувати позицію, розмір і затемнення.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+            </div>
+            <div class="modal-body">
+                <div class="template-hero-media-picker">
+                    <label>Пошук
+                        <input type="search" data-hero-background-search placeholder="Назва або шлях файлу">
+                    </label>
+                    <div class="template-menu-picker-status" data-hero-background-status></div>
+                    <div class="template-hero-media-grid" data-hero-background-grid></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="button secondary" data-hero-background-modal-clear>
+                    <span class="mdi mdi-close" aria-hidden="true"></span><span>Без зображення</span>
                 </button>
                 <button type="button" class="button secondary" data-bs-dismiss="modal"><span class="mdi mdi-close" aria-hidden="true"></span><span>Закрити</span></button>
             </div>

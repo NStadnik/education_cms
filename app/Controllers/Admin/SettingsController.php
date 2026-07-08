@@ -215,6 +215,8 @@ final class SettingsController extends \App\Controllers\AdminBaseController
         $ctaUrl = $this->normalizeUrl(trim((string) ($data['cta_url'] ?? '')));
         $heroButtonUrl = $this->normalizeUrl(trim((string) ($data['hero_button_url'] ?? '')));
         $homeHeroButtonUrl = $this->normalizeUrl(trim((string) ($data['home_hero_button_url'] ?? '')));
+        $heroBackgroundImage = $this->normalizeHeroBackgroundImage((string) ($data['hero_background_image'] ?? ''));
+        $homeHeroBackgroundImage = $this->normalizeHeroBackgroundImage((string) ($data['home_hero_background_image'] ?? ''));
 
         return [
             'variant' => $this->choice((string) ($data['variant'] ?? 'default'), ['default', 'centered', 'compact'], 'default'),
@@ -230,12 +232,24 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'hero_text' => $this->limitString(trim((string) ($data['hero_text'] ?? '')), 500),
             'hero_button_label' => $this->limitString(trim((string) ($data['hero_button_label'] ?? '')), 80),
             'hero_button_url' => $this->limitString($heroButtonUrl, 240),
+            'hero_background_image' => $heroBackgroundImage,
+            'hero_background_position' => $this->choice((string) ($data['hero_background_position'] ?? 'center center'), ['center center', 'center top', 'center bottom', 'left center', 'right center'], 'center center'),
+            'hero_background_size' => $this->choice((string) ($data['hero_background_size'] ?? 'cover'), ['cover', 'contain', 'auto'], 'cover'),
+            'hero_background_repeat' => $this->choice((string) ($data['hero_background_repeat'] ?? 'no-repeat'), ['no-repeat', 'repeat', 'repeat-x', 'repeat-y'], 'no-repeat'),
+            'hero_overlay_enabled' => array_key_exists('hero_overlay_enabled', $data) ? !empty($data['hero_overlay_enabled']) : true,
+            'hero_overlay_opacity' => (string) max(0, min(80, (int) ($data['hero_overlay_opacity'] ?? 35))),
             'home_hero_enabled' => !empty($data['home_hero_enabled']),
             'home_hero_variant' => $this->choice((string) ($data['home_hero_variant'] ?? 'fullscreen'), ['default', 'accent', 'compact', 'fullscreen'], 'fullscreen'),
             'home_hero_title' => $this->limitString(trim((string) ($data['home_hero_title'] ?? '')), 140),
             'home_hero_text' => $this->limitString(trim((string) ($data['home_hero_text'] ?? '')), 500),
             'home_hero_button_label' => $this->limitString(trim((string) ($data['home_hero_button_label'] ?? '')), 80),
             'home_hero_button_url' => $this->limitString($homeHeroButtonUrl, 240),
+            'home_hero_background_image' => $homeHeroBackgroundImage,
+            'home_hero_background_position' => $this->choice((string) ($data['home_hero_background_position'] ?? 'center center'), ['center center', 'center top', 'center bottom', 'left center', 'right center'], 'center center'),
+            'home_hero_background_size' => $this->choice((string) ($data['home_hero_background_size'] ?? 'cover'), ['cover', 'contain', 'auto'], 'cover'),
+            'home_hero_background_repeat' => $this->choice((string) ($data['home_hero_background_repeat'] ?? 'no-repeat'), ['no-repeat', 'repeat', 'repeat-x', 'repeat-y'], 'no-repeat'),
+            'home_hero_overlay_enabled' => array_key_exists('home_hero_overlay_enabled', $data) ? !empty($data['home_hero_overlay_enabled']) : true,
+            'home_hero_overlay_opacity' => (string) max(0, min(80, (int) ($data['home_hero_overlay_opacity'] ?? 35))),
             'secondary_enabled' => !empty($data['secondary_enabled']),
             'secondary_variant' => $this->choice((string) ($data['secondary_variant'] ?? 'pills'), ['pills', 'tabs', 'plain'], 'pills'),
             'secondary_links' => array_slice($secondaryLinks, 0, 12),
@@ -245,6 +259,17 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'mobile_show_brand' => array_key_exists('mobile_show_brand', $data) ? !empty($data['mobile_show_brand']) : true,
             'mobile_show_cta' => array_key_exists('mobile_show_cta', $data) ? !empty($data['mobile_show_cta']) : true,
         ];
+    }
+
+    private function normalizeHeroBackgroundImage(string $path): string
+    {
+        $path = Files::normalize($path);
+        if ($path === '') {
+            return '';
+        }
+
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        return in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true) ? $path : '';
     }
 
     private function normalizeFooterLayout(string $json): array
@@ -369,7 +394,18 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'url' => url('/news/' . (string) ($item['slug'] ?? '')),
         ], $this->db()->fetchAll('select title, slug from news where status = ? order by coalesce(published_at, created_at) desc, id desc limit 30', ['published']));
 
-        return ['pages' => $pages, 'categories' => $categories, 'news' => $news];
+        $media = array_values(array_filter(Files::all($this->mediaReferences()), static function (array $item): bool {
+            $extension = strtolower(pathinfo((string) ($item['path'] ?? ''), PATHINFO_EXTENSION));
+            return in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true);
+        }));
+        $media = array_map(static fn (array $item): array => [
+            'label' => (string) ($item['name'] ?? $item['path'] ?? ''),
+            'path' => (string) ($item['path'] ?? ''),
+            'url' => url('/uploads/' . (string) ($item['path'] ?? '')),
+            'meta' => trim((string) ($item['type'] ?? '') . ' · ' . (string) ($item['size_label'] ?? ''), ' ·'),
+        ], $media);
+
+        return ['pages' => $pages, 'categories' => $categories, 'news' => $news, 'media' => $media];
     }
 
     private function templatePickerCategories(): array
@@ -506,8 +542,10 @@ final class SettingsController extends \App\Controllers\AdminBaseController
 
         return $this->templatePickerResponse(array_map(static fn (array $item): array => [
             'label' => (string) ($item['name'] ?? $item['path'] ?? ''),
+            'path' => (string) ($item['path'] ?? ''),
             'url' => url('/uploads/' . (string) ($item['path'] ?? '')),
             'meta' => trim((string) ($item['type'] ?? '') . ' · ' . (string) ($item['size_label'] ?? ''), ' ·'),
+            'is_image' => !empty($item['is_image']),
         ], $slice), $pagination, $total);
     }
 

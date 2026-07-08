@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let cardModalState = null;
     let imagePickerItems = [];
     let imagePickerSearchTimer = null;
+    const imagePickerState = {offset: 0, limit: 30, total: 0, hasMore: false, loading: false, token: 0};
     let initialBlocks = [];
     try {
         initialBlocks = JSON.parse(builder.dataset.initial || '[]');
@@ -354,6 +355,40 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function mediaThumbUrl(value, width, height) {
+        let cleanPath = String(value || '').trim();
+        if (!cleanPath) {
+            return '';
+        }
+
+        if (/^https?:\/\//i.test(cleanPath)) {
+            try {
+                const parsed = new URL(cleanPath);
+                if (parsed.origin !== window.location.origin) {
+                    return cleanPath;
+                }
+                cleanPath = parsed.pathname;
+            } catch (error) {
+                return cleanPath;
+            }
+        }
+
+        cleanPath = cleanPath.replace(/^\/+/, '');
+        if (cleanPath.indexOf('uploads/') === 0) {
+            cleanPath = cleanPath.slice(8);
+        }
+        if (cleanPath.indexOf('thumb/') === 0) {
+            cleanPath = cleanPath.slice(6);
+        }
+        cleanPath = cleanPath.split('?')[0];
+
+        if (!cleanPath || cleanPath.indexOf('/') === -1 && cleanPath.indexOf('.') === -1) {
+            return String(value || '').trim();
+        }
+
+        return '/thumb/' + encodeURI(cleanPath) + '?w=' + Number(width || 360) + '&h=' + Number(height || 270) + '&fit=cover';
+    }
+
     function hasHtml(value) {
         return /<\/?[a-z][\s\S]*>/i.test(String(value || ''));
     }
@@ -539,7 +574,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<article class="layout-editor-card layout-editor-card-preview page-layout-card page-layout-card-' + escapeHtml(style) + '" data-card-index="' + cardIndex + '" data-drag-kind="card">' +
             '<div class="layout-editor-card-head">' +
                 dragHandle('Перетягнути картку') +
-                (image ? '<img class="layout-editor-card-thumb" src="' + escapeHtml(image) + '" alt="' + escapeHtml(title) + '">' : '') +
+                (image ? '<img class="layout-editor-card-thumb" src="' + escapeHtml(mediaThumbUrl(image, 96, 96)) + '" alt="' + escapeHtml(title) + '">' : '') +
                 '<strong>' + escapeHtml(title || ('Картка ' + (cardIndex + 1))) + '</strong>' +
                 '<div class="layout-editor-card-actions">' +
                     '<button class="button secondary compact" type="button" data-layout-edit-card title="Редагувати картку"><span class="mdi mdi-pencil-outline"></span></button>' +
@@ -547,7 +582,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 '</div>' +
             '</div>' +
             '<div class="layout-editor-card-preview-body">' +
-                (image ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(title) + '">' : '') +
+                (image ? '<img src="' + escapeHtml(mediaThumbUrl(image, 640, 360)) + '" alt="' + escapeHtml(title) + '">' : '') +
                 (title ? '<h3>' + escapeHtml(title) + '</h3>' : '') +
                 '<div class="rich-content">' + cardTextPreview(card.text) + '</div>' +
                 (buttonText && buttonUrl ? '<span class="button compact layout-card-preview-button">' + escapeHtml(buttonText) + '</span>' : '') +
@@ -756,7 +791,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         cardModalPreview.innerHTML =
-            (image ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(title) + '">' : '') +
+            (image ? '<img src="' + escapeHtml(mediaThumbUrl(image, 640, 360)) + '" alt="' + escapeHtml(title) + '">' : '') +
             (title ? '<h3>' + escapeHtml(title) + '</h3>' : '') +
             (text ? '<div class="rich-content">' + cardTextPreview(text) + '</div>' : '') +
             (buttonText && buttonUrl ? '<span class="button read-more layout-card-preview-button">' + escapeHtml(buttonText) + '</span>' : '');
@@ -802,7 +837,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         cardImagePreview.hidden = false;
         cardImagePreview.innerHTML =
-            '<img src="' + escapeHtml(image) + '" alt="">' +
+            '<img src="' + escapeHtml(mediaThumbUrl(image, 112, 112)) + '" alt="">' +
             '<span>' + escapeHtml(image) + '</span>';
     }
 
@@ -852,7 +887,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         imagePickerModal.show();
-        loadCardImageItems();
+        const imagePickerBody = imagePickerNode.querySelector('.modal-body');
+        if (imagePickerBody) {
+            imagePickerBody.scrollTop = 0;
+        }
+        loadCardImageItems(false);
+        queueCardImageMoreCheck();
         const search = imagePickerNode.querySelector('[data-card-image-search]');
         if (search) {
             setTimeout(function () {
@@ -861,8 +901,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    async function loadCardImageItems() {
+    async function loadCardImageItems(append) {
         if (!imagePickerNode) {
+            return;
+        }
+        if (imagePickerState.loading && append) {
             return;
         }
 
@@ -871,16 +914,23 @@ document.addEventListener('DOMContentLoaded', function () {
         const search = imagePickerNode.querySelector('[data-card-image-search]');
         const adminBody = document.body;
         const url = new URL(adminBody ? (adminBody.dataset.richMediaPickerUrl || '/admin/media/picker') : '/admin/media/picker', window.location.origin);
-        url.searchParams.set('limit', '80');
+        const token = append ? imagePickerState.token : ++imagePickerState.token;
+        url.searchParams.set('limit', String(imagePickerState.limit));
+        url.searchParams.set('offset', append ? String(imagePickerState.offset) : '0');
         if (search && search.value.trim() !== '') {
             url.searchParams.set('q', search.value.trim());
         }
 
+        imagePickerState.loading = true;
         if (status) {
-            status.textContent = 'Завантаження...';
+            status.textContent = append ? 'Підвантаження...' : 'Завантаження...';
         }
         if (grid) {
-            grid.innerHTML = '';
+            grid.classList.add('is-loading');
+        }
+        if (grid && !append) {
+            grid.innerHTML = '<div class="layout-card-image-picker-loading"><span class="mdi mdi-loading mdi-spin" aria-hidden="true"></span><span>Завантаження зображень...</span></div>';
+            imagePickerItems = [];
         }
 
         try {
@@ -889,22 +939,59 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!response.ok || !data.ok) {
                 throw new Error(data.message || 'Не вдалося завантажити медіафайли.');
             }
+            if (token !== imagePickerState.token) {
+                return;
+            }
 
-            imagePickerItems = (data.items || []).filter(function (item) {
+            const images = (data.items || []).filter(function (item) {
                 return item && item.is_image;
             });
-            renderCardImageItems();
-            if (status) {
-                status.textContent = imagePickerItems.length ? 'Знайдено зображень: ' + imagePickerItems.length + '.' : 'Зображень не знайдено.';
+            imagePickerState.offset = Number(data.next_offset || 0);
+            imagePickerState.total = Number(data.total || 0);
+            imagePickerState.hasMore = Boolean(data.has_more);
+
+            if (!images.length && imagePickerState.hasMore) {
+                imagePickerState.loading = false;
+                await loadCardImageItems(true);
+                return;
             }
+
+            appendCardImageItems(images, imagePickerItems.length, append);
         } catch (error) {
             if (status) {
                 status.textContent = error.message || 'Помилка завантаження.';
             }
+            if (grid) {
+                grid.classList.remove('is-loading');
+                grid.innerHTML = '<div class="layout-card-image-picker-empty">Не вдалося завантажити зображення.</div>';
+            }
+        } finally {
+            if (token === imagePickerState.token) {
+                imagePickerState.loading = false;
+                queueCardImageMoreCheck();
+            }
         }
     }
 
-    function renderCardImageItems() {
+    function maybeLoadMoreCardImages() {
+        if (!imagePickerNode || !imagePickerState.hasMore || imagePickerState.loading) {
+            return;
+        }
+        const imagePickerBody = imagePickerNode.querySelector('.modal-body');
+        if (!imagePickerBody) {
+            return;
+        }
+        const nearBottom = imagePickerBody.scrollTop + imagePickerBody.clientHeight >= imagePickerBody.scrollHeight - 160;
+        if (nearBottom) {
+            loadCardImageItems(true);
+        }
+    }
+
+    function queueCardImageMoreCheck() {
+        window.setTimeout(maybeLoadMoreCardImages, 80);
+    }
+
+    function appendCardImageItems(items, startIndex, append) {
         if (!imagePickerNode) {
             return;
         }
@@ -915,19 +1002,39 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (!imagePickerItems.length) {
+        const status = imagePickerNode.querySelector('[data-card-image-status]');
+        if (!append || !imagePickerItems.length) {
+            grid.innerHTML = '';
+        }
+
+        if (!items.length && !imagePickerItems.length) {
+            grid.classList.remove('is-loading');
             grid.innerHTML = '<div class="layout-card-image-picker-empty">Немає зображень за цим запитом.</div>';
+            if (status) {
+                status.textContent = 'Зображень не знайдено.';
+            }
             return;
         }
 
-        grid.innerHTML = imagePickerItems.map(function (item, index) {
+        imagePickerItems = imagePickerItems.concat(items);
+        const html = items.map(function (item, itemIndex) {
+            const index = startIndex + itemIndex;
             const selected = currentImage === item.url;
+            const thumb = mediaThumbUrl(item.path || item.url, 360, 270);
             return '<button class="layout-card-image-option' + (selected ? ' is-selected' : '') + '" type="button" data-card-image-index="' + index + '">' +
-                '<img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(item.name) + '">' +
+                '<img src="' + escapeHtml(thumb) + '" alt="' + escapeHtml(item.name) + '" loading="lazy">' +
                 '<span>' + escapeHtml(item.name) + '</span>' +
                 '<small>' + escapeHtml(item.size_label || item.type || '') + '</small>' +
             '</button>';
         }).join('');
+        grid.insertAdjacentHTML('beforeend', html);
+        grid.classList.remove('is-loading');
+        if (status) {
+            status.textContent = imagePickerState.hasMore
+                ? 'Показано зображень: ' + imagePickerItems.length + '. Прокрутіть нижче, щоб підвантажити ще.'
+                : 'Знайдено зображень: ' + imagePickerItems.length + '.';
+        }
+        queueCardImageMoreCheck();
     }
 
     function openCardModal(i, cardIndex) {
@@ -1044,7 +1151,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (search) {
             search.addEventListener('input', function () {
                 window.clearTimeout(imagePickerSearchTimer);
-                imagePickerSearchTimer = window.setTimeout(loadCardImageItems, 250);
+                imagePickerSearchTimer = window.setTimeout(function () {
+                    loadCardImageItems(false);
+                }, 250);
             });
         }
         imagePickerNode.addEventListener('click', function (event) {
@@ -1063,6 +1172,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 imagePickerModal.hide();
             }
         });
+        const imagePickerBody = imagePickerNode.querySelector('.modal-body');
+        if (imagePickerBody) {
+            imagePickerBody.addEventListener('scroll', maybeLoadMoreCardImages, {passive: true});
+        }
+        imagePickerNode.addEventListener('scroll', maybeLoadMoreCardImages, true);
     }
 
     function addSectionFromTemplate(template) {

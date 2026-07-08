@@ -13,12 +13,24 @@
         'hero_text' => '',
         'hero_button_label' => '',
         'hero_button_url' => '',
+        'hero_background_image' => '',
+        'hero_background_position' => 'center center',
+        'hero_background_size' => 'cover',
+        'hero_background_repeat' => 'no-repeat',
+        'hero_overlay_enabled' => true,
+        'hero_overlay_opacity' => '35',
         'home_hero_enabled' => false,
         'home_hero_variant' => 'fullscreen',
         'home_hero_title' => '',
         'home_hero_text' => '',
         'home_hero_button_label' => '',
         'home_hero_button_url' => '',
+        'home_hero_background_image' => '',
+        'home_hero_background_position' => 'center center',
+        'home_hero_background_size' => 'cover',
+        'home_hero_background_repeat' => 'no-repeat',
+        'home_hero_overlay_enabled' => true,
+        'home_hero_overlay_opacity' => '35',
         'secondary_enabled' => false,
         'secondary_variant' => 'pills',
         'secondary_links' => [],
@@ -37,6 +49,26 @@
     $hasHeaderHero = !empty($layout['hero_enabled']) && ((string) ($layout['hero_title'] ?? '') !== '' || (string) ($layout['hero_text'] ?? '') !== '');
     $hasHomeHero = !empty($isHomePage) && !empty($layout['home_hero_enabled']) && ((string) ($layout['home_hero_title'] ?? '') !== '' || (string) ($layout['home_hero_text'] ?? '') !== '');
     $siteLogo = \App\Services\Files::normalize((string) ($settings['site_logo'] ?? ''));
+    $heroBackground = static function (array $layout, string $prefix): array {
+        $image = \App\Services\Files::normalize((string) ($layout[$prefix . '_background_image'] ?? ''));
+        if ($image === '') {
+            return ['class' => '', 'style' => ''];
+        }
+        $position = in_array((string) ($layout[$prefix . '_background_position'] ?? ''), ['center center', 'center top', 'center bottom', 'left center', 'right center'], true)
+            ? (string) $layout[$prefix . '_background_position']
+            : 'center center';
+        $size = in_array((string) ($layout[$prefix . '_background_size'] ?? ''), ['cover', 'contain', 'auto'], true)
+            ? (string) $layout[$prefix . '_background_size']
+            : 'cover';
+        $repeat = in_array((string) ($layout[$prefix . '_background_repeat'] ?? ''), ['no-repeat', 'repeat', 'repeat-x', 'repeat-y'], true)
+            ? (string) $layout[$prefix . '_background_repeat']
+            : 'no-repeat';
+        $opacity = max(0, min(80, (int) ($layout[$prefix . '_overlay_opacity'] ?? 35))) / 100;
+        $style = '--site-hero-bg-image: url("' . e(url('/uploads/' . $image)) . '"); --site-hero-bg-position: ' . e($position) . '; --site-hero-bg-size: ' . e($size) . '; --site-hero-bg-repeat: ' . e($repeat) . '; --site-hero-overlay-opacity: ' . e((string) $opacity) . ';';
+        $class = ' site-header-hero-has-background' . (!empty($layout[$prefix . '_overlay_enabled']) ? ' site-header-hero-has-overlay' : '');
+
+        return ['class' => $class, 'style' => $style];
+    };
     $renderMenuLabel = static function (string $label, string $icon, string $fallback): string {
         $icon = trim($icon);
         $icon = preg_replace('/^mdi\s+/', '', $icon) ?? '';
@@ -138,7 +170,8 @@
     </div>
 </header>
 <?php if ($hasHeaderHero && !$hasHomeHero): ?>
-    <section class="site-header-hero site-header-hero-<?= e($heroVariant) ?>">
+    <?php $headerHeroBackground = $heroBackground($layout, 'hero'); ?>
+    <section class="site-header-hero site-header-hero-<?= e($heroVariant) ?><?= e($headerHeroBackground['class']) ?>"<?= $headerHeroBackground['style'] !== '' ? ' style="' . $headerHeroBackground['style'] . '"' : '' ?>>
         <div class="container site-header-hero-inner">
             <div>
                 <?php if (!empty($layout['hero_title'])): ?><h1><?= e((string) $layout['hero_title']) ?></h1><?php endif; ?>
@@ -160,7 +193,8 @@
     </nav>
 <?php endif; ?>
 <?php if ($hasHomeHero): ?>
-    <section class="site-home-hero site-header-hero site-header-hero-<?= e($homeHeroVariant) ?>">
+    <?php $homeHeroBackground = $heroBackground($layout, 'home_hero'); ?>
+    <section class="site-home-hero site-header-hero site-header-hero-<?= e($homeHeroVariant) ?><?= e($homeHeroBackground['class']) ?>"<?= $homeHeroBackground['style'] !== '' ? ' style="' . $homeHeroBackground['style'] . '"' : '' ?>>
         <div class="container site-header-hero-inner">
             <div>
                 <?php if (!empty($layout['home_hero_title'])): ?><h1><?= e((string) $layout['home_hero_title']) ?></h1><?php endif; ?>
