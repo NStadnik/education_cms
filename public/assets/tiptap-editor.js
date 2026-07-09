@@ -3,7 +3,7 @@
 
     let bundle = getBundle();
     let bundleLoading = false;
-    const bundleFile = 'tiptap.bundle.20260709-7.js';
+    const bundleFile = 'tiptap.bundle.20260709-7.js?v=20260709-12';
     const scriptUrl = document.currentScript ? document.currentScript.src : '';
     const assetsBase = scriptUrl ? scriptUrl.replace(/\/tiptap-editor\.js(?:\?.*)?$/, '') : '/assets';
     const editors = new WeakMap();
@@ -36,7 +36,7 @@
             return;
         }
 
-        (root || document).querySelectorAll('textarea[data-tinymce-editor], textarea[data-tiptap-editor]').forEach(function (textarea) {
+        (root || document).querySelectorAll('textarea[data-tiptap-editor]').forEach(function (textarea) {
             if (textarea.dataset.tiptapReady === '1') {
                 return;
             }
@@ -112,7 +112,7 @@
     }
 
     function markPendingEditors(root, message) {
-        (root || document).querySelectorAll('textarea[data-tinymce-editor], textarea[data-tiptap-editor]').forEach(function (textarea) {
+        (root || document).querySelectorAll('textarea[data-tiptap-editor]').forEach(function (textarea) {
             if (textarea.dataset.tiptapReady === '1') {
                 return;
             }
@@ -122,6 +122,8 @@
 
     function fullExtensions(textarea) {
         return [
+            createRichGalleryExtension(),
+            createRichGalleryCaptionExtension(),
             bundle.StarterKit,
             bundle.Underline,
             bundle.Link && bundle.Link.configure({
@@ -133,6 +135,94 @@
             bundle.TextAlign && bundle.TextAlign.configure({types: ['heading', 'paragraph']}),
             bundle.Placeholder && bundle.Placeholder.configure({placeholder: textarea.getAttribute('placeholder') || ''})
         ].filter(Boolean);
+    }
+
+    function createRichGalleryExtension() {
+        if (!bundle.Node) {
+            return null;
+        }
+        return bundle.Node.create({
+            name: 'richGallery',
+            group: 'block',
+            atom: true,
+            selectable: true,
+            draggable: true,
+            addAttributes: function () {
+                return {
+                    columns: {default: '3'},
+                    align: {default: 'center'},
+                    images: {default: []}
+                };
+            },
+            parseHTML: function () {
+                return [{
+                    tag: 'div.rich-gallery',
+                    getAttrs: function (element) {
+                        const className = element.getAttribute('class') || '';
+                        const columnsMatch = className.match(/rich-gallery-cols-(2|3|4)/);
+                        const alignMatch = className.match(/media-align-(left|center|right|justify)/);
+                        const images = Array.prototype.slice.call(element.querySelectorAll('img')).map(function (image) {
+                            const link = image.closest('a');
+                            return {
+                                src: image.getAttribute('src') || '',
+                                alt: image.getAttribute('alt') || '',
+                                href: link && element.contains(link) ? (link.getAttribute('href') || '') : ''
+                            };
+                        }).filter(function (image) {
+                            return image.src;
+                        });
+                        return {
+                            columns: columnsMatch ? columnsMatch[1] : '3',
+                            align: alignMatch ? alignMatch[1] : 'center',
+                            images: images
+                        };
+                    }
+                }];
+            },
+            renderHTML: function (props) {
+                const attrs = props.node.attrs || {};
+                const columns = normalizeColumns(attrs.columns);
+                const align = normalizeAlign(attrs.align);
+                const figures = (Array.isArray(attrs.images) ? attrs.images : []).filter(function (image) {
+                    return image && image.src;
+                }).map(function (image) {
+                    const imageNode = ['img', {src: image.src, alt: image.alt || ''}];
+                    return ['figure', ['a', {href: image.href || image.src}, imageNode]];
+                });
+                return ['div', {class: 'rich-gallery rich-gallery-cols-' + columns + ' media-align-' + align}].concat(figures);
+            }
+        });
+    }
+
+    function createRichGalleryCaptionExtension() {
+        if (!bundle.Node) {
+            return null;
+        }
+        return bundle.Node.create({
+            name: 'richGalleryCaption',
+            group: 'block',
+            content: 'text*',
+            marks: '',
+            addAttributes: function () {
+                return {
+                    align: {default: 'center'}
+                };
+            },
+            parseHTML: function () {
+                return [{
+                    tag: 'p.rich-gallery-caption',
+                    getAttrs: function (element) {
+                        const className = element.getAttribute('class') || '';
+                        const alignMatch = className.match(/media-align-(left|center|right|justify)/);
+                        return {align: alignMatch ? alignMatch[1] : 'center'};
+                    }
+                }];
+            },
+            renderHTML: function (props) {
+                const align = normalizeAlign(props.node.attrs && props.node.attrs.align);
+                return ['p', {class: 'rich-gallery-caption media-align-' + align}, 0];
+            }
+        });
     }
 
     function createEditor(textarea, content, toolbar, extensions) {
@@ -174,7 +264,7 @@
     }
 
     function setBundleError(message) {
-        document.querySelectorAll('textarea[data-tinymce-editor], textarea[data-tiptap-editor]').forEach(function (textarea) {
+        document.querySelectorAll('textarea[data-tiptap-editor]').forEach(function (textarea) {
             if (textarea.dataset.tiptapReady !== '1') {
                 setStatus(textarea, message);
             }
@@ -182,7 +272,7 @@
     }
 
     function clearBundleStatus(root) {
-        (root || document).querySelectorAll('textarea[data-tinymce-editor], textarea[data-tiptap-editor]').forEach(function (textarea) {
+        (root || document).querySelectorAll('textarea[data-tiptap-editor]').forEach(function (textarea) {
             if (textarea.dataset.tiptapReady !== '1') {
                 clearStatus(textarea);
             }
@@ -351,7 +441,7 @@
     }
 
     function syncAll(root) {
-        (root || document).querySelectorAll('textarea[data-tinymce-editor], textarea[data-tiptap-editor]').forEach(syncOne);
+        (root || document).querySelectorAll('textarea[data-tiptap-editor]').forEach(syncOne);
     }
 
     function syncOne(textarea) {
@@ -670,13 +760,50 @@
         const align = modalNode.querySelector('[data-rich-media-align]').value;
         const columns = modalNode.querySelector('[data-rich-media-columns]').value;
         const caption = modalNode.querySelector('[data-rich-media-caption]').value.trim();
-        const html = mode === 'gallery' ? buildGalleryHtml(selected.filter(function (item) { return item.is_image; }), align, columns, caption) : buildMediaHtml(selected[0], align, caption);
+        const galleryItems = selected.filter(function (item) { return item.is_image; });
+        const html = mode === 'gallery' ? buildGalleryHtml(galleryItems, align, columns, caption) : buildMediaHtml(selected[0], align, caption);
         if (html === '') {
             modalNode.querySelector('[data-rich-media-status]').textContent = 'Для галереї оберіть зображення.';
             return;
         }
+        if (mode === 'gallery' && insertGalleryContent(mediaState.editor, galleryItems, align, columns, caption)) {
+            mediaState.modal.hide();
+            return;
+        }
         insertContent(mediaState.editor, html);
         mediaState.modal.hide();
+    }
+
+    function insertGalleryContent(textarea, items, align, columns, caption) {
+        const editor = textarea ? editors.get(textarea) : null;
+        if (!editor || !editor.schema.nodes.richGallery) {
+            return false;
+        }
+        const content = [{
+            type: 'richGallery',
+            attrs: {
+                columns: normalizeColumns(columns),
+                align: normalizeAlign(align),
+                images: items.map(function (item) {
+                    return {
+                        src: item.url,
+                        alt: item.alt_text || item.title || item.name || '',
+                        href: item.url
+                    };
+                })
+            }
+        }];
+        if (caption && editor.schema.nodes.richGalleryCaption) {
+            content.push({
+                type: 'richGalleryCaption',
+                attrs: {align: normalizeAlign(align)},
+                content: [{type: 'text', text: caption}]
+            });
+        }
+        editor.chain().focus().insertContent(content).run();
+        syncOne(textarea);
+        textarea.dispatchEvent(new Event('input', {bubbles: true}));
+        return true;
     }
 
     function buildMediaHtml(item, align, caption) {
@@ -693,10 +820,21 @@
         if (!items.length) {
             return '';
         }
+        const safeAlign = normalizeAlign(align);
+        const safeColumns = normalizeColumns(columns);
         const images = items.map(function (item) {
-            return '<p><img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(item.alt_text || item.title || item.name) + '"></p>';
+            return '<figure><a href="' + escapeHtml(item.url) + '"><img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(item.alt_text || item.title || item.name) + '"></a></figure>';
         }).join('');
-        return images + (caption ? '<p class="rich-gallery-caption media-align-' + escapeHtml(align) + '">' + escapeHtml(caption) + '</p>' : '');
+        return '<div class="rich-gallery rich-gallery-cols-' + escapeHtml(safeColumns) + ' media-align-' + escapeHtml(safeAlign) + '">' + images + '</div>' +
+            (caption ? '<p class="rich-gallery-caption media-align-' + escapeHtml(safeAlign) + '">' + escapeHtml(caption) + '</p>' : '');
+    }
+
+    function normalizeAlign(value) {
+        return ['left', 'center', 'right', 'justify'].indexOf(value) === -1 ? 'center' : value;
+    }
+
+    function normalizeColumns(value) {
+        return ['2', '3', '4'].indexOf(String(value)) === -1 ? '3' : String(value);
     }
 
     function escapeHtml(value) {
@@ -714,7 +852,6 @@
     };
 
     window.TiptapEditor = api;
-    window.TinyMceEditor = api;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () {

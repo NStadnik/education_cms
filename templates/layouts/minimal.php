@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($title ?? 'CMS') ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="<?= url('/assets/site.css') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260709-11') ?>">
 </head>
 <body>
     <main class="section">

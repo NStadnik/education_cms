@@ -36,13 +36,14 @@ document.addEventListener('DOMContentLoaded', function () {
         let activeItems = [];
         let activeIndex = 0;
 
-        function itemFromLink(link) {
-            const img = link.querySelector('img');
-            const figure = link.closest('figure');
+        function itemFromGalleryNode(node) {
+            const img = node.matches('img') ? node : node.querySelector('img');
+            const link = node.matches('a') ? node : (img ? img.closest('a') : null);
+            const figure = node.closest('figure');
             const figureCaption = figure ? figure.querySelector('figcaption') : null;
             const text = figureCaption ? figureCaption.textContent.trim() : '';
             return {
-                src: link.href || (img ? img.currentSrc || img.src : ''),
+                src: link ? link.href : (img ? img.currentSrc || img.src : ''),
                 alt: img ? img.getAttribute('alt') || '' : '',
                 caption: text || (img ? img.getAttribute('alt') || '' : '')
             };
@@ -88,21 +89,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         galleries.forEach(function (gallery) {
             gallery.addEventListener('click', function (event) {
-                const link = event.target.closest('a');
-                if (!link || !gallery.contains(link)) {
+                const target = event.target.closest('a, img');
+                if (!target || !gallery.contains(target)) {
                     return;
                 }
 
-                const links = Array.from(gallery.querySelectorAll('a')).filter(function (item) {
-                    return item.querySelector('img');
+                const items = Array.from(gallery.querySelectorAll('figure')).map(function (figure) {
+                    return figure.querySelector('a') || figure.querySelector('img');
+                }).filter(function (item) {
+                    return item && (item.matches('img') || item.querySelector('img'));
                 });
-                const index = links.indexOf(link);
+                const index = items.findIndex(function (item) {
+                    return item === target || item.contains(target);
+                });
                 if (index === -1) {
                     return;
                 }
 
                 event.preventDefault();
-                openViewer(links.map(itemFromLink), index);
+                openViewer(items.map(itemFromGalleryNode), index);
             });
         });
 

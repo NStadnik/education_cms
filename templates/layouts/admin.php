@@ -23,11 +23,11 @@
     <title><?= e($title ?? 'Адмінка') ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="<?= url('/assets/site.css') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260709-11') ?>">
     <link rel="stylesheet" href="<?= url('/assets/admin.css') ?>">
-    <link rel="stylesheet" href="<?= url('/assets/tiptap-editor.css?v=20260709-9') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/tiptap-editor.css?v=20260709-12') ?>">
     <?php if (strpos($currentPath, '/admin/pages') === 0): ?>
-        <link rel="stylesheet" href="<?= url('/assets/admin-pages-form.css') ?>">
+        <link rel="stylesheet" href="<?= url('/assets/admin-pages-form.css?v=20260709-12') ?>">
     <?php endif; ?>
     <?php if (strpos($currentPath, '/admin/templates') === 0): ?>
         <link rel="stylesheet" href="<?= url('/assets/admin-templates.css') ?>">
@@ -227,9 +227,9 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="<?= url('/assets/tiptap.bundle.20260709-7.js') ?>"></script>
-    <script src="<?= url('/assets/tiptap-editor.js?v=20260709-9') ?>"></script>
+    <script src="<?= url('/assets/tiptap.bundle.20260709-7.js?v=20260709-12') ?>"></script>
+    <script src="<?= url('/assets/tiptap-editor.js?v=20260709-12') ?>"></script>
     <script src="<?= url('/assets/admin-link-picker.js') ?>"></script>
-    <script src="<?= url('/assets/admin.js') ?>"></script>
+    <script src="<?= url('/assets/admin.js?v=20260709-12') ?>"></script>
 </body>
 </html>

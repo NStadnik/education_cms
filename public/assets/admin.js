@@ -285,7 +285,7 @@
         }
     }, true);
 
-    initTinyMceEditors();
+    initTiptapEditors();
     initCategoryPickers();
 
     document.addEventListener('submit', async function (event) {
@@ -295,7 +295,7 @@
         }
 
         event.preventDefault();
-        syncTinyMceEditors(form);
+        syncTiptapEditors(form);
         const button = form.querySelector('button[type="submit"]');
         const originalHtml = button ? button.innerHTML : '';
         setAjaxFormMessage(form, 'Збереження...', false);
@@ -480,7 +480,7 @@
     document.addEventListener('submit', function (event) {
         const form = event.target.closest('form');
         if (form) {
-            syncTinyMceEditors(form);
+            syncTiptapEditors(form);
         }
     }, true);
 
@@ -804,20 +804,20 @@
 
     initOptimizerTabs();
 
-    function initTinyMceEditors() {
-        if (window.TinyMceEditor) {
-            window.TinyMceEditor.init();
+    function initTiptapEditors() {
+        if (window.TiptapEditor) {
+            window.TiptapEditor.init();
         }
     }
 
-    function syncTinyMceEditors(root) {
-        if (window.TinyMceEditor) {
-            window.TinyMceEditor.syncAll(root);
+    function syncTiptapEditors(root) {
+        if (window.TiptapEditor) {
+            window.TiptapEditor.syncAll(root);
         }
     }
 
-    function syncTinyMceEditor(textarea) {
-        if (window.TinyMceEditor) {
-            window.TinyMceEditor.syncOne(textarea);
+    function syncTiptapEditor(textarea) {
+        if (window.TiptapEditor) {
+            window.TiptapEditor.syncOne(textarea);
         }
     }

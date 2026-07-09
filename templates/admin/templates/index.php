@@ -78,8 +78,8 @@
     $previewContext = [
         'bootstrapCss' => 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
         'mdiCss' => 'https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css',
-        'siteCss' => url('/assets/site.css'),
-        'siteJs' => url('/assets/site.js'),
+        'siteCss' => url('/assets/site.css?v=20260709-11'),
+        'siteJs' => url('/assets/site.js?v=20260709-11'),
         'templates' => $previewTemplates,
         'institutionName' => (string) ($settings['institution_name'] ?? 'Заклад освіти'),
         'menu' => is_array($previewMenu ?? null) ? $previewMenu : [],

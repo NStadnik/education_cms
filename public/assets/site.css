@@ -183,7 +183,7 @@ img { max-width: 100%; height: auto; }
 .rich-gallery { display: grid; gap: 10px; margin: 0 0 16px; }
 .rich-gallery figure { margin: 0; }
 .rich-gallery a, .rich-media-block a { display: block; }
-.rich-gallery a { cursor: zoom-in; }
+.rich-gallery a, .rich-gallery img { cursor: zoom-in; }
 .rich-gallery img { display: block; width: 100%; aspect-ratio: 4 / 3; margin: 0; object-fit: cover; border-radius: 6px; }
 .rich-gallery-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .rich-gallery-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }

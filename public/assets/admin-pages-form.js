@@ -722,8 +722,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const html = layoutToSimpleHtml();
         simpleTextarea.value = html;
 
-        if (window.TinyMceEditor) {
-            window.TinyMceEditor.setContent(simpleTextarea, html);
+        if (window.TiptapEditor) {
+            window.TiptapEditor.setContent(simpleTextarea, html);
         }
     }
 
@@ -1109,8 +1109,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const field = cardModalField(name);
             if (field) {
                 field.value = card[name] || (name === 'style' ? 'default' : '');
-                if (name === 'text' && window.TinyMceEditor) {
-                    window.TinyMceEditor.setContent(field, field.value);
+                if (name === 'text' && window.TiptapEditor) {
+                    window.TiptapEditor.setContent(field, field.value);
                 }
             }
         });
@@ -1120,8 +1120,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function readCardModalValues() {
         const card = emptyCard();
         const textField = cardModalField('text');
-        if (textField && window.TinyMceEditor) {
-            window.TinyMceEditor.syncOne(textField);
+        if (textField && window.TiptapEditor) {
+            window.TiptapEditor.syncOne(textField);
         }
         ['style', 'title', 'text', 'image', 'button_text', 'button_url'].forEach(function (name) {
             const field = cardModalField(name);
@@ -1388,8 +1388,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (window.TiptapEditor) {
             window.TiptapEditor.insertContent(field, html);
-        } else if (window.TinyMceEditor && window.TinyMceEditor.insertContent) {
-            window.TinyMceEditor.insertContent(field, html);
+        } else if (window.TiptapEditor && window.TiptapEditor.insertContent) {
+            window.TiptapEditor.insertContent(field, html);
         } else {
             const separator = String(field.value || '').trim() ? '\n\n' : '';
             field.value = String(field.value || '') + separator + html;
@@ -1582,12 +1582,12 @@ document.addEventListener('DOMContentLoaded', function () {
             saveLabel.textContent = isEdit ? 'Оновити картку' : 'Додати картку';
         }
         updateCardModalPreview();
-        if (window.TinyMceEditor) {
+        if (window.TiptapEditor) {
             cardModalNode.addEventListener('shown.bs.modal', function () {
                 const textField = cardModalField('text');
-                window.TinyMceEditor.init(cardModalNode);
+                window.TiptapEditor.init(cardModalNode);
                 if (textField) {
-                    window.TinyMceEditor.setContent(textField, textField.value);
+                    window.TiptapEditor.setContent(textField, textField.value);
                 }
             }, {once: true});
         }
@@ -2024,8 +2024,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = builder.closest('form');
     if (form) {
         form.addEventListener('submit', function () {
-            if (window.TinyMceEditor) {
-                window.TinyMceEditor.syncAll(document);
+            if (window.TiptapEditor) {
+                window.TiptapEditor.syncAll(document);
             }
             if (!modeInput || modeInput.value === 'advanced') {
                 updateSimpleEditorFromLayout();

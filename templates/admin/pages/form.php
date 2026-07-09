@@ -625,4 +625,4 @@
     </div>
 </div>
 
-<script src="<?= url('/assets/admin-pages-form.js') ?>"></script>
+<script src="<?= url('/assets/admin-pages-form.js?v=20260709-12') ?>"></script>
