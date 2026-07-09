@@ -218,7 +218,7 @@
                     <label>Почати з файлу №<input type="number" name="wp_media_offset" value="0" min="0"></label>
                 </div>
                 <div class="grid grid-3">
-                    <label>Файлів за пакет<input type="number" name="wp_media_limit" value="100" min="1" max="100"></label>
+                    <label>Файлів за пакет<input type="number" name="wp_media_limit" value="20" min="1" max="20"></label>
                 </div>
                 <input type="hidden" name="wp_import_media" value="1">
             </div>

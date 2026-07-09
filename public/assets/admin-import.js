@@ -394,6 +394,13 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         return Number.isFinite(value) ? value : fallback;
     }
 
+    function setInputValue(name, value) {
+        const input = fieldByName(name);
+        if (input && input.value !== undefined) {
+            input.value = String(value);
+        }
+    }
+
     function progressText(stage, done, total, created) {
         const totalText = total > 0 ? total : done;
         const label = stage.indexOf('Файли') === 0 ? 'імпортовано' : mutationLabel();
@@ -423,7 +430,7 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         const postsBase = importMedia && importPosts ? 45 : 0;
         const postsRange = importPosts ? (importMedia ? 55 : 100) : 0;
         const mediaStartOffset = intInput('wp_media_offset', 0);
-        const mediaLimit = Math.min(intInput('wp_media_limit', 100), 100);
+        const mediaLimit = Math.min(intInput('wp_media_limit', 20), 20);
         let mediaOffset = mediaStartOffset;
         let mediaEndOffset = mediaStartOffset;
         let mediaTotal = 0;
@@ -434,12 +441,14 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
                 const mediaData = await requestImport(form.action, button, 'Файли...', {
                     wp_media_only: '1',
                     wp_media_offset: String(mediaOffset),
-                    wp_media_limit: String(mediaLimit)
+                    wp_media_limit: String(mediaLimit),
+                    wp_media_seconds: '25'
                 });
                 const stats = mediaData.stats || {};
                 mediaTotal = parseInt(stats.media_total || mediaData.total || mediaTotal || 0, 10);
                 mediaOffset = parseInt(mediaData.next_offset || stats.media_next_offset || mediaOffset, 10);
                 mediaEndOffset = mediaOffset;
+                setInputValue('wp_media_offset', mediaOffset);
                 mediaImported += parseInt(stats.media_imported || 0, 10);
                 setMessage(progressText('Файли WordPress', mediaOffset, mediaTotal, mediaImported), false);
                 updateProgressSegment('media', mediaOffset, mediaTotal, mediaImported, 0, mediaRange);
@@ -491,6 +500,7 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
             const stats = postData.stats || {};
             postTotal = parseInt(stats.posts_total || postData.total || postTotal || 0, 10);
             postOffset = parseInt(postData.next_offset || stats.posts_next_offset || postOffset, 10);
+            setInputValue('db_offset', postOffset);
             createdTotal += parseInt(postData.created || 0, 10);
             setMessage(progressText('Матеріали WordPress', postOffset, postTotal, createdTotal), false);
             updateProgressSegment('posts', postOffset, postTotal, createdTotal, postsBase, postsRange);
@@ -573,7 +583,11 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
                 modal.hide();
             }
         } catch (error) {
-            setMessage(error.message || 'Помилка імпорту.', true);
+            let errorMessage = error.message || 'Помилка імпорту.';
+            if (activeSource() === 'database') {
+                errorMessage += ' Прогрес збережено у полях offset: файли №' + intInput('wp_media_offset', 0) + ', матеріали №' + intInput('db_offset', 0) + '. Запустіть імпорт ще раз, щоб продовжити.';
+            }
+            setMessage(errorMessage, true);
         } finally {
             finishImport();
         }

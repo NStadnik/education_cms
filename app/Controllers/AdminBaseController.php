@@ -19,6 +19,7 @@ abstract class AdminBaseController extends BaseController
     protected const IMPORT_TITLE_LIMIT = 220;
     protected const WP_CONTENT_MEDIA_LIMIT = 20;
     protected const WP_CONTENT_MEDIA_SECONDS = 20;
+    protected const WP_MEDIA_BATCH_SECONDS = 25;
     protected const IMPORT_DOWNLOAD_TIMEOUT = 8;
 
     protected array $lastImportStats = [];
@@ -1333,9 +1334,11 @@ abstract class AdminBaseController extends BaseController
         $siteUrl = rtrim(trim((string) $request->input('wp_site_url', '')), '/');
         $uploadsPath = rtrim(trim((string) $request->input('wp_uploads_path', '')), '/\\');
         $offset = max(0, (int) $request->input('wp_media_offset', 0));
-        $maxLimit = $download ? 100 : 50000;
+        $maxLimit = $download ? 20 : 50000;
         $limitInput = $request->input('wp_media_map_limit', $request->input('wp_media_limit', 1000));
         $limit = max(1, min($maxLimit, (int) $limitInput));
+        $seconds = $download ? max(5, min(45, (int) $request->input('wp_media_seconds', self::WP_MEDIA_BATCH_SECONDS))) : 0;
+        $deadline = $seconds > 0 ? microtime(true) + $seconds : 0.0;
         $this->lastWordPressMediaPaths = [];
 
         $countStmt = $pdo->query("select count(*) as c from {$postsTable} where post_type = 'attachment'");
@@ -1378,6 +1381,10 @@ abstract class AdminBaseController extends BaseController
             foreach ($this->wordPressMediaAliases($relativeSource, $sourceUrl, $siteUrl, (string) ($attachment['attachment_metadata'] ?? ''), (string) ($attachment['post_name'] ?? ''), (int) ($attachment['ID'] ?? 0)) as $alias) {
                 $map[$alias] = $newUrl;
             }
+
+            if ($deadline > 0 && microtime(true) >= $deadline) {
+                break;
+            }
         }
 
         uksort($map, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
@@ -1389,6 +1396,7 @@ abstract class AdminBaseController extends BaseController
             'media_imported' => $saved,
             'media_next_offset' => $offset + $loaded,
             'media_has_more' => ($offset + $loaded) < $total,
+            'media_time_limited' => $deadline > 0 && microtime(true) >= $deadline,
         ]);
         return $map;
     }

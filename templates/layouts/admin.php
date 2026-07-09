@@ -36,8 +36,9 @@
 <body data-admin-csrf-token="<?= e(\App\Core\Csrf::token()) ?>" data-rich-media-picker-url="<?= url('/admin/media/picker') ?>" data-rich-media-upload-url="<?= url('/admin/media/upload') ?>" data-admin-link-picker-url="<?= url('/admin/link-picker') ?>">
     <div class="admin-shell">
         <aside class="admin-sidebar">
-            <div class="mb-4">
+            <div class="admin-brand mb-4">
                 <h2 class="h4 mb-1 text-white">Education CMS</h2>
+                <a href="https://lcloud.in.ua" target="_blank" rel="noopener">Навчальна хмара «ЛКЛАУД»</a>
                 <p class="small text-white-50 mb-0">Панель керування</p>
             </div>
             <nav class="nav nav-pills flex-column gap-1">
