@@ -1,0 +1,25 @@
+This file documents the third-party libraries bundled into tiptap.bundle.js.
+
+tiptap.bundle.js includes Tiptap and ProseMirror packages used by the admin
+rich text editor:
+
+- @tiptap/core
+- @tiptap/starter-kit
+- @tiptap/extension-image
+- @tiptap/extension-link
+- @tiptap/extension-placeholder
+- @tiptap/extension-text-align
+- @tiptap/extension-underline
+- @tiptap/pm
+- prosemirror-* dependencies pulled by Tiptap
+
+These packages are MIT licensed.
+
+Project URLs:
+- https://tiptap.dev
+- https://github.com/ueberdosis/tiptap
+- https://prosemirror.net
+- https://github.com/ProseMirror
+
+The runtime project does not require node_modules or npm install. The browser
+loads the already bundled public/assets/tiptap.bundle.js file directly.

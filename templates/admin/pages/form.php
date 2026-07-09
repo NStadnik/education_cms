@@ -153,7 +153,7 @@
                         </div>
                     </div>
                     <label>Вміст
-                        <textarea class="textarea-large" name="blocks_text" data-tinymce-editor placeholder="Введіть текст сторінки. Можна вставляти HTML з базовим форматуванням."><?= e($simpleText) ?></textarea>
+                        <textarea class="textarea-large" name="blocks_text" data-tiptap-editor placeholder="Введіть текст сторінки. Можна вставляти HTML з базовим форматуванням."><?= e($simpleText) ?></textarea>
                     </label>
                 </section>
                 <input type="hidden" name="layout_json" data-layout-json>
@@ -538,7 +538,7 @@
                         </label>
                         <div class="layout-card-modal-wide layout-card-rich-text">
                             <label>Текст
-                                <textarea data-card-modal-field="text" data-tinymce-editor rows="6" required placeholder="Основний текст картки"></textarea>
+                                <textarea data-card-modal-field="text" data-tiptap-editor rows="6" required placeholder="Основний текст картки"></textarea>
                             </label>
                             <div class="layout-card-text-tools" aria-label="Швидке форматування тексту картки">
                                 <button class="button secondary compact" type="button" data-card-text-list="ul">

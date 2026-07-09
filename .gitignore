@@ -1,3 +1,4 @@
 .vscode/sftp.json
 .gitignore
 config/local.php
+node_modules/

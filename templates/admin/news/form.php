@@ -54,7 +54,7 @@
 
             <div class="form-grid wide">
                 <label>Назва<input name="title" value="<?= e($item['title'] ?? '') ?>" required></label>
-                <label>Текст<textarea class="textarea-large" name="body" data-tinymce-editor required><?= e($item['body'] ?? '') ?></textarea></label>
+                <label>Текст<textarea class="textarea-large" name="body" data-tiptap-editor required><?= e($item['body'] ?? '') ?></textarea></label>
             </div>
         </section>
 

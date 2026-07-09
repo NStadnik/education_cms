@@ -1386,11 +1386,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!field) {
             return;
         }
-        const editor = field.id && window.tinymce ? window.tinymce.get(field.id) : null;
-        if (editor) {
-            editor.focus();
-            editor.insertContent(html);
-            editor.save();
+        if (window.TiptapEditor) {
+            window.TiptapEditor.insertContent(field, html);
+        } else if (window.TinyMceEditor && window.TinyMceEditor.insertContent) {
+            window.TinyMceEditor.insertContent(field, html);
         } else {
             const separator = String(field.value || '').trim() ? '\n\n' : '';
             field.value = String(field.value || '') + separator + html;
