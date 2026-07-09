@@ -3,7 +3,7 @@
 
     let bundle = getBundle();
     let bundleLoading = false;
-    const bundleFile = 'tiptap.bundle.20260709-7.js?v=20260709-12';
+    const bundleFile = 'tiptap.bundle.20260709-7.js?v=20260709-13';
     const scriptUrl = document.currentScript ? document.currentScript.src : '';
     const assetsBase = scriptUrl ? scriptUrl.replace(/\/tiptap-editor\.js(?:\?.*)?$/, '') : '/assets';
     const editors = new WeakMap();
@@ -231,6 +231,11 @@
             element: content,
             content: textarea.value || '',
             extensions: extensions,
+            editorProps: {
+                handleDOMEvents: {
+                    click: preventEditorGalleryLinkOpen
+                }
+            },
             onUpdate: function () {
                 syncOne(textarea);
                 textarea.dispatchEvent(new Event('input', {bubbles: true}));
@@ -240,6 +245,16 @@
             }
         });
         return editor;
+    }
+
+    function preventEditorGalleryLinkOpen(view, event) {
+        const target = event.target && event.target.nodeType === 1 ? event.target : null;
+        const link = target && target.closest ? target.closest('.rich-gallery a') : null;
+        if (!link || !view.dom.contains(link)) {
+            return false;
+        }
+        event.preventDefault();
+        return false;
     }
 
     function setStatus(textarea, message) {
