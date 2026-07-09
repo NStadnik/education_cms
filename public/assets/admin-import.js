@@ -432,9 +432,9 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         const mediaStartOffset = intInput('wp_media_offset', 0);
         const mediaLimit = Math.min(intInput('wp_media_limit', 20), 20);
         let mediaOffset = mediaStartOffset;
-        let mediaEndOffset = mediaStartOffset;
         let mediaTotal = 0;
         let mediaImported = 0;
+        let mediaFailed = 0;
 
         if (importMedia) {
             while (true) {
@@ -442,15 +442,15 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
                     wp_media_only: '1',
                     wp_media_offset: String(mediaOffset),
                     wp_media_limit: String(mediaLimit),
-                    wp_media_seconds: '25'
+                    wp_media_seconds: '15'
                 });
                 const stats = mediaData.stats || {};
                 mediaTotal = parseInt(stats.media_total || mediaData.total || mediaTotal || 0, 10);
                 mediaOffset = parseInt(mediaData.next_offset || stats.media_next_offset || mediaOffset, 10);
-                mediaEndOffset = mediaOffset;
                 setInputValue('wp_media_offset', mediaOffset);
                 mediaImported += parseInt(stats.media_imported || 0, 10);
-                setMessage(progressText('Файли WordPress', mediaOffset, mediaTotal, mediaImported), false);
+                mediaFailed += parseInt(stats.media_failed || 0, 10);
+                setMessage(progressText('Файли WordPress', mediaOffset, mediaTotal, mediaImported) + (mediaFailed > 0 ? ', пропущено ' + mediaFailed : ''), false);
                 updateProgressSegment('media', mediaOffset, mediaTotal, mediaImported, 0, mediaRange);
                 if (!mediaData.has_more || mediaOffset >= mediaTotal) {
                     break;
@@ -464,7 +464,7 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         }
 
         if (!importPosts) {
-            setMessage('Імпорт файлів завершено: оброблено ' + mediaImported + ' із ' + mediaTotal + ' файлів.', false);
+            setMessage('Імпорт файлів завершено: оброблено ' + mediaImported + ' із ' + mediaTotal + ' файлів' + (mediaFailed > 0 ? ', пропущено ' + mediaFailed : '') + '.', false);
             showProgress({
                 title: 'Імпорт завершено',
                 detail: 'Файли WordPress оброблено.',
@@ -491,8 +491,6 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
             };
             if (importMedia) {
                 extra.wp_media_replace_only = '1';
-                extra.wp_media_offset = String(mediaStartOffset);
-                extra.wp_media_map_limit = String(Math.max(mediaLimit, mediaEndOffset - mediaStartOffset));
                 extra.wp_content_media_limit = '20';
                 extra.wp_content_media_seconds = '20';
             }
@@ -510,7 +508,7 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
             await pauseIfRequested('матеріали WordPress оброблено до №' + postOffset);
         }
 
-        setMessage('Імпорт завершено: ' + mutationLabel() + ' ' + createdTotal + ' із ' + postTotal + ' матеріалів' + (importMedia ? ', файлів оброблено ' + mediaImported : '') + '.', false);
+        setMessage('Імпорт завершено: ' + mutationLabel() + ' ' + createdTotal + ' із ' + postTotal + ' матеріалів' + (importMedia ? ', файлів оброблено ' + mediaImported + (mediaFailed > 0 ? ', пропущено ' + mediaFailed : '') : '') + '.', false);
         showProgress({
             title: 'Імпорт завершено',
             detail: 'WordPress імпорт виконано.',

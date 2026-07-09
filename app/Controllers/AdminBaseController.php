@@ -19,7 +19,7 @@ abstract class AdminBaseController extends BaseController
     protected const IMPORT_TITLE_LIMIT = 220;
     protected const WP_CONTENT_MEDIA_LIMIT = 20;
     protected const WP_CONTENT_MEDIA_SECONDS = 20;
-    protected const WP_MEDIA_BATCH_SECONDS = 25;
+    protected const WP_MEDIA_BATCH_SECONDS = 15;
     protected const IMPORT_DOWNLOAD_TIMEOUT = 8;
 
     protected array $lastImportStats = [];
@@ -496,7 +496,7 @@ abstract class AdminBaseController extends BaseController
 
         $mediaMap = [];
         $mediaPaths = [];
-        if (!$preview && $this->shouldImportWordPressMedia($request)) {
+        if (!$preview && $this->shouldImportWordPressMedia($request) && !$request->input('wp_media_replace_only')) {
             $mediaMap = $this->importWordPressMedia($pdo, $prefix, $request, !$request->input('wp_media_replace_only'));
             $mediaPaths = $this->lastWordPressMediaPaths;
         }
@@ -1369,7 +1369,7 @@ abstract class AdminBaseController extends BaseController
                 continue;
             }
 
-            $savedPath = $this->saveImportedMedia($source, $relativeSource, $sourceUrl, (int) ($attachment['ID'] ?? 0), $download);
+            $savedPath = $this->saveImportedMedia($source, $relativeSource, $sourceUrl, (int) ($attachment['ID'] ?? 0), $download, $deadline);
             if ($savedPath === '') {
                 continue;
             }
@@ -1394,6 +1394,7 @@ abstract class AdminBaseController extends BaseController
             'media_limit' => $limit,
             'media_loaded' => $loaded,
             'media_imported' => $saved,
+            'media_failed' => max(0, $loaded - $saved),
             'media_next_offset' => $offset + $loaded,
             'media_has_more' => ($offset + $loaded) < $total,
             'media_time_limited' => $deadline > 0 && microtime(true) >= $deadline,
@@ -1985,7 +1986,7 @@ abstract class AdminBaseController extends BaseController
         return (int) (sprintf('%u', crc32($relative)) ?: 0);
     }
 
-    protected function saveImportedMedia(string $source, string $relativeSource, string $sourceUrl, int $id, bool $download = true): string
+    protected function saveImportedMedia(string $source, string $relativeSource, string $sourceUrl, int $id, bool $download = true, ?float $deadline = null): string
     {
         $name = basename($relativeSource ?: (parse_url($sourceUrl, PHP_URL_PATH) ?: ''));
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
@@ -2008,18 +2009,23 @@ abstract class AdminBaseController extends BaseController
         if (!$download) {
             return '';
         }
+        if ($deadline !== null && $deadline > 0 && microtime(true) >= $deadline) {
+            return '';
+        }
         if (!is_dir(dirname($target))) {
             mkdir(dirname($target), 0775, true);
         }
 
+        $streamTimeout = max(1, min(4, self::IMPORT_DOWNLOAD_TIMEOUT));
         $context = stream_context_create([
-            'http' => ['timeout' => self::IMPORT_DOWNLOAD_TIMEOUT],
-            'https' => ['timeout' => self::IMPORT_DOWNLOAD_TIMEOUT],
+            'http' => ['timeout' => $streamTimeout],
+            'https' => ['timeout' => $streamTimeout],
         ]);
         $sourceStream = is_file($source) ? @fopen($source, 'rb') : @fopen($source, 'rb', false, $context);
         if (!$sourceStream) {
             return '';
         }
+        @stream_set_timeout($sourceStream, $streamTimeout);
 
         $targetStream = @fopen($target, 'wb');
         if (!$targetStream) {
@@ -2027,7 +2033,32 @@ abstract class AdminBaseController extends BaseController
             return '';
         }
 
-        $bytes = stream_copy_to_stream($sourceStream, $targetStream);
+        $bytes = 0;
+        while (!feof($sourceStream)) {
+            if ($deadline !== null && $deadline > 0 && microtime(true) >= $deadline) {
+                $bytes = false;
+                break;
+            }
+            $chunk = fread($sourceStream, 1024 * 256);
+            if ($chunk === false) {
+                $bytes = false;
+                break;
+            }
+            if ($chunk === '') {
+                $meta = stream_get_meta_data($sourceStream);
+                if (!empty($meta['timed_out'])) {
+                    $bytes = false;
+                    break;
+                }
+                continue;
+            }
+            $written = fwrite($targetStream, $chunk);
+            if ($written === false || $written <= 0) {
+                $bytes = false;
+                break;
+            }
+            $bytes += $written;
+        }
         fclose($sourceStream);
         fclose($targetStream);
         if ($bytes === false || $bytes <= 0) {
