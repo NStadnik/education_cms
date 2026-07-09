@@ -1,4 +1,135 @@
 document.addEventListener('DOMContentLoaded', function () {
+    function initRichGalleryViewer() {
+        const galleries = Array.from(document.querySelectorAll('.rich-gallery'));
+        if (!galleries.length) {
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'rich-gallery-modal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-label', 'Перегляд фото');
+        modal.hidden = true;
+        modal.innerHTML = [
+            '<button class="rich-gallery-modal-close" type="button" aria-label="Закрити">',
+                '<span class="mdi mdi-close" aria-hidden="true"></span>',
+            '</button>',
+            '<button class="rich-gallery-modal-nav rich-gallery-modal-prev" type="button" aria-label="Попереднє фото">',
+                '<span class="mdi mdi-chevron-left" aria-hidden="true"></span>',
+            '</button>',
+            '<figure class="rich-gallery-modal-figure">',
+                '<img class="rich-gallery-modal-image" alt="">',
+                '<figcaption class="rich-gallery-modal-caption"></figcaption>',
+            '</figure>',
+            '<button class="rich-gallery-modal-nav rich-gallery-modal-next" type="button" aria-label="Наступне фото">',
+                '<span class="mdi mdi-chevron-right" aria-hidden="true"></span>',
+            '</button>'
+        ].join('');
+        document.body.appendChild(modal);
+
+        const image = modal.querySelector('.rich-gallery-modal-image');
+        const caption = modal.querySelector('.rich-gallery-modal-caption');
+        const closeButton = modal.querySelector('.rich-gallery-modal-close');
+        const prevButton = modal.querySelector('.rich-gallery-modal-prev');
+        const nextButton = modal.querySelector('.rich-gallery-modal-next');
+        let activeItems = [];
+        let activeIndex = 0;
+
+        function itemFromLink(link) {
+            const img = link.querySelector('img');
+            const figure = link.closest('figure');
+            const figureCaption = figure ? figure.querySelector('figcaption') : null;
+            const text = figureCaption ? figureCaption.textContent.trim() : '';
+            return {
+                src: link.href || (img ? img.currentSrc || img.src : ''),
+                alt: img ? img.getAttribute('alt') || '' : '',
+                caption: text || (img ? img.getAttribute('alt') || '' : '')
+            };
+        }
+
+        function renderItem() {
+            const item = activeItems[activeIndex];
+            if (!item) {
+                return;
+            }
+
+            image.src = item.src;
+            image.alt = item.alt;
+            caption.textContent = item.caption;
+            caption.hidden = item.caption === '';
+            const hasNavigation = activeItems.length > 1;
+            prevButton.hidden = !hasNavigation;
+            nextButton.hidden = !hasNavigation;
+        }
+
+        function openViewer(items, index) {
+            activeItems = items;
+            activeIndex = index;
+            renderItem();
+            modal.hidden = false;
+            document.body.classList.add('rich-gallery-modal-open');
+            closeButton.focus();
+        }
+
+        function closeViewer() {
+            modal.hidden = true;
+            image.removeAttribute('src');
+            document.body.classList.remove('rich-gallery-modal-open');
+        }
+
+        function moveViewer(direction) {
+            if (activeItems.length < 2) {
+                return;
+            }
+            activeIndex = (activeIndex + direction + activeItems.length) % activeItems.length;
+            renderItem();
+        }
+
+        galleries.forEach(function (gallery) {
+            gallery.addEventListener('click', function (event) {
+                const link = event.target.closest('a');
+                if (!link || !gallery.contains(link)) {
+                    return;
+                }
+
+                const links = Array.from(gallery.querySelectorAll('a')).filter(function (item) {
+                    return item.querySelector('img');
+                });
+                const index = links.indexOf(link);
+                if (index === -1) {
+                    return;
+                }
+
+                event.preventDefault();
+                openViewer(links.map(itemFromLink), index);
+            });
+        });
+
+        closeButton.addEventListener('click', closeViewer);
+        prevButton.addEventListener('click', function () { moveViewer(-1); });
+        nextButton.addEventListener('click', function () { moveViewer(1); });
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) {
+                closeViewer();
+            }
+        });
+        document.addEventListener('keydown', function (event) {
+            if (modal.hidden) {
+                return;
+            }
+            if (event.key === 'Escape') {
+                closeViewer();
+            } else if (event.key === 'ArrowLeft') {
+                moveViewer(-1);
+            } else if (event.key === 'ArrowRight') {
+                moveViewer(1);
+            }
+        });
+    }
+
+    initRichGalleryViewer();
+
     const header = document.querySelector('[data-site-header]');
     if (header) {
         const toggle = header.querySelector('[data-site-menu-toggle]');

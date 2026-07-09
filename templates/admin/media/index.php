@@ -17,17 +17,24 @@
     <div class="metric"><div><span>Вільні</span><strong data-media-stat="unused"><?= e((string) $stats['unused']) ?></strong></div><span class="mdi mdi-trash-can-outline metric-icon" aria-hidden="true"></span></div>
 </div>
 
-<section class="card admin-form-card">
+<section class="card admin-form-card media-upload-card">
     <div class="form-section-head">
         <div>
             <h2>Завантажити файл</h2>
             <p class="meta">Підтримуються PDF, Word, Excel і зображення JPG, PNG, WEBP. PHP-ліміт: <?= e($uploadLimitLabel ?? 'не визначено') ?>.</p>
         </div>
+        <span class="media-upload-limit"><span class="mdi mdi-cloud-upload-outline" aria-hidden="true"></span><?= e($uploadLimitLabel ?? 'не визначено') ?></span>
     </div>
-    <form class="form-grid wide" method="post" action="<?= url('/admin/media/upload') ?>" enctype="multipart/form-data" data-media-upload data-upload-limit="<?= e((string) ($uploadLimitBytes ?? 0)) ?>" data-upload-limit-label="<?= e((string) ($uploadLimitLabel ?? '')) ?>">
+    <form class="media-upload-form" method="post" action="<?= url('/admin/media/upload') ?>" enctype="multipart/form-data" data-media-upload data-upload-limit="<?= e((string) ($uploadLimitBytes ?? 0)) ?>" data-upload-limit-label="<?= e((string) ($uploadLimitLabel ?? '')) ?>">
         <?= \App\Core\Csrf::field() ?>
         <?php if (!empty($uploadLimitBytes)): ?><input type="hidden" name="MAX_FILE_SIZE" value="<?= e((string) $uploadLimitBytes) ?>"><?php endif; ?>
-        <label>Файл<input type="file" name="file" required></label>
+        <label class="media-file-drop">Файл
+            <span class="media-file-drop-box">
+                <span class="mdi mdi-tray-arrow-up" aria-hidden="true"></span>
+                <span data-media-file-label>Оберіть файл або перетягніть його сюди</span>
+            </span>
+            <input type="file" name="file" required data-media-file-input>
+        </label>
         <label>Віртуальна папка
             <input name="folder" list="mediaFolderOptions" placeholder="Наприклад: Герої, Документи, Новини">
         </label>
@@ -47,26 +54,35 @@
     <?= \App\Core\Csrf::field() ?>
 </form>
 <div id="mediaListPanel" class="list-panel" data-infinite-list data-list-url="<?= url('/admin/media') ?>" data-list-target="#mediaRows" data-list-offset="<?= e((string) count($items)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($items) < $total ? '1' : '0' ?>" data-list-empty-label="файли" data-media-metadata-url="<?= url('/admin/media/metadata') ?>">
-    <div class="list-tools">
-        <input data-filter-input type="search" value="<?= e($query ?? '') ?>" placeholder="Пошук файлів" aria-label="Пошук медіафайлів">
-        <select name="folder" data-list-filter data-media-folder-filter aria-label="Віртуальна папка">
-            <option value="">Усі папки</option>
-            <option value="__none" <?= ($folder ?? '') === '__none' ? 'selected' : '' ?>>Без папки</option>
-            <?php foreach (($folders ?? []) as $folderName): ?>
-                <option value="<?= e((string) $folderName) ?>" <?= selected($folder ?? '', (string) $folderName) ?>><?= e((string) $folderName) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <div class="admin-view-switch" role="group" aria-label="Режим перегляду медіафайлів">
-            <button class="button secondary compact" type="button" data-media-view="list" title="Список"><span class="mdi mdi-format-list-bulleted" aria-hidden="true"></span></button>
-            <button class="button secondary compact" type="button" data-media-view="grid" title="Великі превʼю"><span class="mdi mdi-view-grid-outline" aria-hidden="true"></span></button>
+    <div class="list-tools list-tools-modern media-list-tools">
+        <div class="list-filter-bar">
+            <label class="list-search-field">
+                <span class="mdi mdi-magnify" aria-hidden="true"></span>
+                <input data-filter-input type="search" value="<?= e($query ?? '') ?>" placeholder="Пошук за назвою або шляхом" aria-label="Пошук медіафайлів">
+            </label>
+            <label class="list-select-field list-select-field-wide">
+                <span class="mdi mdi-folder-outline" aria-hidden="true"></span>
+                <select name="folder" data-list-filter data-media-folder-filter aria-label="Віртуальна папка">
+                    <option value="">Усі папки</option>
+                    <option value="__none" <?= ($folder ?? '') === '__none' ? 'selected' : '' ?>>Без папки</option>
+                    <?php foreach (($folders ?? []) as $folderName): ?>
+                        <option value="<?= e((string) $folderName) ?>" <?= selected($folder ?? '', (string) $folderName) ?>><?= e((string) $folderName) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <div class="admin-view-switch" role="group" aria-label="Режим перегляду медіафайлів">
+                <button class="button secondary compact" type="button" data-media-view="list" title="Список" aria-label="Список"><span class="mdi mdi-format-list-bulleted" aria-hidden="true"></span></button>
+                <button class="button secondary compact" type="button" data-media-view="grid" title="Великі превʼю" aria-label="Великі превʼю"><span class="mdi mdi-view-grid-outline" aria-hidden="true"></span></button>
+            </div>
         </div>
-        <div class="bulk-actions">
+        <div class="bulk-actions list-bulk-modern media-bulk-actions">
             <select name="bulk_action" form="mediaBulkForm" aria-label="Групова дія">
                 <option value="">Групова дія</option>
                 <option value="delete">Видалити</option>
             </select>
             <button class="button secondary compact" type="submit" form="mediaBulkForm"><span class="mdi mdi-check" aria-hidden="true"></span><span>Застосувати</span></button>
-            <span class="meta"><span data-filter-count><?= e((string) $total) ?></span> файлів · <span data-media-stat="size"><?= e($stats['size']) ?></span></span>
+            <span class="list-count-pill"><span data-filter-count><?= e((string) $total) ?></span> файлів · <span data-media-stat="size"><?= e($stats['size']) ?></span></span>
+            <span class="media-selected-count" data-media-selected-count hidden>0 вибрано</span>
         </div>
     </div>
     <div class="table-scroll">

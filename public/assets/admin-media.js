@@ -5,6 +5,9 @@ let mediaPreviewModal = null;
 let mediaMetadataModal = null;
 
 initMediaViewMode();
+initMediaUploadField();
+initMediaRowsObserver();
+updateMediaSelectedCount();
 
 document.addEventListener('click', function (event) {
     const viewButton = event.target.closest('[data-media-view]');
@@ -66,6 +69,18 @@ document.addEventListener('click', function (event) {
     mediaPreviewModal.show();
 });
 
+document.addEventListener('change', function (event) {
+    const fileInput = event.target.closest('[data-media-file-input]');
+    if (fileInput) {
+        updateMediaFileLabel(fileInput);
+        return;
+    }
+
+    if (event.target.closest('[data-bulk-check], [data-bulk-check-all]')) {
+        window.setTimeout(updateMediaSelectedCount, 0);
+    }
+});
+
 document.addEventListener('submit', async function (event) {
     const form = event.target.closest('form[data-media-upload], form[data-media-delete], form[data-media-metadata-form]');
     if (!form || event.defaultPrevented) {
@@ -125,6 +140,10 @@ document.addEventListener('submit', async function (event) {
 
         if (form.matches('[data-media-upload]')) {
             form.reset();
+            const fileInput = form.querySelector('[data-media-file-input]');
+            if (fileInput) {
+                updateMediaFileLabel(fileInput);
+            }
         }
         if (form.matches('[data-media-metadata-form]') && mediaMetadataModal) {
             mediaMetadataModal.hide();
@@ -197,6 +216,7 @@ function updateMediaList(panel, data) {
     if (Array.isArray(data.folders)) {
         updateFolderFilters(data.folders);
     }
+    updateMediaSelectedCount();
 }
 
 function updateFolderFilters(folders) {
@@ -238,6 +258,73 @@ function setMediaMessage(message, isError) {
 function initMediaViewMode() {
     const mode = window.localStorage ? (localStorage.getItem('adminMediaViewMode') || 'list') : 'list';
     setMediaViewMode(mode === 'grid' ? 'grid' : 'list', false);
+}
+
+function initMediaUploadField() {
+    document.querySelectorAll('[data-media-file-input]').forEach(function (input) {
+        const label = input.closest('.media-file-drop');
+        if (label) {
+            label.addEventListener('dragover', function (event) {
+                event.preventDefault();
+                label.classList.add('is-dragover');
+            });
+            label.addEventListener('dragleave', function () {
+                label.classList.remove('is-dragover');
+            });
+            label.addEventListener('drop', function (event) {
+                const files = event.dataTransfer ? event.dataTransfer.files : null;
+                if (!files || !files.length) {
+                    return;
+                }
+
+                event.preventDefault();
+                input.files = files;
+                label.classList.remove('is-dragover');
+                updateMediaFileLabel(input);
+            });
+        }
+        updateMediaFileLabel(input);
+    });
+}
+
+function initMediaRowsObserver() {
+    const rows = document.getElementById('mediaRows');
+    if (!rows || !window.MutationObserver) {
+        return;
+    }
+
+    const observer = new MutationObserver(updateMediaSelectedCount);
+    observer.observe(rows, {childList: true});
+}
+
+function updateMediaFileLabel(input) {
+    const label = input.closest('.media-file-drop');
+    const target = label ? label.querySelector('[data-media-file-label]') : null;
+    const file = input.files && input.files[0] ? input.files[0] : null;
+    if (!target) {
+        return;
+    }
+
+    target.textContent = file ? file.name : 'Оберіть файл або перетягніть його сюди';
+    if (label) {
+        label.classList.toggle('has-file', Boolean(file));
+    }
+}
+
+function updateMediaSelectedCount() {
+    const node = document.querySelector('[data-media-selected-count]');
+    const form = document.getElementById('mediaBulkForm');
+    if (!node || !form) {
+        return;
+    }
+
+    const selected = document.querySelectorAll('[data-bulk-check][form="' + form.id + '"]:checked').length;
+    node.textContent = selected + ' вибрано';
+    node.hidden = selected === 0;
+    document.querySelectorAll('[data-list-row]').forEach(function (row) {
+        const checkbox = row.querySelector('[data-bulk-check]');
+        row.classList.toggle('is-selected', Boolean(checkbox && checkbox.checked));
+    });
 }
 
 function setMediaViewMode(mode, persist) {

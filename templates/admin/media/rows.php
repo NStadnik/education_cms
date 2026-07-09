@@ -41,17 +41,17 @@
         </td>
         <td>
             <div class="form-actions">
-                <button class="button secondary compact" type="button" data-media-metadata data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>" data-folder="<?= e((string) ($item['folder'] ?? '')) ?>" data-alt-text="<?= e((string) ($item['alt_text'] ?? '')) ?>" data-title="<?= e((string) ($item['title'] ?? '')) ?>" data-caption="<?= e((string) ($item['caption'] ?? '')) ?>" data-description="<?= e((string) ($item['description'] ?? '')) ?>">
-                    <span class="mdi mdi-pencil-outline" aria-hidden="true"></span><span>Метадані</span>
+                <button class="button secondary compact media-row-action" type="button" data-media-metadata title="Метадані" aria-label="Редагувати метадані файлу <?= e($item['name']) ?>" data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>" data-folder="<?= e((string) ($item['folder'] ?? '')) ?>" data-alt-text="<?= e((string) ($item['alt_text'] ?? '')) ?>" data-title="<?= e((string) ($item['title'] ?? '')) ?>" data-caption="<?= e((string) ($item['caption'] ?? '')) ?>" data-description="<?= e((string) ($item['description'] ?? '')) ?>">
+                    <span class="mdi mdi-pencil-outline" aria-hidden="true"></span><span class="media-action-label">Метадані</span>
                 </button>
-                <button class="button secondary compact" type="button" data-media-preview data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-type="<?= e($item['type']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>" data-alt-text="<?= e((string) ($item['alt_text'] ?? '')) ?>" data-title="<?= e((string) ($item['title'] ?? '')) ?>" data-caption="<?= e((string) ($item['caption'] ?? '')) ?>" data-description="<?= e((string) ($item['description'] ?? '')) ?>">
-                    <span class="mdi mdi-eye-outline" aria-hidden="true"></span><span>Переглянути</span>
+                <button class="button secondary compact media-row-action" type="button" data-media-preview title="Переглянути" aria-label="Переглянути файл <?= e($item['name']) ?>" data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-type="<?= e($item['type']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>" data-alt-text="<?= e((string) ($item['alt_text'] ?? '')) ?>" data-title="<?= e((string) ($item['title'] ?? '')) ?>" data-caption="<?= e((string) ($item['caption'] ?? '')) ?>" data-description="<?= e((string) ($item['description'] ?? '')) ?>">
+                    <span class="mdi mdi-eye-outline" aria-hidden="true"></span><span class="media-action-label">Переглянути</span>
                 </button>
                 <?php if (empty($item['is_used'])): ?>
                     <form method="post" action="<?= url('/admin/media/delete') ?>" data-media-delete>
                         <?= \App\Core\Csrf::field() ?>
                         <input type="hidden" name="path" value="<?= e($item['path']) ?>">
-                        <button class="button danger compact" type="submit"><span class="mdi mdi-trash-can-outline" aria-hidden="true"></span><span>Видалити</span></button>
+                        <button class="button danger compact media-row-action" type="submit" title="Видалити" aria-label="Видалити файл <?= e($item['name']) ?>"><span class="mdi mdi-trash-can-outline" aria-hidden="true"></span><span class="media-action-label">Видалити</span></button>
                     </form>
                 <?php endif; ?>
             </div>
