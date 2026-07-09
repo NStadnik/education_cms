@@ -17,9 +17,13 @@ abstract class AdminBaseController extends BaseController
 {
     protected const LIST_LIMIT = 20;
     protected const IMPORT_TITLE_LIMIT = 220;
+    protected const WP_CONTENT_MEDIA_LIMIT = 20;
+    protected const WP_CONTENT_MEDIA_SECONDS = 20;
+    protected const IMPORT_DOWNLOAD_TIMEOUT = 8;
 
     protected array $lastImportStats = [];
     protected array $lastWordPressMediaPaths = [];
+    protected ?array $importedMediaPathIndex = null;
 
     protected function guard(?string $permission = null): void
     {
@@ -521,6 +525,8 @@ abstract class AdminBaseController extends BaseController
         }
         $wpCategories = $this->wordPressCategoriesForPosts($pdo, $prefix, array_map(static fn (array $row): int => (int) $row['ID'], $posts));
         $builderMeta = $this->wordPressBuilderMeta($pdo, $prefix, array_map(static fn (array $row): int => (int) $row['ID'], $posts));
+        $contentMediaRemaining = $this->wordPressContentMediaLimit($request);
+        $contentMediaDeadline = microtime(true) + $this->wordPressContentMediaSeconds($request);
 
         $rows = [];
         foreach ($posts as $row) {
@@ -536,8 +542,9 @@ abstract class AdminBaseController extends BaseController
                 $body = str_replace(array_keys($mediaMap), array_values($mediaMap), $body);
             }
             if (!$preview && $body !== '' && $this->shouldImportWordPressMedia($request)) {
-                $body = $this->replaceWordPressContentMediaUrls($body, $request);
+                $body = $this->replaceWordPressContentMediaUrls($body, $request, $contentMediaRemaining, $contentMediaDeadline);
             }
+            $body = $this->normalizeImportedContent($body);
             $categories = $wpCategories[(int) ($row['ID'] ?? 0)] ?? [];
             $categoryNames = array_map(static fn (array $category): string => (string) $category['title'], $categories);
             $thumbnailId = (int) ($row['thumbnail_id'] ?? 0);
@@ -598,6 +605,347 @@ abstract class AdminBaseController extends BaseController
         }
 
         return $meta;
+    }
+
+    protected function normalizeImportedContent(string $html): string
+    {
+        $html = trim($html);
+        if ($html === '' || !$this->looksLikeWordPressContent($html)) {
+            return $html;
+        }
+
+        $html = preg_replace('/<!--\s*\/?wp:[\s\S]*?-->/u', '', $html) ?? $html;
+        $html = preg_replace('/(?:\xC2\xA0|&nbsp;|&#160;)+/i', ' ', $html) ?? $html;
+
+        if (!class_exists(\DOMDocument::class)) {
+            return $this->normalizeImportedContentFallback($html);
+        }
+
+        $previous = libxml_use_internal_errors(true);
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $loaded = $dom->loadHTML(
+            '<?xml encoding="UTF-8"><div id="import-content-root">' . $html . '</div>',
+            LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
+        );
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        if (!$loaded) {
+            return trim($html);
+        }
+
+        $root = $dom->getElementById('import-content-root');
+        if (!$root) {
+            return trim($html);
+        }
+
+        $this->normalizeWordPressGalleries($dom, $root);
+        $this->normalizeWordPressImageFigures($dom, $root);
+        $this->normalizeWordPressBulletParagraphs($dom, $root);
+        $this->normalizeImportedClasses($root);
+
+        return $this->domInnerHtml($root);
+    }
+
+    protected function looksLikeWordPressContent(string $html): bool
+    {
+        return str_contains($html, '<!-- wp:')
+            || str_contains($html, 'wp-block-')
+            || str_contains($html, 'wp-image-')
+            || preg_match('/<p\b[^>]*>\s*(?:&middot;|&#183;|·|•)\s*/iu', $html) === 1;
+    }
+
+    protected function normalizeImportedContentFallback(string $html): string
+    {
+        $html = preg_replace('/\sclass=(["\'])(?=[^"\']*\bwp-)[^"\']*\1/i', '', $html) ?? $html;
+        $html = preg_replace('/<figure\b[^>]*class=(["\'])[^"\']*\bwp-block-gallery\b[^"\']*\1[^>]*>/i', '<div class="rich-gallery rich-gallery-cols-3">', $html) ?? $html;
+        $html = preg_replace('/<\/figure>\s*$/i', '</div>', trim($html)) ?? $html;
+        return trim($html);
+    }
+
+    protected function normalizeWordPressGalleries(\DOMDocument $dom, \DOMElement $root): void
+    {
+        $xpath = new \DOMXPath($dom);
+        $galleries = iterator_to_array($xpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " wp-block-gallery ")]', $root) ?: []);
+        foreach ($galleries as $gallery) {
+            if (!$gallery instanceof \DOMElement || !$gallery->parentNode) {
+                continue;
+            }
+
+            $images = iterator_to_array($xpath->query('.//img', $gallery) ?: []);
+            if (!$images) {
+                continue;
+            }
+
+            $container = $dom->createElement('div');
+            $container->setAttribute('class', 'rich-gallery rich-gallery-cols-' . $this->importedGalleryColumns($gallery, count($images)));
+            foreach ($images as $image) {
+                if ($image instanceof \DOMElement) {
+                    $container->appendChild($this->importedImageFigure($dom, $image));
+                }
+            }
+
+            $gallery->parentNode->replaceChild($container, $gallery);
+        }
+    }
+
+    protected function importedGalleryColumns(\DOMElement $gallery, int $imageCount): int
+    {
+        $classes = ' ' . $gallery->getAttribute('class') . ' ';
+        if (preg_match('/\bcolumns-([2-4])\b/', $classes, $match) === 1) {
+            return (int) $match[1];
+        }
+
+        if ($imageCount <= 2) {
+            return 2;
+        }
+
+        return $imageCount === 4 ? 4 : 3;
+    }
+
+    protected function normalizeWordPressImageFigures(\DOMDocument $dom, \DOMElement $root): void
+    {
+        $xpath = new \DOMXPath($dom);
+        $figures = iterator_to_array($xpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " wp-block-image ")]', $root) ?: []);
+        foreach ($figures as $figure) {
+            if (!$figure instanceof \DOMElement) {
+                continue;
+            }
+
+            $figure->setAttribute('class', $this->mergeImportedClasses($figure->getAttribute('class'), ['rich-media-block']));
+            $image = $xpath->query('.//img', $figure)->item(0);
+            if ($image instanceof \DOMElement) {
+                $image->removeAttribute('class');
+                $this->normalizeImportedImageLink($dom, $image);
+            }
+        }
+    }
+
+    protected function importedImageFigure(\DOMDocument $dom, \DOMElement $sourceImage): \DOMElement
+    {
+        $figure = $dom->createElement('figure');
+        $href = $this->importedImageHref($sourceImage);
+        $image = $dom->createElement('img');
+        foreach (['src', 'alt', 'width', 'height'] as $attribute) {
+            if ($sourceImage->hasAttribute($attribute)) {
+                $image->setAttribute($attribute, $sourceImage->getAttribute($attribute));
+            }
+        }
+        if ($href !== '') {
+            $image->setAttribute('src', $this->importedImagePreviewSrc($href));
+        }
+        if (!$image->hasAttribute('alt')) {
+            $image->setAttribute('alt', '');
+        }
+        if ($href !== '') {
+            $link = $dom->createElement('a');
+            $link->setAttribute('href', $href);
+            $link->appendChild($image);
+            $figure->appendChild($link);
+        } else {
+            $figure->appendChild($image);
+        }
+        return $figure;
+    }
+
+    protected function normalizeImportedImageLink(\DOMDocument $dom, \DOMElement $image): void
+    {
+        $href = $this->importedImageHref($image);
+        if ($href === '') {
+            return;
+        }
+
+        $image->setAttribute('src', $this->importedImagePreviewSrc($href));
+        $parent = $image->parentNode;
+        if ($parent instanceof \DOMElement && strtolower($parent->tagName) === 'a') {
+            $parent->setAttribute('href', $href);
+            return;
+        }
+
+        $link = $dom->createElement('a');
+        $link->setAttribute('href', $href);
+        $parent?->insertBefore($link, $image);
+        $link->appendChild($image);
+    }
+
+    protected function importedImageHref(\DOMElement $image): string
+    {
+        $src = trim($image->getAttribute('src'));
+        $parent = $image->parentNode;
+        $href = '';
+        if ($parent instanceof \DOMElement && strtolower($parent->tagName) === 'a') {
+            $href = trim($parent->getAttribute('href'));
+        }
+
+        if ($src !== '' && $this->importedImageUrlIsUsable($src)) {
+            return $src;
+        }
+
+        if ($href !== '' && $this->importedImageUrlIsUsable($href)) {
+            return $href;
+        }
+
+        return $src !== '' ? $src : $href;
+    }
+
+    protected function importedImageUrlIsUsable(string $url): bool
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') {
+            $path = $url;
+        }
+
+        return preg_match('/\.(?:jpe?g|png|webp)$/i', $path) === 1;
+    }
+
+    protected function importedImagePreviewSrc(string $url): string
+    {
+        if (!str_starts_with($url, '/uploads/')) {
+            return $url;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') {
+            return $url;
+        }
+
+        $marker = '/uploads/';
+        if (!str_starts_with($path, $marker)) {
+            return $url;
+        }
+
+        $relative = Files::normalize(rawurldecode(substr($path, strlen($marker))));
+        if ($relative === '') {
+            return $url;
+        }
+
+        return url('/thumb/' . $relative . '?w=960&h=720&fit=contain');
+    }
+
+    protected function normalizeWordPressBulletParagraphs(\DOMDocument $dom, \DOMElement $root): void
+    {
+        $this->normalizeWordPressBulletParagraphsInNode($dom, $root);
+    }
+
+    protected function normalizeWordPressBulletParagraphsInNode(\DOMDocument $dom, \DOMNode $parent): void
+    {
+        $children = iterator_to_array($parent->childNodes);
+        $list = null;
+        foreach ($children as $child) {
+            if (!$child instanceof \DOMElement) {
+                if ($child->nodeType !== XML_TEXT_NODE || trim((string) $child->nodeValue) !== '') {
+                    $list = null;
+                }
+                continue;
+            }
+
+            $this->normalizeWordPressBulletParagraphsInNode($dom, $child);
+            if (strtolower($child->tagName) !== 'p') {
+                $list = null;
+                continue;
+            }
+
+            $html = $this->domInnerHtml($child);
+            $stripped = preg_replace('/^\s*(?:&middot;|&#183;|·|•)\s*/iu', '', $html);
+            if ($stripped === null || $stripped === $html) {
+                $list = null;
+                continue;
+            }
+
+            if (!$list || !$list->parentNode) {
+                $list = $dom->createElement('ul');
+                $parent->insertBefore($list, $child);
+            }
+
+            $li = $dom->createElement('li');
+            foreach (iterator_to_array($child->childNodes) as $paragraphChild) {
+                $li->appendChild($paragraphChild->cloneNode(true));
+            }
+            $this->stripLeadingBulletMarker($li);
+            $list->appendChild($li);
+            $parent->removeChild($child);
+        }
+    }
+
+    protected function stripLeadingBulletMarker(\DOMNode $node): bool
+    {
+        foreach (iterator_to_array($node->childNodes) as $child) {
+            if ($child->nodeType === XML_TEXT_NODE) {
+                $text = (string) $child->nodeValue;
+                if (trim($text) === '') {
+                    $child->nodeValue = '';
+                    continue;
+                }
+
+                $clean = preg_replace('/^\s*(?:·|•)\s*/u', '', $text, 1, $count);
+                if ($count > 0) {
+                    $child->nodeValue = $clean ?? $text;
+                    return true;
+                }
+
+                return false;
+            }
+
+            if ($child instanceof \DOMElement && $this->stripLeadingBulletMarker($child)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function normalizeImportedClasses(\DOMElement $root): void
+    {
+        $nodes = [$root];
+        foreach ($root->getElementsByTagName('*') as $node) {
+            $nodes[] = $node;
+        }
+
+        foreach ($nodes as $node) {
+            if (!$node instanceof \DOMElement || !$node->hasAttribute('class')) {
+                continue;
+            }
+
+            $classes = $this->filterImportedClasses($node->getAttribute('class'));
+            if ($classes === '') {
+                $node->removeAttribute('class');
+            } else {
+                $node->setAttribute('class', $classes);
+            }
+        }
+    }
+
+    protected function filterImportedClasses(string $classes): string
+    {
+        $keep = [];
+        foreach (preg_split('/\s+/', trim($classes)) ?: [] as $class) {
+            $class = preg_replace('/[^a-zA-Z0-9_-]/', '', $class) ?? '';
+            if ($class === ''
+                || str_starts_with($class, 'wp-')
+                || str_starts_with($class, 'wp_')
+                || preg_match('/^(wp-image-\d+|size-\w+|columns-\w+|is-\w+|has-nested-images)$/', $class) === 1) {
+                continue;
+            }
+            $keep[$class] = true;
+        }
+
+        return implode(' ', array_keys($keep));
+    }
+
+    protected function mergeImportedClasses(string $classes, array $extra): string
+    {
+        $filtered = $this->filterImportedClasses($classes);
+        $merged = array_filter(array_merge(preg_split('/\s+/', $filtered) ?: [], $extra));
+        return implode(' ', array_values(array_unique($merged)));
+    }
+
+    protected function domInnerHtml(\DOMNode $node): string
+    {
+        $html = '';
+        foreach ($node->childNodes as $child) {
+            $html .= $node->ownerDocument?->saveHTML($child) ?: '';
+        }
+
+        return trim($html);
     }
 
     protected function wordPressBuilderContent(array $meta): string
@@ -985,7 +1333,7 @@ abstract class AdminBaseController extends BaseController
         $siteUrl = rtrim(trim((string) $request->input('wp_site_url', '')), '/');
         $uploadsPath = rtrim(trim((string) $request->input('wp_uploads_path', '')), '/\\');
         $offset = max(0, (int) $request->input('wp_media_offset', 0));
-        $maxLimit = $download ? 5000 : 50000;
+        $maxLimit = $download ? 100 : 50000;
         $limitInput = $request->input('wp_media_map_limit', $request->input('wp_media_limit', 1000));
         $limit = max(1, min($maxLimit, (int) $limitInput));
         $this->lastWordPressMediaPaths = [];
@@ -1439,9 +1787,17 @@ abstract class AdminBaseController extends BaseController
             if (is_file($local)) {
                 return $local;
             }
+
+            $originalRelative = $this->wordPressOriginalImageRelative($relativeSource);
+            if ($originalRelative !== $relativeSource) {
+                $localOriginal = $uploadsPath . '/' . $originalRelative;
+                if (is_file($localOriginal)) {
+                    return $localOriginal;
+                }
+            }
         }
 
-        if ($sourceUrl !== '') {
+        if ($sourceUrl !== '' && preg_match('/^https?:\/\//i', $sourceUrl)) {
             return $sourceUrl;
         }
 
@@ -1452,7 +1808,36 @@ abstract class AdminBaseController extends BaseController
         return '';
     }
 
-    protected function replaceWordPressContentMediaUrls(string $content, Request $request): string
+    protected function wordPressOriginalImageRelative(string $relative): string
+    {
+        $extension = pathinfo($relative, PATHINFO_EXTENSION);
+        if ($extension === '' || !in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            return $relative;
+        }
+
+        $dirname = trim(str_replace('\\', '/', pathinfo($relative, PATHINFO_DIRNAME)), '.');
+        $filename = pathinfo($relative, PATHINFO_FILENAME);
+        $original = preg_replace('/-\d{2,5}x\d{2,5}$/', '', $filename) ?? $filename;
+        if ($original === $filename) {
+            return $relative;
+        }
+
+        return Files::normalize(($dirname !== '' ? $dirname . '/' : '') . $original . '.' . $extension);
+    }
+
+    protected function wordPressContentMediaLimit(Request $request): int
+    {
+        $limit = (int) $request->input('wp_content_media_limit', self::WP_CONTENT_MEDIA_LIMIT);
+        return max(0, min(100, $limit));
+    }
+
+    protected function wordPressContentMediaSeconds(Request $request): int
+    {
+        $seconds = (int) $request->input('wp_content_media_seconds', self::WP_CONTENT_MEDIA_SECONDS);
+        return max(5, min(60, $seconds));
+    }
+
+    protected function replaceWordPressContentMediaUrls(string $content, Request $request, int &$remainingDownloads, float $deadline): string
     {
         $urls = $this->wordPressContentMediaUrls($content);
         if (!$urls) {
@@ -1467,27 +1852,36 @@ abstract class AdminBaseController extends BaseController
             if ($relative === '') {
                 continue;
             }
+            $targetRelative = $this->wordPressOriginalImageRelative($relative);
+            $sourceUrl = $this->absoluteWordPressMediaUrl($url, $siteUrl);
 
-            $sourceUrl = str_starts_with($url, '//') ? 'https:' . $url : $url;
-            $source = $this->wordPressMediaSource($relative, $sourceUrl, $siteUrl, $uploadsPath);
-            if ($source === '') {
-                continue;
+            $savedPath = $this->saveImportedMedia('', $targetRelative, $sourceUrl, $this->wordPressContentMediaId($targetRelative), false);
+            if ($savedPath === '') {
+                if ($remainingDownloads <= 0 || microtime(true) >= $deadline) {
+                    $this->lastImportStats['content_media_deferred'] = (int) ($this->lastImportStats['content_media_deferred'] ?? 0) + 1;
+                    continue;
+                }
+
+                $remainingDownloads--;
+                $source = $this->wordPressMediaSource($relative, $sourceUrl, $siteUrl, $uploadsPath);
+                if ($source === '') {
+                    continue;
+                }
+
+                $savedPath = $this->saveImportedMedia($source, $targetRelative, $sourceUrl, $this->wordPressContentMediaId($targetRelative));
             }
-
-            $savedPath = $this->saveImportedMedia($source, $relative, $sourceUrl, $this->wordPressContentMediaId($relative));
             if ($savedPath === '') {
                 continue;
             }
 
+            $this->lastImportStats['content_media_imported'] = (int) ($this->lastImportStats['content_media_imported'] ?? 0) + 1;
             $newUrl = url('/uploads/' . $savedPath);
-            $replacements[$url] = $newUrl;
-            $decodedUrl = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            if ($decodedUrl !== $url) {
-                $replacements[$decodedUrl] = $newUrl;
+            $variants = $this->wordPressContentUrlVariants($url, $siteUrl);
+            if ($targetRelative !== $relative) {
+                $variants = array_merge($variants, $this->wordPressContentUrlVariants('/wp-content/uploads/' . $targetRelative, $siteUrl));
             }
-            $encodedUrl = htmlspecialchars($decodedUrl, ENT_QUOTES, 'UTF-8');
-            if ($encodedUrl !== $url && $encodedUrl !== $decodedUrl) {
-                $replacements[$encodedUrl] = $newUrl;
+            foreach ($variants as $variant) {
+                $replacements[$variant] = $newUrl;
             }
         }
 
@@ -1500,13 +1894,66 @@ abstract class AdminBaseController extends BaseController
         $urls = [];
         foreach ($matches[0] ?? [] as $url) {
             $url = trim(html_entity_decode((string) $url, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-            $url = rtrim($url, " \t\n\r\0\x0B'\"),.;");
+            $url = $this->cleanWordPressContentMediaUrl($url);
             if ($url !== '') {
                 $urls[$url] = true;
             }
         }
 
         return array_keys($urls);
+    }
+
+    protected function cleanWordPressContentMediaUrl(string $url): string
+    {
+        $url = trim($url);
+        $url = preg_replace('/\s+\d+[wx]\s*$/i', '', $url) ?? $url;
+        $url = rtrim($url, " \t\n\r\0\x0B'\"),.;");
+        return $url;
+    }
+
+    protected function absoluteWordPressMediaUrl(string $url, string $siteUrl): string
+    {
+        if (str_starts_with($url, '//')) {
+            return 'https:' . $url;
+        }
+
+        if (preg_match('/^https?:\/\//i', $url)) {
+            return $url;
+        }
+
+        if ($siteUrl !== '' && str_starts_with($url, '/')) {
+            return rtrim($siteUrl, '/') . $url;
+        }
+
+        return $url;
+    }
+
+    protected function wordPressContentUrlVariants(string $url, string $siteUrl): array
+    {
+        $decodedUrl = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $variants = [$url, $decodedUrl];
+
+        $encodedUrl = htmlspecialchars($decodedUrl, ENT_QUOTES, 'UTF-8');
+        $variants[] = $encodedUrl;
+
+        $absoluteUrl = $this->absoluteWordPressMediaUrl($decodedUrl, $siteUrl);
+        if ($absoluteUrl !== $decodedUrl) {
+            $variants[] = $absoluteUrl;
+            $variants[] = htmlspecialchars($absoluteUrl, ENT_QUOTES, 'UTF-8');
+        }
+
+        $alternateUrl = $this->toggleScheme($absoluteUrl);
+        if ($alternateUrl !== '') {
+            $variants[] = $alternateUrl;
+            $variants[] = htmlspecialchars($alternateUrl, ENT_QUOTES, 'UTF-8');
+        }
+
+        $path = parse_url($absoluteUrl, PHP_URL_PATH);
+        if (is_string($path) && $path !== '') {
+            $variants[] = $path;
+        }
+
+        return array_values(array_unique(array_filter($variants, static fn (string $variant): bool => trim($variant) !== '')));
     }
 
     protected function wordPressUploadsRelativeFromUrl(string $url): string
@@ -1541,17 +1988,26 @@ abstract class AdminBaseController extends BaseController
         $safeName = preg_replace('/[^a-zA-Z0-9._-]+/', '-', pathinfo($name, PATHINFO_FILENAME)) ?: 'file';
         $targetRelative = date('Y/m/') . 'wp-' . $id . '-' . $safeName . '.' . $extension;
         $target = base_path('storage/uploads/' . $targetRelative);
-        if (!is_dir(dirname($target))) {
-            mkdir(dirname($target), 0775, true);
-        }
         if (is_file($target)) {
             return $targetRelative;
         }
+
+        $existingPath = $this->existingImportedMediaPath($safeName, $extension);
+        if ($existingPath !== '') {
+            return $existingPath;
+        }
+
         if (!$download) {
             return '';
         }
+        if (!is_dir(dirname($target))) {
+            mkdir(dirname($target), 0775, true);
+        }
 
-        $context = stream_context_create(['http' => ['timeout' => 30], 'https' => ['timeout' => 30]]);
+        $context = stream_context_create([
+            'http' => ['timeout' => self::IMPORT_DOWNLOAD_TIMEOUT],
+            'https' => ['timeout' => self::IMPORT_DOWNLOAD_TIMEOUT],
+        ]);
         $sourceStream = is_file($source) ? @fopen($source, 'rb') : @fopen($source, 'rb', false, $context);
         if (!$sourceStream) {
             return '';
@@ -1571,7 +2027,70 @@ abstract class AdminBaseController extends BaseController
             return '';
         }
 
+        if ($this->importedMediaPathIndex !== null) {
+            $this->addImportedMediaPathIndexEntry($this->importedMediaPathIndex, basename($targetRelative), $targetRelative);
+            $this->addImportedMediaPathIndexEntry($this->importedMediaPathIndex, $safeName . '.' . $extension, $targetRelative);
+        }
+
         return $targetRelative;
+    }
+
+    protected function existingImportedMediaPath(string $safeName, string $extension): string
+    {
+        $needle = strtolower($safeName . '.' . $extension);
+        $index = $this->importedMediaPathIndex();
+        return (string) ($index[$needle] ?? '');
+    }
+
+    protected function importedMediaPathIndex(): array
+    {
+        if ($this->importedMediaPathIndex !== null) {
+            return $this->importedMediaPathIndex;
+        }
+
+        $root = base_path('storage/uploads');
+        if (!is_dir($root)) {
+            return $this->importedMediaPathIndex = [];
+        }
+
+        $index = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file instanceof \SplFileInfo || !$file->isFile()) {
+                continue;
+            }
+
+            $extension = strtolower($file->getExtension());
+            if (!in_array($extension, ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'webp'], true)) {
+                continue;
+            }
+
+            $relative = Files::normalize(str_replace('\\', '/', substr($file->getPathname(), strlen($root) + 1)));
+            if ($relative === '') {
+                continue;
+            }
+
+            $basename = $file->getBasename();
+            $this->addImportedMediaPathIndexEntry($index, $basename, $relative);
+            if (preg_match('/^wp-\d+-(.+)$/i', $basename, $match) === 1) {
+                $this->addImportedMediaPathIndexEntry($index, (string) $match[1], $relative);
+            }
+        }
+
+        return $this->importedMediaPathIndex = $index;
+    }
+
+    protected function addImportedMediaPathIndexEntry(array &$index, string $basename, string $relative): void
+    {
+        $key = strtolower(trim($basename));
+        if ($key === '' || isset($index[$key])) {
+            return;
+        }
+
+        $index[$key] = $relative;
     }
 
     protected function wordPressMediaAliases(string $relativeSource, string $sourceUrl, string $siteUrl, string $metadata, string $attachmentSlug, int $attachmentId): array
@@ -1887,7 +2406,7 @@ abstract class AdminBaseController extends BaseController
                 $title,
                 $category,
                 $imagePath !== '' ? $imagePath : null,
-                $this->importValue($row, ['body', 'text', 'контент', 'текст', 'опис']),
+                $this->normalizeImportedContent($this->importValue($row, ['body', 'text', 'контент', 'текст', 'опис'])),
                 $status,
                 $publishedAt ?: null,
                 $now,
@@ -2045,7 +2564,7 @@ abstract class AdminBaseController extends BaseController
             if (!array_key_exists($template, $this->pageTemplates())) {
                 $template = 'default';
             }
-            $body = $this->importValue($row, ['body', 'blocks_text', 'text', 'контент', 'текст', 'опис']);
+            $body = $this->normalizeImportedContent($this->importValue($row, ['body', 'blocks_text', 'text', 'контент', 'текст', 'опис']));
             $blocks = json_encode($this->blocksFromText($body, false), JSON_UNESCAPED_UNICODE);
 
             $data = [

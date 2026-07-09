@@ -166,11 +166,15 @@ img { max-width: 100%; height: auto; }
 .rich-content h2, .rich-content h3, .rich-content h4 { margin: 18px 0 10px; }
 .rich-content img { display: block; max-width: 100%; height: auto; margin: 14px 0; border-radius: 6px; }
 .justify { text-align: justify; }
+.has-text-align-left { text-align: left; }
+.has-text-align-center { text-align: center; }
+.has-text-align-right { text-align: right; }
 .rich-media-block { margin: 0 0 16px; }
 .rich-media-block img { display: block; width: 100%; margin: 0; border-radius: 6px; }
 .rich-media-block figcaption, .rich-gallery-caption { margin: 7px 0 16px; color: var(--muted); font-size: 14px; text-align: center; }
 .rich-gallery { display: grid; gap: 10px; margin: 0 0 16px; }
 .rich-gallery figure { margin: 0; }
+.rich-gallery a, .rich-media-block a { display: block; }
 .rich-gallery img { display: block; width: 100%; aspect-ratio: 4 / 3; margin: 0; object-fit: cover; border-radius: 6px; }
 .rich-gallery-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .rich-gallery-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }

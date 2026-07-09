@@ -16,7 +16,12 @@
         searchTimer: null,
         bound: false,
         bookmark: null,
-        view: 'compact'
+        view: 'compact',
+        offset: 0,
+        limit: 80,
+        total: 0,
+        hasMore: false,
+        token: 0
     };
 
     function init(root) {
@@ -121,11 +126,18 @@
         modalNode.querySelector('[data-rich-media-mode]').value = 'single';
         modalNode.querySelector('[data-rich-media-align]').value = 'center';
         modalNode.querySelector('[data-rich-media-search]').value = '';
+        mediaState.offset = 0;
+        mediaState.total = 0;
+        mediaState.hasMore = false;
         setRichMediaView(localStorage.getItem('richMediaViewMode') || 'compact', false);
 
         mediaState.modal = window.bootstrap.Modal.getOrCreateInstance(modalNode);
         mediaState.modal.show();
-        loadMediaItems();
+        const modalBody = modalNode.querySelector('.modal-body');
+        if (modalBody) {
+            modalBody.scrollTop = 0;
+        }
+        loadMediaItems(false);
     }
 
     function bindMediaPicker(modalNode) {
@@ -136,7 +148,9 @@
 
         modalNode.querySelector('[data-rich-media-search]').addEventListener('input', function () {
             window.clearTimeout(mediaState.searchTimer);
-            mediaState.searchTimer = window.setTimeout(loadMediaItems, 250);
+            mediaState.searchTimer = window.setTimeout(function () {
+                loadMediaItems(false);
+            }, 250);
         });
         modalNode.querySelector('[data-rich-media-mode]').addEventListener('change', function () {
             if (this.value === 'single' && mediaState.selected.size > 1) {
@@ -161,23 +175,39 @@
         });
         modalNode.querySelector('[data-rich-media-insert]').addEventListener('click', insertSelectedMedia);
         modalNode.querySelector('[data-rich-media-upload]').addEventListener('change', uploadMediaFile);
+        const modalBody = modalNode.querySelector('.modal-body');
+        if (modalBody) {
+            modalBody.addEventListener('scroll', maybeLoadMoreMediaItems, {passive: true});
+        }
     }
 
-    async function loadMediaItems() {
+    async function loadMediaItems(append) {
+        if (mediaState.loading && append) {
+            return;
+        }
+
         const modalNode = document.getElementById('richMediaModal');
         const grid = modalNode.querySelector('[data-rich-media-grid]');
         const status = modalNode.querySelector('[data-rich-media-status]');
         const search = modalNode.querySelector('[data-rich-media-search]').value.trim();
         const url = new URL(adminBody ? (adminBody.dataset.richMediaPickerUrl || '/admin/media/picker') : '/admin/media/picker', window.location.origin);
-        url.searchParams.set('limit', '80');
+        const token = append ? mediaState.token : ++mediaState.token;
+        url.searchParams.set('limit', String(mediaState.limit));
+        url.searchParams.set('offset', append ? String(mediaState.offset) : '0');
         if (search !== '') {
             url.searchParams.set('q', search);
         }
 
         mediaState.loading = true;
-        status.textContent = 'Завантаження...';
-        grid.innerHTML = '';
-        updateSelectionPreview();
+        status.textContent = append ? 'Підвантаження...' : 'Завантаження...';
+        if (!append) {
+            mediaState.items = [];
+            mediaState.offset = 0;
+            mediaState.total = 0;
+            mediaState.hasMore = false;
+            grid.innerHTML = '';
+            updateSelectionPreview();
+        }
 
         try {
             const response = await fetch(url.toString(), {headers: {'X-Requested-With': 'XMLHttpRequest'}});
@@ -185,19 +215,55 @@
             if (!response.ok || !data.ok) {
                 throw new Error(data.message || 'Не вдалося завантажити медіафайли.');
             }
-            mediaState.items = data.items || [];
+            if (token !== mediaState.token) {
+                return;
+            }
+
+            const items = data.items || [];
+            mediaState.items = append ? mediaState.items.concat(items) : items;
+            mediaState.offset = Number(data.next_offset || 0);
+            mediaState.total = Number(data.total || 0);
+            mediaState.hasMore = Boolean(data.has_more);
             mediaState.items.forEach(function (item) {
                 if (mediaState.selected.has(item.path)) {
                     mediaState.selectedItems.set(item.path, item);
                 }
             });
             renderMediaItems();
-            status.textContent = mediaState.items.length ? 'Знайдено файлів: ' + data.total + '.' : 'Файлів не знайдено.';
+            status.textContent = mediaState.items.length
+                ? (mediaState.hasMore
+                    ? 'Показано файлів: ' + mediaState.items.length + ' з ' + mediaState.total + '. Прокрутіть нижче, щоб підвантажити ще.'
+                    : 'Знайдено файлів: ' + mediaState.items.length + '.')
+                : 'Файлів не знайдено.';
         } catch (error) {
-            status.textContent = error.message || 'Помилка завантаження.';
+            if (token === mediaState.token) {
+                status.textContent = error.message || 'Помилка завантаження.';
+            }
         } finally {
-            mediaState.loading = false;
+            if (token === mediaState.token) {
+                mediaState.loading = false;
+                queueMediaMoreCheck();
+            }
         }
+    }
+
+    function maybeLoadMoreMediaItems() {
+        if (!mediaState.hasMore || mediaState.loading) {
+            return;
+        }
+        const modalNode = document.getElementById('richMediaModal');
+        const modalBody = modalNode ? modalNode.querySelector('.modal-body') : null;
+        if (!modalBody) {
+            return;
+        }
+        const nearBottom = modalBody.scrollTop + modalBody.clientHeight >= modalBody.scrollHeight - 160;
+        if (nearBottom) {
+            loadMediaItems(true);
+        }
+    }
+
+    function queueMediaMoreCheck() {
+        window.setTimeout(maybeLoadMoreMediaItems, 80);
     }
 
     function renderMediaItems() {
@@ -342,7 +408,7 @@
             }
             mediaState.selected = new Set(data.uploaded_path ? [data.uploaded_path] : []);
             input.value = '';
-            await loadMediaItems();
+            await loadMediaItems(false);
             status.textContent = 'Файл завантажено.';
         } catch (error) {
             status.textContent = error.message || 'Помилка завантаження.';

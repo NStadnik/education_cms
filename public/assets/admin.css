@@ -184,6 +184,7 @@
 .import-progress-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
 .import-progress-head strong, .import-progress-head span { display: block; }
 .import-progress-head span:not(.import-progress-percent) { margin-top: 2px; color: var(--muted); font-size: 14px; }
+.import-progress-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .import-progress-percent { color: var(--brand-strong); font-weight: 750; }
 .import-progress-track { height: 10px; border-radius: 999px; background: #e8edf6; overflow: hidden; }
 .import-progress-track span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--brand); transition: width .2s ease; }

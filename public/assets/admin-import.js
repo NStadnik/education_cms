@@ -6,6 +6,8 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
     const progressDetail = progress ? progress.querySelector('[data-import-progress-detail]') : null;
     const progressPercent = progress ? progress.querySelector('[data-import-progress-percent]') : null;
     const progressBar = progress ? progress.querySelector('[data-import-progress-bar]') : null;
+    const pauseButton = progress ? progress.querySelector('[data-import-pause]') : null;
+    const pauseLabel = progress ? progress.querySelector('[data-import-pause-label]') : null;
     const progressMedia = progress ? progress.querySelector('[data-import-progress-media]') : null;
     const progressPosts = progress ? progress.querySelector('[data-import-progress-posts]') : null;
     const progressSteps = progress ? Array.from(progress.querySelectorAll('[data-import-progress-step]')) : [];
@@ -16,7 +18,7 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
     const scopeInputs = form.querySelectorAll('[data-wp-scope]');
     const wpPostFields = form.querySelector('[data-wp-post-fields]');
     const wpMediaFields = form.querySelector('[data-wp-media-fields]');
-    const wpMediaToggle = form.querySelector('[data-wp-media-toggle]');
+    const wpMenuImportButton = form.querySelector('[data-wp-menu-import]');
     const dbPreviewButtons = form.querySelectorAll('[data-db-preview-button]');
     const fileBlocks = form.querySelectorAll('[data-file-source]');
     const dbBlocks = form.querySelectorAll('[data-db-source]');
@@ -24,6 +26,11 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
     const modal = modalNode ? new bootstrap.Modal(modalNode) : null;
     const modalBody = modalNode ? modalNode.querySelector('[data-import-preview-body]') : null;
     const confirmButton = modalNode ? modalNode.querySelector('[data-import-confirm]') : null;
+    let importRunning = false;
+    let pauseAvailable = false;
+    let pauseRequested = false;
+    let paused = false;
+    let resumeImport = null;
 
     function setMessage(text, isError) {
         if (!message) {
@@ -91,7 +98,79 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         }
     }
 
+    function syncPauseButton() {
+        if (!pauseButton || !pauseLabel) {
+            return;
+        }
+        pauseButton.hidden = !importRunning || !pauseAvailable;
+        pauseButton.disabled = !importRunning || !pauseAvailable;
+        pauseButton.classList.toggle('secondary', !paused);
+        pauseButton.classList.toggle('button', true);
+        pauseLabel.textContent = paused ? 'Продовжити' : (pauseRequested ? 'Пауза...' : 'Пауза');
+        const icon = pauseButton.querySelector('.mdi');
+        if (icon) {
+            icon.className = 'mdi ' + (paused ? 'mdi-play' : 'mdi-pause');
+        }
+    }
+
+    function requestPause() {
+        if (!importRunning || !pauseAvailable || paused) {
+            return;
+        }
+        pauseRequested = true;
+        syncPauseButton();
+        setMessage('Імпорт буде поставлено на паузу після завершення поточного пакета.', false);
+    }
+
+    function resumePausedImport() {
+        if (!paused) {
+            return;
+        }
+        paused = false;
+        pauseRequested = false;
+        const resume = resumeImport;
+        resumeImport = null;
+        syncPauseButton();
+        setMessage('Імпорт продовжено.', false);
+        if (resume) {
+            resume();
+        }
+    }
+
+    function pauseIfRequested(label) {
+        if (!pauseRequested) {
+            return Promise.resolve();
+        }
+
+        paused = true;
+        syncPauseButton();
+        const detail = label ? 'Пауза: ' + label : 'Імпорт на паузі.';
+        if (progressDetail) {
+            progressDetail.textContent = detail;
+        }
+        setMessage('Імпорт на паузі. Натисніть «Продовжити», щоб запустити наступний пакет.', false);
+
+        return new Promise(function (resolve) {
+            resumeImport = resolve;
+        });
+    }
+
+    function finishImport() {
+        importRunning = false;
+        pauseAvailable = false;
+        pauseRequested = false;
+        paused = false;
+        resumeImport = null;
+        syncPauseButton();
+    }
+
     function resetProgress() {
+        importRunning = true;
+        pauseAvailable = false;
+        pauseRequested = false;
+        paused = false;
+        resumeImport = null;
+        syncPauseButton();
         showProgress({
             title: 'Перебіг імпорту',
             detail: 'Підготовка запиту...',
@@ -259,8 +338,7 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
     }
 
     function isStepImportEnabled() {
-        const checkbox = fieldByName('wp_step_import');
-        return activeSource() === 'database' && checkbox && checkbox.checked;
+        return activeSource() === 'database';
     }
 
     function importScope() {
@@ -297,21 +375,16 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         const scope = importScope();
         const mediaOnly = scope === 'media';
         const postsOnly = scope === 'posts';
-        const menuOnly = scope === 'menu';
         if (wpPostFields) {
-            wpPostFields.hidden = mediaOnly || menuOnly;
-            setGroupDisabled(wpPostFields, mediaOnly || menuOnly);
+            wpPostFields.hidden = mediaOnly;
+            setGroupDisabled(wpPostFields, mediaOnly);
         }
         if (wpMediaFields) {
-            wpMediaFields.hidden = postsOnly || menuOnly;
-            setGroupDisabled(wpMediaFields, postsOnly || menuOnly);
-        }
-        if (wpMediaToggle) {
-            wpMediaToggle.hidden = scope !== 'all';
-            setGroupDisabled(wpMediaToggle, scope !== 'all');
+            wpMediaFields.hidden = postsOnly;
+            setGroupDisabled(wpMediaFields, postsOnly);
         }
         dbPreviewButtons.forEach(function (button) {
-            button.hidden = mediaOnly || menuOnly;
+            button.hidden = mediaOnly;
         });
     }
 
@@ -341,15 +414,16 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
 
     async function runStepImport(button) {
         resetProgress();
+        pauseAvailable = true;
+        syncPauseButton();
         const scope = importScope();
-        const mediaCheckbox = fieldByName('wp_import_media');
-        const importMedia = scope === 'media' || (scope !== 'posts' && scope !== 'menu' && !!(mediaCheckbox && mediaCheckbox.checked));
-        const importPosts = scope !== 'media' && scope !== 'menu';
+        const importMedia = scope === 'media' || scope === 'all';
+        const importPosts = scope !== 'media';
         const mediaRange = importMedia && importPosts ? 45 : (importMedia ? 100 : 0);
         const postsBase = importMedia && importPosts ? 45 : 0;
         const postsRange = importPosts ? (importMedia ? 55 : 100) : 0;
         const mediaStartOffset = intInput('wp_media_offset', 0);
-        const mediaLimit = intInput('wp_media_limit', 1000);
+        const mediaLimit = Math.min(intInput('wp_media_limit', 100), 100);
         let mediaOffset = mediaStartOffset;
         let mediaEndOffset = mediaStartOffset;
         let mediaTotal = 0;
@@ -372,7 +446,12 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
                 if (!mediaData.has_more || mediaOffset >= mediaTotal) {
                     break;
                 }
+                await pauseIfRequested('файли WordPress оброблено до №' + mediaOffset);
             }
+        }
+
+        if (importPosts) {
+            await pauseIfRequested('перед імпортом матеріалів');
         }
 
         if (!importPosts) {
@@ -393,7 +472,7 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
         }
 
         let postOffset = intInput('db_offset', 0);
-        const postLimit = intInput('db_limit', 200);
+        const postLimit = importMedia ? Math.min(intInput('db_limit', 200), 50) : intInput('db_limit', 200);
         let postTotal = 0;
         let createdTotal = 0;
         while (true) {
@@ -405,6 +484,8 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
                 extra.wp_media_replace_only = '1';
                 extra.wp_media_offset = String(mediaStartOffset);
                 extra.wp_media_map_limit = String(Math.max(mediaLimit, mediaEndOffset - mediaStartOffset));
+                extra.wp_content_media_limit = '20';
+                extra.wp_content_media_seconds = '20';
             }
             const postData = await requestImport(form.action, button, 'Матеріали...', extra);
             const stats = postData.stats || {};
@@ -416,6 +497,7 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
             if (!postData.has_more || postOffset >= postTotal) {
                 break;
             }
+            await pauseIfRequested('матеріали WordPress оброблено до №' + postOffset);
         }
 
         setMessage('Імпорт завершено: ' + mutationLabel() + ' ' + createdTotal + ' із ' + postTotal + ' матеріалів' + (importMedia ? ', файлів оброблено ' + mediaImported : '') + '.', false);
@@ -434,10 +516,19 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
     }
 
     async function run(button) {
+        if (importRunning) {
+            if (paused) {
+                resumePausedImport();
+            } else {
+                setMessage('Імпорт уже виконується. Щоб зупинити наступний пакет, натисніть «Пауза».', false);
+            }
+            return;
+        }
+
         try {
             resetProgress();
             const scope = importScope();
-            if (isStepImportEnabled() && scope !== 'menu') {
+            if (isStepImportEnabled()) {
                 await runStepImport(button);
                 return;
             }
@@ -445,11 +536,13 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
             if (activeSource() === 'database' && scope === 'media') {
                 extra.wp_media_only = '1';
             }
+            if (activeSource() === 'database' && scope === 'all') {
+                extra.db_limit = String(Math.min(intInput('db_limit', 200), 50));
+                extra.wp_content_media_limit = '20';
+                extra.wp_content_media_seconds = '20';
+            }
             if (activeSource() === 'database' && scope === 'posts') {
                 extra.wp_import_media = '0';
-            }
-            if (activeSource() === 'database' && scope === 'menu') {
-                extra.wp_menu_only = '1';
             }
             const data = await requestImport(form.action, button, 'Імпорт...', extra);
             if (activeSource() === 'database' && scope === 'media') {
@@ -463,19 +556,6 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
                     postsText: 'Не імпортувались',
                     mediaState: 'is-done',
                     postsState: 'is-muted'
-                });
-            } else if (activeSource() === 'database' && scope === 'menu') {
-                const stats = data.stats || {};
-                const menuItems = parseInt(stats.menu_items_imported || data.created || 0, 10);
-                setMessage('Імпорт меню завершено: перенесено ' + menuItems + ' пунктів.', false);
-                showProgress({
-                    title: 'Імпорт завершено',
-                    detail: 'WordPress меню перенесено у шаблон.',
-                    percent: 100,
-                    mediaText: 'Не імпортувались',
-                    postsText: menuItems + ' пунктів меню',
-                    mediaState: 'is-muted',
-                    postsState: 'is-done'
                 });
             } else {
                 setMessage('Імпорт завершено: ' + mutationLabel() + ' ' + data.created + ' із ' + data.total + ' записів.', false);
@@ -494,6 +574,36 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
             }
         } catch (error) {
             setMessage(error.message || 'Помилка імпорту.', true);
+        } finally {
+            finishImport();
+        }
+    }
+
+    async function runMenuImport(button) {
+        if (importRunning) {
+            setMessage('Зачекайте завершення поточного імпорту перед імпортом меню.', true);
+            return;
+        }
+
+        try {
+            resetProgress();
+            const data = await requestImport(form.action, button, 'Меню...', {wp_menu_only: '1', wp_import_scope: 'menu'});
+            const stats = data.stats || {};
+            const menuItems = parseInt(stats.menu_items_imported || data.created || 0, 10);
+            setMessage('Імпорт меню завершено: перенесено ' + menuItems + ' пунктів.', false);
+            showProgress({
+                title: 'Імпорт завершено',
+                detail: 'WordPress меню перенесено у шаблон.',
+                percent: 100,
+                mediaText: 'Не імпортувались',
+                postsText: menuItems + ' пунктів меню',
+                mediaState: 'is-muted',
+                postsState: 'is-done'
+            });
+        } catch (error) {
+            setMessage(error.message || 'Помилка імпорту меню.', true);
+        } finally {
+            finishImport();
         }
     }
 
@@ -508,6 +618,18 @@ document.querySelectorAll('[data-import-form]').forEach(function (form) {
     });
     if (confirmButton) {
         confirmButton.addEventListener('click', function () { run(confirmButton); });
+    }
+    if (pauseButton) {
+        pauseButton.addEventListener('click', function () {
+            if (paused) {
+                resumePausedImport();
+                return;
+            }
+            requestPause();
+        });
+    }
+    if (wpMenuImportButton) {
+        wpMenuImportButton.addEventListener('click', function () { runMenuImport(wpMenuImportButton); });
     }
     form.addEventListener('submit', function (event) {
         event.preventDefault();

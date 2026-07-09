@@ -13,7 +13,13 @@
             <strong data-import-progress-title>Перебіг імпорту</strong>
             <span data-import-progress-detail>Очікування запуску</span>
         </div>
-        <span class="import-progress-percent" data-import-progress-percent>0%</span>
+        <div class="import-progress-actions">
+            <span class="import-progress-percent" data-import-progress-percent>0%</span>
+            <button class="button secondary compact" type="button" data-import-pause hidden disabled>
+                <span class="mdi mdi-pause" aria-hidden="true"></span>
+                <span data-import-pause-label>Пауза</span>
+            </button>
+        </div>
     </div>
     <div class="import-progress-track" aria-hidden="true"><span data-import-progress-bar></span></div>
     <div class="import-progress-steps">
@@ -121,8 +127,8 @@
                 <div class="wp-import-panel-head">
                     <span class="mdi mdi-tune-variant" aria-hidden="true"></span>
                     <div>
-                        <strong>Режим імпорту</strong>
-                        <small>Виберіть обсяг роботи для запуску</small>
+                        <strong>Матеріали WordPress</strong>
+                        <small>Оберіть один зі стандартних сценаріїв перенесення</small>
                     </div>
                 </div>
                 <div class="wp-scope-options">
@@ -135,21 +141,31 @@
                     <label class="wp-scope-option">
                         <input type="radio" name="wp_import_scope" value="media" data-wp-scope>
                         <span class="mdi mdi-file-upload-outline" aria-hidden="true"></span>
-                        <strong>Тільки файли</strong>
+                        <strong>Лише медіафайли</strong>
                         <small>Завантажити вкладення без новин і сторінок</small>
                     </label>
                     <label class="wp-scope-option">
                         <input type="radio" name="wp_import_scope" value="posts" data-wp-scope>
                         <span class="mdi mdi-newspaper-variant-outline" aria-hidden="true"></span>
-                        <strong>Тільки матеріали</strong>
-                        <small>Створити новини та сторінки без файлів</small>
+                        <strong>Матеріали без файлів</strong>
+                        <small>Оновити новини та сторінки без завантаження медіа</small>
                     </label>
-                    <label class="wp-scope-option">
-                        <input type="radio" name="wp_import_scope" value="menu" data-wp-scope>
+                </div>
+            </div>
+
+            <div class="wp-import-panel compact">
+                <div class="wp-import-panel-head">
+                    <span class="mdi mdi-menu" aria-hidden="true"></span>
+                    <div>
+                        <strong>Меню WordPress</strong>
+                        <small>Імпортуйте навігацію окремо після перенесення сторінок</small>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="button secondary" type="button" data-wp-menu-import>
                         <span class="mdi mdi-menu" aria-hidden="true"></span>
-                        <strong>Тільки меню</strong>
-                        <small>Перенести WordPress меню та mega menu</small>
-                    </label>
+                        <span>Імпортувати меню</span>
+                    </button>
                 </div>
             </div>
 
@@ -202,21 +218,12 @@
                     <label>Почати з файлу №<input type="number" name="wp_media_offset" value="0" min="0"></label>
                 </div>
                 <div class="grid grid-3">
-                    <label>Файлів за пакет<input type="number" name="wp_media_limit" value="1000" min="1" max="5000"></label>
+                    <label>Файлів за пакет<input type="number" name="wp_media_limit" value="100" min="1" max="100"></label>
                 </div>
-                <label class="check-row" data-wp-media-toggle><input type="checkbox" name="wp_import_media" value="1" checked> Завантажити файли, перенести головні зображення та замінити старі адреси в публікаціях</label>
+                <input type="hidden" name="wp_import_media" value="1">
             </div>
 
-            <div class="wp-import-panel compact">
-                <div class="wp-import-panel-head">
-                    <span class="mdi mdi-progress-upload" aria-hidden="true"></span>
-                    <div>
-                        <strong>Пакетне виконання</strong>
-                        <small>Для великих баз імпорт іде порціями з прогресом</small>
-                    </div>
-                </div>
-                <label class="check-row"><input type="checkbox" name="wp_step_import" value="1" checked> Поетапно завантажувати великі обсяги</label>
-            </div>
+            <input type="hidden" name="wp_step_import" value="1">
         </div>
     </section>
 
