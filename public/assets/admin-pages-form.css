@@ -110,7 +110,7 @@
 .layout-card-preset-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
 .layout-card-preset-head strong { color: var(--text); font-size: 15px; line-height: 1.25; }
 .layout-card-preset-head span { color: var(--muted); font-size: 13px; line-height: 1.35; }
-.layout-card-preset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.layout-card-preset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
 .layout-card-preset-grid button { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 8px; align-items: center; min-height: 58px; padding: 9px; border: 1px solid #d8dee8; border-radius: 8px; background: #fff; color: var(--text); text-align: left; box-shadow: none; }
 .layout-card-preset-grid button:hover, .layout-card-preset-grid button:focus { border-color: #9aa8bb; background: #f8fafc; color: var(--text); box-shadow: 0 0 0 2px rgba(31,111,235,.08); }
 .layout-card-preset-grid button.is-active { border-color: var(--brand); background: #eef4ff; color: var(--brand-strong); box-shadow: 0 0 0 2px rgba(31,111,235,.12); }
