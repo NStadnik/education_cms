@@ -164,6 +164,9 @@
                             <p class="meta mb-0">Створюйте секції, ряди, колонки та картки. На сайті вони рендеряться через Bootstrap grid.</p>
                         </div>
                         <div class="layout-builder-actions">
+                            <button class="button secondary compact" type="button" data-layout-import-export-open>
+                                <span class="mdi mdi-code-json" aria-hidden="true"></span><span>Імпорт/експорт</span>
+                            </button>
                             <button class="button compact" type="button" data-layout-open-section-picker>
                                 <span class="mdi mdi-view-grid-plus-outline" aria-hidden="true"></span><span>Додати секцію</span>
                             </button>
@@ -231,6 +234,190 @@
         <input type="hidden" name="ids[]" value="<?= e((string) $item['id']) ?>">
     </form>
 <?php endif; ?>
+
+<div class="modal fade" id="layoutImportExportModal" tabindex="-1" aria-labelledby="layoutImportExportTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow mb-1">Конструктор</p>
+                    <h5 class="modal-title" id="layoutImportExportTitle">
+                        Імпорт та експорт JSON
+                    </h5>
+                </div>
+
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Закрити"></button>
+            </div>
+
+            <div class="modal-body">
+
+                <ul class="nav nav-tabs mb-4" id="layoutImportExportTabs" role="tablist">
+
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active"
+                                data-bs-toggle="tab"
+                                data-bs-target="#layoutExportTab"
+                                type="button">
+                            <span class="mdi mdi-export"></span>
+                            Експорт
+                        </button>
+                    </li>
+
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link"
+                                data-bs-toggle="tab"
+                                data-bs-target="#layoutImportTab"
+                                type="button">
+                            <span class="mdi mdi-import"></span>
+                            Імпорт
+                        </button>
+                    </li>
+
+                </ul>
+
+                <div class="tab-content">
+
+                    <!-- ======================== -->
+                    <!-- ЕКСПОРТ -->
+                    <!-- ======================== -->
+
+                    <div class="tab-pane fade show active"
+                         id="layoutExportTab">
+
+                        <label class="w-100">
+                            Експорт JSON
+
+                            <textarea
+                                class="textarea-small"
+                                readonly
+                                data-layout-export-field
+                                placeholder="JSON поточної структури конструктора"></textarea>
+
+                        </label>
+
+                        <div class="d-flex gap-2 flex-wrap mt-3">
+
+                            <button
+                                class="button secondary compact"
+                                type="button"
+                                data-layout-export-copy>
+
+                                <span class="mdi mdi-content-copy"></span>
+                                <span>Скопіювати</span>
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                    <!-- ======================== -->
+                    <!-- ІМПОРТ -->
+                    <!-- ======================== -->
+
+                    <div class="tab-pane fade"
+                         id="layoutImportTab">
+
+                        <label class="w-100">
+                            Імпорт JSON
+
+                            <textarea
+                                class="textarea-small"
+                                data-layout-import-field
+                                placeholder="Вставте JSON секцій або blocks_json"></textarea>
+
+                        </label>
+
+                        <div class="layout-import-export-example mt-3">
+
+                            <label class="w-100">
+
+                                Приклад JSON
+
+                                <textarea
+                                    class="textarea-small"
+                                    readonly
+                                    data-layout-example-field
+                                    placeholder="Приклад структури"></textarea>
+
+                            </label>
+
+                        </div>
+
+                        <div class="layout-import-export-actions mt-3">
+
+                            <button
+                                class="button secondary compact"
+                                type="button"
+                                data-layout-example-copy>
+
+                                <span class="mdi mdi-content-copy"></span>
+                                <span>Скопіювати приклад</span>
+
+                            </button>
+
+                            <button
+                                class="button secondary compact"
+                                type="button"
+                                data-layout-example-use>
+
+                                <span class="mdi mdi-file-replace-outline"></span>
+                                <span>Вставити приклад</span>
+
+                            </button>
+
+                            <button
+                                class="button secondary compact"
+                                type="button"
+                                data-layout-import-apply>
+
+                                <span class="mdi mdi-file-import-outline"></span>
+                                <span>Імпортувати</span>
+
+                            </button>
+
+                            <button
+                                class="button secondary compact"
+                                type="button"
+                                data-layout-import-clear>
+
+                                <span class="mdi mdi-close"></span>
+                                <span>Очистити</span>
+
+                            </button>
+
+                            <span class="meta"
+                                  data-layout-import-status></span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button
+                    type="button"
+                    class="button secondary"
+                    data-bs-dismiss="modal">
+
+                    <span class="mdi mdi-close"></span>
+                    <span>Закрити</span>
+
+                </button>
+
+            </div>
+
+        </div>
+    </div>
+</div>
 
 <div class="modal fade" id="layoutSectionPickerModal" tabindex="-1" aria-labelledby="layoutSectionPickerTitle" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">

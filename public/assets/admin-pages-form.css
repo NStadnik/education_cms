@@ -17,6 +17,16 @@
 .layout-builder-actions .button:hover, .layout-builder-actions button:hover { border-color: #9aa8bb; background: #f8fafc; color: var(--text); }
 .layout-builder-actions [data-layout-open-section-picker] { border-color: #24364f; background: #24364f; color: #fff; }
 .layout-builder-actions [data-layout-open-section-picker]:hover { border-color: #10233f; background: #10233f; color: #fff; }
+.layout-import-export { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; border: 1px solid #d8dee8; border-radius: 8px; background: #fff; }
+.layout-import-export label { min-width: 0; margin: 0; }
+.layout-import-export textarea { min-height: 118px !important; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.45; resize: vertical; }
+.layout-import-export textarea[readonly] { background: #f8fafc; color: #344054; }
+.layout-import-export-example { grid-column: 1 / -1; min-width: 0; }
+.layout-import-export-example textarea { min-height: 260px !important; }
+.layout-import-export-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.layout-import-export-actions .meta { min-width: 0; font-weight: 650; }
+.layout-import-export-actions .meta.is-success { color: var(--ok); }
+.layout-import-export-actions .meta.is-error { color: var(--danger); }
 .layout-section-list { display: grid; gap: 14px; }
 .layout-section-template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
 .layout-section-template-card { display: grid !important; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px !important; align-items: start; min-height: 210px; padding: 14px !important; border: 1px solid #d8dee8 !important; border-radius: 8px !important; background: #fff !important; color: var(--text) !important; text-align: left !important; box-shadow: 0 1px 2px rgba(16,35,63,.04); }
@@ -184,6 +194,7 @@ button.layout-editor-section-summary:hover, button.layout-editor-section-summary
     .layout-builder-head { align-items: stretch; flex-direction: column; }
     .layout-builder-actions { justify-content: flex-start; }
     .layout-builder-actions .button, .layout-builder-actions button { flex: 1 1 auto; justify-content: center; }
+    .layout-import-export { grid-template-columns: 1fr; }
     .layout-editor-section-head { grid-template-columns: auto auto minmax(0, 1fr); }
     .layout-editor-counts, .layout-editor-section-actions { grid-column: 1 / -1; justify-content: flex-start; }
     .layout-editor-section-actions .button, .layout-editor-section-actions button { flex: 1 1 auto; justify-content: center; }

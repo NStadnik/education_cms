@@ -12,6 +12,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const simplePanel = document.querySelector('[data-simple-editor-panel]');
     const advancedPanel = document.querySelector('[data-advanced-editor-panel]');
     const modeButtons = document.querySelectorAll('[data-editor-mode-button]');
+    const exportField = document.querySelector('[data-layout-export-field]');
+    const importField = document.querySelector('[data-layout-import-field]');
+    const exampleField = document.querySelector('[data-layout-example-field]');
+    const importStatus = document.querySelector('[data-layout-import-status]');
+    const importExportNode = document.getElementById('layoutImportExportModal');
+    const importExportModal = importExportNode && window.bootstrap ? new window.bootstrap.Modal(importExportNode) : null;
     const cardModalNode = document.getElementById('layoutCardModal');
     const cardModal = cardModalNode && window.bootstrap ? new window.bootstrap.Modal(cardModalNode) : null;
     const cardModalError = cardModalNode ? cardModalNode.querySelector('[data-card-modal-error]') : null;
@@ -140,6 +146,135 @@ document.addEventListener('DOMContentLoaded', function () {
     let imagePickerItems = [];
     let imagePickerSearchTimer = null;
     const imagePickerState = {offset: 0, limit: 30, total: 0, hasMore: false, loading: false, token: 0};
+    const layoutExample = [{
+        type: 'layout',
+        title: 'Hero та базова картка',
+        background: 'accent',
+        rows: [{
+            columns: [{
+                width: 'col-md-12',
+                cards: [{
+                    style: 'cta',
+                    title: 'Головний заклик сторінки',
+                    text: '<p>Стислий вступний текст із головною пропозицією, який може містити <strong>форматування</strong>.</p>',
+                    image: '/uploads/example/hero.jpg',
+                    button_text: 'Основна дія',
+                    button_url: '/page/contact',
+                    links: [
+                        {label: 'Основна дія', url: '/page/contact'},
+                        {label: 'Докладніше', url: '/page/about'}
+                    ]
+                }, {
+                    style: 'default',
+                    title: 'Звичайна картка',
+                    text: '<p>Базовий стиль для універсального текстового блоку.</p>',
+                    image: '',
+                    button_text: '',
+                    button_url: '',
+                    links: []
+                }]
+            }]
+        }]
+    }, {
+        type: 'layout',
+        title: 'Інформаційна сітка',
+        background: 'light',
+        rows: [{
+            columns: [{
+                width: 'col-md-4',
+                cards: [{
+                    style: 'feature',
+                    title: 'Перевага',
+                    text: '<p>Короткий опис переваги або послуги.</p>',
+                    image: '',
+                    button_text: '',
+                    button_url: '',
+                    links: []
+                }]
+            }, {
+                width: 'col-md-4',
+                cards: [{
+                    style: 'accent',
+                    title: 'Акцент',
+                    text: '<p>Важлива інформація, яку потрібно виділити.</p>',
+                    image: '',
+                    button_text: 'Перейти',
+                    button_url: '/page/details',
+                    links: [{label: 'Перейти', url: '/page/details'}]
+                }]
+            }, {
+                width: 'col-md-4',
+                cards: [{
+                    style: 'plain',
+                    title: 'Без рамки',
+                    text: '<p>Легкий блок без візуальної рамки.</p>',
+                    image: '',
+                    button_text: '',
+                    button_url: '',
+                    links: []
+                }]
+            }]
+        }]
+    }, {
+        type: 'layout',
+        title: 'Медіа, статистика, цитата і контакти',
+        background: 'default',
+        rows: [{
+            columns: [{
+                width: 'col-md-8',
+                cards: [{
+                    style: 'media',
+                    title: 'Медіа-картка',
+                    text: '<p>Текст поруч або під зображенням. Підходить для новин, подій і послуг.</p>',
+                    image: '/uploads/example/media.jpg',
+                    button_text: 'Відкрити матеріал',
+                    button_url: '/news/example',
+                    links: [
+                        {label: 'Відкрити матеріал', url: '/news/example'},
+                        {label: 'Завантажити файл', url: '/uploads/example/document.pdf'}
+                    ]
+                }]
+            }, {
+                width: 'col-md-4',
+                cards: [{
+                    style: 'stat',
+                    title: '120+',
+                    text: '<p>Підпис до цифри або показника.</p>',
+                    image: '',
+                    button_text: '',
+                    button_url: '',
+                    links: []
+                }]
+            }]
+        }, {
+            columns: [{
+                width: 'col-md-6',
+                cards: [{
+                    style: 'quote',
+                    title: 'Цитата',
+                    text: '<blockquote>Важлива думка, відгук або коротке повідомлення.</blockquote>',
+                    image: '',
+                    button_text: '',
+                    button_url: '',
+                    links: []
+                }]
+            }, {
+                width: 'col-md-6',
+                cards: [{
+                    style: 'contact',
+                    title: 'Контакти',
+                    text: '<p><strong>Телефон:</strong> +380 XX XXX XX XX<br><strong>Email:</strong> info@example.com</p>',
+                    image: '',
+                    button_text: 'Написати',
+                    button_url: 'mailto:info@example.com',
+                    links: [
+                        {label: 'Написати', url: 'mailto:info@example.com'},
+                        {label: 'Карта', url: 'https://maps.google.com/'}
+                    ]
+                }]
+            }]
+        }]
+    }];
     let initialBlocks = [];
     try {
         initialBlocks = JSON.parse(builder.dataset.initial || '[]');
@@ -592,6 +727,159 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function setImportStatus(message, isError) {
+        if (!importStatus) {
+            return;
+        }
+        importStatus.textContent = message || '';
+        importStatus.classList.toggle('is-error', Boolean(isError));
+        importStatus.classList.toggle('is-success', Boolean(message && !isError));
+    }
+
+    function exportLayoutJson() {
+        return JSON.stringify(sections, null, 2);
+    }
+
+    function updateExportField() {
+        if (exportField) {
+            exportField.value = exportLayoutJson();
+        }
+    }
+
+    function exampleLayoutJson() {
+        return JSON.stringify(layoutExample, null, 2);
+    }
+
+    function updateExampleField() {
+        if (exampleField) {
+            exampleField.value = exampleLayoutJson();
+        }
+    }
+
+    function parseImportedLayoutJson(value) {
+        let data;
+        try {
+            data = JSON.parse(String(value || ''));
+        } catch (error) {
+            throw new Error('JSON має помилку синтаксису.');
+        }
+
+        if (data && !Array.isArray(data) && typeof data === 'object') {
+            if (Array.isArray(data.sections)) {
+                data = data.sections;
+            } else if (Array.isArray(data.blocks)) {
+                data = data.blocks;
+            } else if (typeof data.blocks_json === 'string') {
+                try {
+                    data = JSON.parse(data.blocks_json);
+                } catch (error) {
+                    throw new Error('Поле blocks_json містить некоректний JSON.');
+                }
+            }
+        }
+
+        if (!Array.isArray(data)) {
+            throw new Error('Очікується масив секцій або обʼєкт із sections/blocks.');
+        }
+
+        const normalized = normalizeInitial(data).filter(function (section) {
+            return section && Array.isArray(section.rows);
+        });
+        if (!normalized.length) {
+            throw new Error('У JSON немає секцій для імпорту.');
+        }
+
+        return normalized;
+    }
+
+    function applyImportedLayout() {
+        if (!importField) {
+            return;
+        }
+        const raw = importField.value.trim();
+        if (raw === '') {
+            setImportStatus('Вставте JSON для імпорту.', true);
+            return;
+        }
+
+        try {
+            sections = parseImportedLayoutJson(raw);
+            expandedSections = new Set([0]);
+            setEditorMode('advanced');
+            setImportStatus('Імпортовано секцій: ' + sections.length + '.', false);
+            render();
+        } catch (error) {
+            setImportStatus(error.message || 'Не вдалося імпортувати JSON.', true);
+        }
+    }
+
+    function copyExportJson() {
+        const json = exportLayoutJson();
+        updateExportField();
+        if (exportField) {
+            exportField.focus();
+            exportField.select();
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(json).then(function () {
+                setImportStatus('JSON скопійовано в буфер.', false);
+            }).catch(function () {
+                setImportStatus('JSON готовий у полі експорту.', false);
+            });
+            return;
+        }
+        setImportStatus('JSON готовий у полі експорту.', false);
+    }
+
+    function copyExampleJson() {
+        const json = exampleLayoutJson();
+        updateExampleField();
+        if (exampleField) {
+            exampleField.focus();
+            exampleField.select();
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(json).then(function () {
+                setImportStatus('Приклад JSON скопійовано.', false);
+            }).catch(function () {
+                setImportStatus('Приклад готовий у полі для копіювання.', false);
+            });
+            return;
+        }
+        setImportStatus('Приклад готовий у полі для копіювання.', false);
+    }
+
+    function useExampleJson() {
+        if (!importField) {
+            return;
+        }
+        updateExampleField();
+        importField.value = exampleLayoutJson();
+        importField.focus();
+        importField.select();
+        setImportStatus('Приклад вставлено в імпорт. Натисніть “Імпортувати”, щоб застосувати.', false);
+    }
+
+    function openImportExportModal() {
+        updateExportField();
+        updateExampleField();
+        setImportStatus('', false);
+        if (importExportModal) {
+            importExportModal.show();
+            if (exportField) {
+                importExportNode.addEventListener('shown.bs.modal', function () {
+                    exportField.focus();
+                    exportField.select();
+                }, {once: true});
+            }
+            return;
+        }
+        if (exportField) {
+            exportField.focus();
+            exportField.select();
+        }
+    }
+
     function render() {
         list.innerHTML = sections.map(function (section, sectionIndex) {
             const isExpanded = expandedSections.has(sectionIndex);
@@ -740,6 +1028,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function sync() {
         hidden.value = JSON.stringify(sections);
+        updateExportField();
         if (!modeInput || modeInput.value === 'advanced') {
             updateSimpleEditorFromLayout();
         }
@@ -1505,10 +1794,46 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    if (importExportNode) {
+        importExportNode.addEventListener('click', function (event) {
+            const button = event.target.closest('button');
+            if (!button) {
+                return;
+            }
+            if (button.matches('[data-layout-export-copy]')) {
+                copyExportJson();
+                return;
+            }
+            if (button.matches('[data-layout-example-copy]')) {
+                copyExampleJson();
+                return;
+            }
+            if (button.matches('[data-layout-example-use]')) {
+                useExampleJson();
+                return;
+            }
+            if (button.matches('[data-layout-import-apply]')) {
+                applyImportedLayout();
+                return;
+            }
+            if (button.matches('[data-layout-import-clear]')) {
+                if (importField) {
+                    importField.value = '';
+                    importField.focus();
+                }
+                setImportStatus('', false);
+            }
+        });
+    }
+
     builder.addEventListener('click', function (event) {
         const button = event.target.closest('button');
         if (!button) return;
         const i = indexes(button);
+        if (button.matches('[data-layout-import-export-open]')) {
+            openImportExportModal();
+            return;
+        }
         if (button.matches('[data-layout-open-section-picker]')) {
             if (sectionPickerModal) {
                 sectionPickerModal.show();
@@ -1700,6 +2025,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = builder.closest('form');
     if (form) {
         form.addEventListener('submit', function () {
+            if (window.TinyMceEditor) {
+                window.TinyMceEditor.syncAll(document);
+            }
             if (!modeInput || modeInput.value === 'advanced') {
                 updateSimpleEditorFromLayout();
             }
