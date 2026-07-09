@@ -44,7 +44,7 @@
                 language: 'uk',
                 language_url: tinymceBase + '/langs/uk.js',
                 plugins: 'advlist autolink lists link image media table code preview fullscreen searchreplace wordcount quickbars autoresize',
-                toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright | bullist numlist | link table mediaLibrary | code fullscreen preview',
+                toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright alignjustify | bullist numlist | link table mediaLibrary | code fullscreen preview',
                 toolbar_mode: 'wrap',
                 quickbars_selection_toolbar: 'bold italic | bullist numlist | quicklink h2 h3 blockquote',
                 menubar: false,
@@ -54,6 +54,9 @@
                 autoresize_bottom_margin: 24,
                 content_css: [assetsBase + '/site.css'],
                 body_class: 'rich-content',
+                formats: {
+                    alignjustify: {selector: 'p,h1,h2,h3,h4,h5,h6,div,blockquote,ul,ol,li,td,th', classes: 'justify'}
+                },
                 convert_urls: false,
                 relative_urls: false,
                 remove_script_host: false,

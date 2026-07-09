@@ -165,6 +165,7 @@ img { max-width: 100%; height: auto; }
 .rich-content blockquote { padding: 10px 14px; border-left: 3px solid var(--brand); background: #f6f8fc; color: #344054; }
 .rich-content h2, .rich-content h3, .rich-content h4 { margin: 18px 0 10px; }
 .rich-content img { display: block; max-width: 100%; height: auto; margin: 14px 0; border-radius: 6px; }
+.justify { text-align: justify; }
 .rich-media-block { margin: 0 0 16px; }
 .rich-media-block img { display: block; width: 100%; margin: 0; border-radius: 6px; }
 .rich-media-block figcaption, .rich-gallery-caption { margin: 7px 0 16px; color: var(--muted); font-size: 14px; text-align: center; }
