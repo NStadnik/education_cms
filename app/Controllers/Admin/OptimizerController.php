@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace App\Controllers\Admin;
 
+use App\Core\Container;
 use App\Core\Csrf;
+use App\Core\Debug;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Files;
 use App\Services\MediaMetadata;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use RuntimeException;
+use SplFileInfo;
 use Throwable;
 
 final class OptimizerController extends \App\Controllers\AdminBaseController
@@ -17,14 +23,42 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
 
     public function index(Request $request): Response
     {
-        $this->guard('media.manage');
+        $this->guardOptimizer();
 
         return $this->admin('admin/optimizer/index', [
             'title' => 'Оптимізатор',
-            'analysis' => $this->mediaFolderAnalysis(),
+            'cacheInfo' => $this->cacheInfo(),
+            'debugInfo' => $this->debugInfo(),
+            'canManageMedia' => Container::get('auth')->can('media.manage'),
+            'canManageSystem' => Container::get('auth')->can('settings.manage'),
             'previewLimit' => self::PREVIEW_LIMIT,
+            'mediaTabActive' => (string) $request->input('tab', '') === 'media' || (int) $request->input('applied', 0) > 0,
             'applied' => max(0, (int) $request->input('applied', 0)),
+            'cacheCleared' => max(0, (int) $request->input('cache_cleared', 0)),
+            'debugChanged' => (string) $request->input('debug', ''),
         ]);
+    }
+
+    public function mediaFolders(Request $request): Response
+    {
+        $this->guard('media.manage');
+
+        try {
+            $analysis = $this->mediaFolderAnalysis();
+            $html = $this->view()->partial('admin/optimizer/media-folders', [
+                'analysis' => $analysis,
+                'previewLimit' => self::PREVIEW_LIMIT,
+                'canManageMedia' => Container::get('auth')->can('media.manage'),
+            ]);
+
+            return $this->json([
+                'ok' => true,
+                'html' => $html,
+                'stats' => $analysis['stats'] ?? [],
+            ]);
+        } catch (Throwable $e) {
+            return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
+        }
     }
 
     public function applyMediaFolders(Request $request): Response
@@ -58,7 +92,7 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
                 ]);
             }
 
-            redirect('/admin/optimizer?applied=' . $updated);
+            redirect('/admin/optimizer?tab=media&applied=' . $updated);
         } catch (Throwable $e) {
             if ($this->isAjax($request)) {
                 return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
@@ -66,9 +100,109 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
 
             return $this->admin('admin/optimizer/index', [
                 'title' => 'Оптимізатор',
-                'analysis' => $this->mediaFolderAnalysis(),
+                'cacheInfo' => $this->cacheInfo(),
+                'debugInfo' => $this->debugInfo(),
+                'canManageMedia' => Container::get('auth')->can('media.manage'),
+                'canManageSystem' => Container::get('auth')->can('settings.manage'),
+                'previewLimit' => self::PREVIEW_LIMIT,
+                'mediaTabActive' => true,
+                'applied' => 0,
+                'cacheCleared' => 0,
+                'debugChanged' => '',
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function clearCache(Request $request): Response
+    {
+        $this->guard('settings.manage');
+        Csrf::verify();
+
+        try {
+            $deleted = $this->clearDirectoryContents(base_path('storage/cache'));
+
+            if ($deleted > 0) {
+                $this->audit('clear_cache', 'system', null, 'deleted: ' . $deleted);
+            }
+
+            if ($this->isAjax($request)) {
+                return $this->json([
+                    'ok' => true,
+                    'message' => $deleted > 0 ? 'Кеш очищено. Видалено файлів: ' . $deleted . '.' : 'Кеш уже порожній.',
+                    'deleted' => $deleted,
+                    'cacheInfo' => $this->cacheInfo(),
+                ]);
+            }
+
+            redirect('/admin/optimizer?cache_cleared=' . $deleted);
+        } catch (Throwable $e) {
+            if ($this->isAjax($request)) {
+                return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
+            }
+
+            return $this->admin('admin/optimizer/index', [
+                'title' => 'Оптимізатор',
+                'cacheInfo' => $this->cacheInfo(),
+                'debugInfo' => $this->debugInfo(),
+                'canManageMedia' => Container::get('auth')->can('media.manage'),
+                'canManageSystem' => Container::get('auth')->can('settings.manage'),
                 'previewLimit' => self::PREVIEW_LIMIT,
                 'applied' => 0,
+                'cacheCleared' => 0,
+                'debugChanged' => '',
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function toggleDebug(Request $request): Response
+    {
+        $this->guard('settings.manage');
+        Csrf::verify();
+
+        try {
+            $enabled = (string) $request->input('enabled', '0') === '1';
+            $path = base_path('storage/debug.enabled');
+            $storage = dirname($path);
+            if (!is_dir($storage) && !mkdir($storage, 0775, true)) {
+                throw new RuntimeException('Не вдалося створити директорію storage.');
+            }
+
+            if ($enabled) {
+                if (file_put_contents($path, 'enabled ' . date('c') . PHP_EOL) === false) {
+                    throw new RuntimeException('Не вдалося увімкнути debug режим.');
+                }
+            } elseif (is_file($path) && !unlink($path)) {
+                throw new RuntimeException('Не вдалося вимкнути debug режим.');
+            }
+
+            $this->audit($enabled ? 'enable_debug' : 'disable_debug', 'system');
+
+            if ($this->isAjax($request)) {
+                return $this->json([
+                    'ok' => true,
+                    'message' => $enabled ? 'Debug режим увімкнено.' : 'Debug режим вимкнено.',
+                    'debugInfo' => $this->debugInfo(),
+                ]);
+            }
+
+            redirect('/admin/optimizer?debug=' . ($enabled ? 'enabled' : 'disabled'));
+        } catch (Throwable $e) {
+            if ($this->isAjax($request)) {
+                return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
+            }
+
+            return $this->admin('admin/optimizer/index', [
+                'title' => 'Оптимізатор',
+                'cacheInfo' => $this->cacheInfo(),
+                'debugInfo' => $this->debugInfo(),
+                'canManageMedia' => Container::get('auth')->can('media.manage'),
+                'canManageSystem' => Container::get('auth')->can('settings.manage'),
+                'previewLimit' => self::PREVIEW_LIMIT,
+                'applied' => 0,
+                'cacheCleared' => 0,
+                'debugChanged' => '',
                 'error' => $e->getMessage(),
             ]);
         }
@@ -158,6 +292,128 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
                 'conflicts' => count($conflicts),
             ],
         ];
+    }
+
+    private function guardOptimizer(): void
+    {
+        $this->guard();
+        $auth = Container::get('auth');
+        if ($auth->can('media.manage') || $auth->can('settings.manage')) {
+            return;
+        }
+
+        if ($this->isAjaxRequest()) {
+            (new Response(json_encode(['ok' => false, 'message' => 'Доступ заборонено.'], JSON_UNESCAPED_UNICODE), 403, [
+                'Content-Type' => 'application/json; charset=UTF-8',
+            ]))->send();
+            exit;
+        }
+
+        \App\Controllers\ErrorController::response(403)->send();
+        exit;
+    }
+
+    private function cacheInfo(): array
+    {
+        $path = base_path('storage/cache');
+        $info = [
+            'path' => $path,
+            'exists' => is_dir($path),
+            'writable' => is_dir($path) && is_writable($path),
+            'files' => 0,
+            'bytes' => 0,
+            'size' => '0 Б',
+        ];
+
+        if (!is_dir($path)) {
+            return $info;
+        }
+
+        foreach ($this->directoryFiles($path) as $file) {
+            if ($file->getFilename() === '.gitkeep') {
+                continue;
+            }
+
+            $info['files']++;
+            $info['bytes'] += max(0, $file->getSize());
+        }
+
+        $info['size'] = $this->formatBytes((int) $info['bytes']);
+        return $info;
+    }
+
+    private function debugInfo(): array
+    {
+        $path = base_path('storage/debug.enabled');
+
+        return [
+            'enabled' => Debug::enabled(base_path()),
+            'marker_path' => $path,
+            'marker_exists' => is_file($path),
+            'storage_writable' => is_writable(base_path('storage')),
+            'log_path' => base_path('storage/debug.log'),
+        ];
+    }
+
+    private function clearDirectoryContents(string $path): int
+    {
+        if (!is_dir($path)) {
+            if (!mkdir($path, 0775, true)) {
+                throw new RuntimeException('Не вдалося створити директорію кешу.');
+            }
+            return 0;
+        }
+
+        if (!is_writable($path)) {
+            throw new RuntimeException('Директорія кешу недоступна для запису.');
+        }
+
+        $deleted = 0;
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            $itemPath = $item->getPathname();
+            if ($item->isFile() || $item->isLink()) {
+                if ($item->getFilename() === '.gitkeep') {
+                    continue;
+                }
+                if (!unlink($itemPath)) {
+                    throw new RuntimeException('Не вдалося видалити файл кешу: ' . $item->getFilename());
+                }
+                $deleted++;
+                continue;
+            }
+
+            if ($item->isDir() && !$this->directoryHasGitkeep($itemPath) && !rmdir($itemPath)) {
+                throw new RuntimeException('Не вдалося видалити директорію кешу: ' . $item->getFilename());
+            }
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * @return iterable<SplFileInfo>
+     */
+    private function directoryFiles(string $path): iterable
+    {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $item) {
+            if ($item->isFile()) {
+                yield $item;
+            }
+        }
+    }
+
+    private function directoryHasGitkeep(string $path): bool
+    {
+        return is_file(rtrim($path, '/\\') . '/.gitkeep');
     }
 
     private function newsRowsForMediaAnalysis(): array

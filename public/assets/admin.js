@@ -1,5 +1,17 @@
     const adminBody = document.body;
     const adminCsrfToken = adminBody ? (adminBody.dataset.adminCsrfToken || '') : '';
+    document.addEventListener('submit', function (event) {
+        const form = event.target.closest('[data-optimizer-confirm]');
+        if (!form) {
+            return;
+        }
+
+        if (!window.confirm(form.dataset.optimizerConfirm || 'Виконати дію?')) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    }, true);
+
     document.querySelectorAll('[data-infinite-list]').forEach(function (panel) {
         const input = panel.querySelector('[data-filter-input]');
         const count = panel.querySelector('[data-filter-count]');
@@ -660,6 +672,137 @@
     });
 
     initNewsCategoryManager();
+
+    function initOptimizerTabs() {
+        const buttons = Array.from(document.querySelectorAll('[data-optimizer-tab]'));
+        const panels = Array.from(document.querySelectorAll('[data-optimizer-tab-panel]'));
+        if (buttons.length === 0 || panels.length === 0) {
+            return;
+        }
+
+        function setServiceMessage(grid, message, isError) {
+            document.querySelectorAll('[data-optimizer-service-message]').forEach(function (node) {
+                node.remove();
+            });
+            if (!grid || !message) {
+                return;
+            }
+
+            const node = document.createElement('div');
+            node.setAttribute('data-optimizer-service-message', '');
+            node.className = isError ? 'alert alert-warning mb-4' : 'alert alert-success mb-4';
+            node.textContent = message;
+            grid.insertAdjacentElement('afterend', node);
+        }
+
+        async function refreshServiceGrid(message) {
+            const grid = document.querySelector('.optimizer-service-grid');
+            if (!grid) {
+                return;
+            }
+
+            const response = await fetch(window.location.href, {
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            });
+            const html = await response.text();
+            if (!response.ok || !html) {
+                throw new Error('Не вдалося оновити стан карток.');
+            }
+
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const freshGrid = doc.querySelector('.optimizer-service-grid');
+            if (!freshGrid) {
+                throw new Error('Не вдалося знайти оновлені картки.');
+            }
+
+            grid.replaceWith(freshGrid);
+            setServiceMessage(freshGrid, message || '', false);
+        }
+
+        async function loadPanel(panel, force) {
+            if (!panel || (!force && panel.dataset.loaded === '1')) {
+                return;
+            }
+
+            const status = panel.querySelector('[data-optimizer-tab-status]');
+            if (status) {
+                status.textContent = 'Завантаження...';
+            }
+
+            try {
+                const response = await fetch(panel.dataset.loadUrl || '', {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'}
+                });
+                const data = await response.json();
+                if (!response.ok || !data.ok) {
+                    throw new Error(data.message || 'Не вдалося завантажити вкладку.');
+                }
+
+                panel.innerHTML = data.html || '';
+                panel.dataset.loaded = '1';
+                document.dispatchEvent(new CustomEvent('admin:content-replaced', {detail: {target: panel}}));
+            } catch (error) {
+                panel.dataset.loaded = '0';
+                if (status) {
+                    status.textContent = error.message || 'Помилка завантаження.';
+                } else {
+                    panel.innerHTML = '<div class="alert">' + escapeHtml(error.message || 'Помилка завантаження.') + '</div>';
+                }
+            }
+        }
+
+        function activate(name) {
+            buttons.forEach(function (button) {
+                const active = button.dataset.optimizerTab === name;
+                button.setAttribute('aria-selected', active ? 'true' : 'false');
+                button.classList.toggle('secondary', !active);
+            });
+            panels.forEach(function (panel) {
+                const active = panel.dataset.optimizerTabPanel === name;
+                panel.hidden = !active;
+                if (active) {
+                    loadPanel(panel, false);
+                }
+            });
+        }
+
+        buttons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                activate(button.dataset.optimizerTab || '');
+            });
+        });
+
+        const activeButton = buttons.find(function (button) {
+            return button.getAttribute('aria-selected') === 'true';
+        });
+        if (activeButton) {
+            activate(activeButton.dataset.optimizerTab || '');
+        }
+
+        document.addEventListener('admin:form-saved', function (event) {
+            const form = event.detail && event.detail.form;
+            if (!form) {
+                return;
+            }
+
+            if (form.matches('[data-optimizer-media-apply]')) {
+                const panel = document.querySelector('[data-optimizer-tab-panel="media"]');
+                if (panel) {
+                    loadPanel(panel, true);
+                }
+                return;
+            }
+
+            if (form.matches('[data-optimizer-service-action]')) {
+                const data = event.detail && event.detail.data ? event.detail.data : {};
+                refreshServiceGrid(data.message || '').catch(function (error) {
+                    setServiceMessage(document.querySelector('.optimizer-service-grid'), error.message || 'Не вдалося оновити стан карток.', true);
+                });
+            }
+        });
+    }
+
+    initOptimizerTabs();
 
     function initTinyMceEditors() {
         if (window.TinyMceEditor) {

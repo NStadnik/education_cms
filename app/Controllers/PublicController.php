@@ -28,9 +28,9 @@ final class PublicController extends BaseController
         $homePageId = (int) ($settings['home_page_id'] ?? 0);
         $page = null;
         if ($homePageId > 0) {
-            $page = $this->db()->fetch('select * from pages where id = ? and status = ?', [$homePageId, 'published']);
+            $page = $this->cachedFetch('select * from pages where id = ? and status = ?', [$homePageId, 'published']);
         }
-        $page ??= $this->db()->fetch('select * from pages where slug = ? and status = ?', ['home', 'published']);
+        $page ??= $this->cachedFetch('select * from pages where slug = ? and status = ?', ['home', 'published']);
         return $this->renderPage($page ?: ['title' => 'Головна', 'blocks_json' => '[]'], true, $settings);
     }
 
@@ -41,7 +41,7 @@ final class PublicController extends BaseController
             return $response;
         }
 
-        $page = $this->db()->fetch('select * from pages where slug = ? and status = ?', [$params['slug'], 'published']);
+        $page = $this->cachedFetch('select * from pages where slug = ? and status = ?', [$params['slug'], 'published']);
         if (!$page) {
             return ErrorController::response(404);
         }
@@ -83,7 +83,7 @@ final class PublicController extends BaseController
             array_push($params, $like, $like, $like, $like);
         }
 
-        $total = (int) ($this->db()->fetch(
+        $total = (int) ($this->cachedFetch(
             'select count(distinct n.id) as c
              from news n
              left join news_category_links l on l.news_id = n.id
@@ -98,7 +98,7 @@ final class PublicController extends BaseController
         }
         $offset = max(0, (int) $request->input('offset', ($page - 1) * $limit));
 
-        $items = $this->db()->fetchAll(
+        $items = $this->cachedFetchAll(
             'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
              from news n
              left join news_category_links l on l.news_id = n.id
@@ -176,7 +176,7 @@ final class PublicController extends BaseController
             return $response;
         }
 
-        $item = $this->db()->fetch(
+        $item = $this->cachedFetch(
             'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
              from news n
              left join news_category_links l on l.news_id = n.id
@@ -199,7 +199,7 @@ final class PublicController extends BaseController
 
     private function newsCategories(): array
     {
-        return $this->db()->fetchAll(
+        return $this->cachedFetchAll(
             "select c.title as category, count(n.id) as items_count
              from news_categories c
              inner join news_category_links l on l.category_id = c.id
@@ -219,8 +219,7 @@ final class PublicController extends BaseController
         }
 
         $type = mime_content_type($file) ?: 'application/octet-stream';
-        return new Response((string) file_get_contents($file), 200, [
-            'Content-Type' => $type,
+        return $this->fileResponse($file, $type, 'public, max-age=604800', [
             'Content-Disposition' => 'inline; filename="' . basename($file) . '"',
         ]);
     }
@@ -238,10 +237,7 @@ final class PublicController extends BaseController
             return new Response($exception->getMessage(), 404);
         }
 
-        return new Response((string) file_get_contents($thumb['path']), 200, [
-            'Content-Type' => $thumb['mime'],
-            'Cache-Control' => 'public, max-age=604800',
-        ]);
+        return $this->fileResponse((string) $thumb['path'], (string) $thumb['mime'], 'public, max-age=604800');
     }
 
     public function asset(Request $request, array $params): Response
@@ -263,10 +259,7 @@ final class PublicController extends BaseController
         ];
         $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 
-        return new Response((string) file_get_contents($file), 200, [
-            'Content-Type' => $types[$extension] ?? 'application/octet-stream',
-            'Cache-Control' => 'public, max-age=86400',
-        ]);
+        return $this->fileResponse($file, $types[$extension] ?? 'application/octet-stream', 'public, max-age=86400');
     }
 
     public function debug(): Response
@@ -282,6 +275,53 @@ final class PublicController extends BaseController
         ], 'layouts/minimal');
     }
 
+    private function fileResponse(string $file, string $contentType, string $cacheControl, array $headers = []): Response
+    {
+        $modifiedAt = (int) filemtime($file);
+        $size = max(0, (int) filesize($file));
+        $etag = '"' . sha1($file . '|' . $modifiedAt . '|' . $size) . '"';
+        $lastModified = gmdate('D, d M Y H:i:s', $modifiedAt) . ' GMT';
+
+        $headers = array_replace([
+            'Content-Type' => $contentType,
+            'Cache-Control' => $cacheControl,
+            'ETag' => $etag,
+            'Last-Modified' => $lastModified,
+        ], $headers);
+
+        if ($this->notModified($etag, $modifiedAt)) {
+            return new Response('', 304, $headers);
+        }
+
+        $content = file_get_contents($file);
+        if ($content === false) {
+            return ErrorController::response(404);
+        }
+
+        $headers['Content-Length'] = (string) strlen($content);
+        return new Response($content, 200, $headers);
+    }
+
+    private function notModified(string $etag, int $modifiedAt): bool
+    {
+        $ifNoneMatch = trim((string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? ''));
+        if ($ifNoneMatch !== '') {
+            $matches = array_map(
+                static fn (string $value): string => preg_replace('/^W\//', '', trim($value)) ?? '',
+                explode(',', $ifNoneMatch)
+            );
+            return in_array('*', $matches, true) || in_array($etag, $matches, true);
+        }
+
+        $ifModifiedSince = (string) ($_SERVER['HTTP_IF_MODIFIED_SINCE'] ?? '');
+        if ($ifModifiedSince === '') {
+            return false;
+        }
+
+        $since = strtotime($ifModifiedSince);
+        return $since !== false && $modifiedAt <= $since;
+    }
+
     private function renderPage(array $page, bool $isHomePage = false, ?array $settings = null): Response
     {
         $settings ??= $this->siteSettings();
@@ -293,7 +333,7 @@ final class PublicController extends BaseController
             'homeHeroVisible' => $isHomePage && $this->homeHeroVisible($settings),
             'blocks' => json_decode($page['blocks_json'] ?? '[]', true) ?: [],
             'menu' => $this->menu(),
-            'latestNews' => $this->db()->fetchAll('select * from news where status = ? order by published_at desc, id desc limit 3', ['published']),
+            'latestNews' => $this->cachedFetchAll('select * from news where status = ? order by published_at desc, id desc limit 3', ['published']),
         ]);
     }
 
@@ -380,10 +420,26 @@ final class PublicController extends BaseController
         $settings = $this->siteSettings();
         $homePageId = (int) ($settings['home_page_id'] ?? 0);
         if ($homePageId > 0) {
-            return $this->db()->fetchAll('select title, slug from pages where status = ? and id <> ? order by sort_order asc, title asc', ['published', $homePageId]);
+            return $this->cachedFetchAll('select title, slug from pages where status = ? and id <> ? order by sort_order asc, title asc', ['published', $homePageId]);
         }
 
-        return $this->db()->fetchAll('select title, slug from pages where status = ? and slug <> ? order by sort_order asc, title asc', ['published', 'home']);
+        return $this->cachedFetchAll('select title, slug from pages where status = ? and slug <> ? order by sort_order asc, title asc', ['published', 'home']);
+    }
+
+    protected function siteSettings(): array
+    {
+        $rows = $this->cachedFetchAll('select name, value from settings');
+        return array_column($rows, 'value', 'name');
+    }
+
+    private function cachedFetch(string $sql, array $params = [], int $ttl = 600): ?array
+    {
+        return $this->db()->cachedFetch('public_site', $sql, $params, $ttl);
+    }
+
+    private function cachedFetchAll(string $sql, array $params = [], int $ttl = 600): array
+    {
+        return $this->db()->cachedFetchAll('public_site', $sql, $params, $ttl);
     }
 
 }

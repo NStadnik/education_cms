@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use App\Services\QueryCache;
 use PDO;
 use RuntimeException;
 
@@ -58,14 +59,40 @@ final class Database
         return $stmt->fetchAll();
     }
 
+    public function cachedFetch(string $scope, string $sql, array $params = [], int $ttl = 600): ?array
+    {
+        $row = QueryCache::remember($scope, $sql, $params, fn (): ?array => $this->fetch($sql, $params), $ttl);
+        return is_array($row) ? $row : null;
+    }
+
+    public function cachedFetchAll(string $scope, string $sql, array $params = [], int $ttl = 600): array
+    {
+        $rows = QueryCache::remember($scope, $sql, $params, fn (): array => $this->fetchAll($sql, $params), $ttl);
+        return is_array($rows) ? $rows : [];
+    }
+
     public function execute(string $sql, array $params = []): bool
     {
         $stmt = $this->pdo()->prepare($sql);
-        return $stmt->execute($params);
+        $ok = $stmt->execute($params);
+        if ($ok && $this->invalidatesPublicQueryCache($sql)) {
+            QueryCache::flush();
+        }
+
+        return $ok;
     }
 
     public function lastInsertId(): string
     {
         return $this->pdo()->lastInsertId();
+    }
+
+    private function invalidatesPublicQueryCache(string $sql): bool
+    {
+        if (!preg_match('/^\s*(insert|update|delete|replace|truncate|alter|drop|create)\b/i', $sql)) {
+            return false;
+        }
+
+        return preg_match('/\b(settings|pages|news|news_categories|news_category_links)\b/i', $sql) === 1;
     }
 }

@@ -141,7 +141,10 @@ final class App
         $this->router->post('/admin/media/delete', [$adminMedia, 'mediaDelete']);
         $this->router->post('/admin/media/bulk', [$adminMedia, 'mediaBulk']);
         $this->router->get('/admin/optimizer', [$adminOptimizer, 'index']);
+        $this->router->get('/admin/optimizer/media-folders', [$adminOptimizer, 'mediaFolders']);
         $this->router->post('/admin/optimizer/media-folders/apply', [$adminOptimizer, 'applyMediaFolders']);
+        $this->router->post('/admin/optimizer/cache/clear', [$adminOptimizer, 'clearCache']);
+        $this->router->post('/admin/optimizer/debug/toggle', [$adminOptimizer, 'toggleDebug']);
         $this->router->get('/admin/users', [$adminUsers, 'users']);
         $this->router->get('/admin/users/roles', [$adminUsers, 'roles']);
         $this->router->get('/admin/users/roles/edit', [$adminUsers, 'roleForm']);
