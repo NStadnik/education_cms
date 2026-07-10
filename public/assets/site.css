@@ -425,7 +425,7 @@ table:not(.table) th { background: #f1f4f9; }
     .site-secondary-menu { display: none; }
     .site-mode-page { min-height: calc(100svh - 64px); padding: 24px 0; }
     .site-mode-panel { padding: 22px; }
-    .site-mode-panel h1 { font-size: clamp(32px, 12vw, 48px); }
+    .site-mode-panel h1 { font-size: clamp(32px, 12vw, 48px); overflow-wrap: anywhere; }
     .site-mode-actions .button { width: 100%; }
     .site-error-page { min-height: 0; padding: 32px 0; }
     .site-error-shell { grid-template-columns: 1fr; gap: 22px; }

@@ -37,7 +37,7 @@
     <div class="admin-shell">
         <aside class="admin-sidebar">
             <div class="admin-brand mb-4">
-                <h2 class="h4 mb-1 text-white">Education CMS</h2>
+                <h2 class="h4 mb-1 text-white"><img src="<?= url('/assets/images/education_cms_logo_for_black.png') ?>" alt="Education CMS" class="admin-logo"></h2>
                 <a href="https://lcloud.in.ua" target="_blank" rel="noopener">Навчальна хмара «ЛКЛАУД»</a>
                 <p class="small text-white-50 mb-0">Панель керування</p>
             </div>

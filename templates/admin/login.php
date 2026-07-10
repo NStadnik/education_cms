@@ -1,6 +1,6 @@
 <div class="card admin-login-card">
     <div class="admin-login-head">
-        <h1>Education CMS</h1>
+        <h1><img src="<?= url('/assets/images/education_cms_logo_for_white.png') ?>" alt="Education CMS" class="admin-logo"></h1>
         <p>Вхід в адмінку</p>
     </div>
     <?php if (!empty($error)): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
