@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const sectionPickerModal = sectionPickerNode && window.bootstrap ? new window.bootstrap.Modal(sectionPickerNode) : null;
     const imagePickerNode = document.getElementById('layoutCardImagePickerModal');
     const imagePickerModal = imagePickerNode && window.bootstrap ? new window.bootstrap.Modal(imagePickerNode) : null;
-    const cardStyles = ['default', 'accent', 'plain', 'feature', 'media', 'cta', 'stat', 'quote', 'contact'];
+    const cardStyles = ['default', 'accent', 'plain', 'feature', 'media', 'cta', 'stat', 'quote', 'contact', 'form'];
     const cardTemplates = {
         feature: {
             style: 'feature',
@@ -529,12 +529,13 @@ document.addEventListener('DOMContentLoaded', function () {
             image: card.image || '',
             button_text: primaryLink ? primaryLink.label : (card.button_text || ''),
             button_url: primaryLink ? primaryLink.url : (card.button_url || ''),
-            links: links
+            links: links,
+            form_id: Number(card.form_id || 0)
         };
     }
 
     function emptyCard() {
-        return {style: 'default', title: '', text: '', image: '', button_text: '', button_url: '', links: []};
+        return {style: 'default', title: '', text: '', image: '', button_text: '', button_url: '', links: [], form_id: 0};
     }
 
     function normalizeCardLinks(card) {
@@ -1119,10 +1120,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function setCardModalValues(card) {
-        ['style', 'title', 'text', 'image', 'button_text', 'button_url'].forEach(function (name) {
+        ['style', 'title', 'text', 'image', 'button_text', 'button_url', 'form_id'].forEach(function (name) {
             const field = cardModalField(name);
             if (field) {
-                field.value = card[name] || (name === 'style' ? 'default' : '');
+                field.value = card[name] || (name === 'style' ? 'default' : (name === 'form_id' ? '0' : ''));
                 if (name === 'text' && window.TiptapEditor) {
                     window.TiptapEditor.setContent(field, field.value);
                 }
@@ -1137,10 +1138,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (textField && window.TiptapEditor) {
             window.TiptapEditor.syncOne(textField);
         }
-        ['style', 'title', 'text', 'image', 'button_text', 'button_url'].forEach(function (name) {
+        ['style', 'title', 'text', 'image', 'button_text', 'button_url', 'form_id'].forEach(function (name) {
             const field = cardModalField(name);
             if (field) {
-                card[name] = field.value.trim();
+                card[name] = name === 'form_id' ? Number(field.value || 0) : field.value.trim();
             }
         });
         card.links = readCardLinksEditor();
@@ -1733,7 +1734,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
                 const card = readCardModalValues();
-                if (card.title === '' || card.text === '') {
+                if ((!card.form_id) && (card.title === '' || card.text === '')) {
                     setCardModalError('Заповніть заголовок і текст картки.');
                     return;
                 }

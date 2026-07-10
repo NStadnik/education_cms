@@ -11,5 +11,5 @@
     </section>
 <?php endif; ?>
 <?php foreach ($blocks as $block): ?>
-    <?= $this->partial('public/partials/page-block', ['page' => $page, 'block' => $block, 'latestNews' => $latestNews, 'homeHeroVisible' => $homeHeroVisible ?? false]) ?>
+    <?= $this->partial('public/partials/page-block', ['page' => $page, 'block' => $block, 'latestNews' => $latestNews, 'homeHeroVisible' => $homeHeroVisible ?? false, 'formsById' => $formsById ?? []]) ?>
 <?php endforeach; ?>

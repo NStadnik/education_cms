@@ -112,3 +112,39 @@ create table if not exists audit_logs (
     details text null,
     created_at varchar(32) not null
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
+create table if not exists forms (
+    id bigint unsigned primary key auto_increment,
+    created_by bigint unsigned null,
+    title varchar(220) not null,
+    slug varchar(180) not null unique,
+    description text null,
+    type varchar(40) not null default 'generic',
+    fields_json longtext not null,
+    settings_json longtext not null,
+    status varchar(40) not null default 'draft',
+    version int unsigned not null default 1,
+    starts_at varchar(32) null,
+    ends_at varchar(32) null,
+    created_at varchar(32) not null,
+    updated_at varchar(32) not null,
+    index forms_status_index (status)
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
+create table if not exists form_submissions (
+    id bigint unsigned primary key auto_increment,
+    form_id bigint unsigned not null,
+    form_version int unsigned not null,
+    answers_json longtext not null,
+    schema_snapshot_json longtext not null,
+    context_json longtext not null,
+    status varchar(40) not null default 'new',
+    submitter_email varchar(180) null,
+    ip_hash varchar(64) null,
+    user_agent varchar(500) null,
+    created_at varchar(32) not null,
+    updated_at varchar(32) not null,
+    index form_submissions_form_id_index (form_id),
+    index form_submissions_status_index (status),
+    constraint form_submissions_form_id_foreign foreign key(form_id) references forms(id) on delete cascade
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;

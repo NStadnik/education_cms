@@ -444,3 +444,4 @@ table:not(.table) th { background: #f1f4f9; }
     .main { padding: 16px; }
     .admin-content { padding: 16px; }
 }
+.form-honeypot{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important;overflow:hidden!important}.public-form-card .form-options{display:flex;gap:.75rem;flex-wrap:wrap}.public-form-card .form-options label{display:inline-flex;align-items:center;gap:.35rem}.public-form-card [data-form-error]{display:block;color:#b42318}.form-submit-status{margin:.75rem 0 0;font-weight:600}

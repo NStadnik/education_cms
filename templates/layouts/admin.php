@@ -4,6 +4,7 @@
     $adminNav = [
         ['/admin', 'Огляд', 'mdi-view-dashboard-outline'],
         ['/admin/pages', 'Сторінки', 'mdi-file-document-edit-outline'],
+        ['/admin/forms', 'Форми', 'mdi-form-select'],
         ['/admin/news', 'Новини', 'mdi-newspaper-variant-outline'],
         ['/admin/media', 'Медіафайли', 'mdi-image-multiple-outline'],
         ['/admin/optimizer', 'Оптимізатор', 'mdi-auto-fix'],

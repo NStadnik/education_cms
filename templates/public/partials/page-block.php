@@ -10,6 +10,9 @@
             </div>
         </section>
     <?php endif; ?>
+<?php elseif ($type === 'form'): ?>
+    <?php $embeddedForm = $formsById[(int) ($block['form_id'] ?? 0)] ?? null; ?>
+    <?php if ($embeddedForm): ?><section class="section"><div class="container"><?= $this->partial('public/partials/form', ['form'=>$embeddedForm,'page'=>$page]) ?></div></section><?php endif; ?>
 <?php elseif ($type === 'news_list'): ?>
     <section class="section">
         <div class="container">
@@ -53,6 +56,11 @@
                         <?php $width = in_array(($column['width'] ?? ''), ['col-md-12', 'col-md-8', 'col-md-6', 'col-md-4'], true) ? $column['width'] : 'col-md-12'; ?>
                         <div class="<?= e($width) ?>">
                             <?php foreach (($column['cards'] ?? []) as $card): ?>
+                                <?php $embeddedForm = !empty($card['form_id']) ? ($formsById[(int) $card['form_id']] ?? null) : null; ?>
+                                <?php if ($embeddedForm): ?>
+                                    <?= $this->partial('public/partials/form', ['form' => $embeddedForm, 'page' => $page]) ?>
+                                    <?php continue; ?>
+                                <?php endif; ?>
                                 <?php $style = preg_replace('/[^a-z0-9_-]/i', '', (string) ($card['style'] ?? 'default')) ?: 'default'; ?>
                                 <article class="card content-card page-layout-card page-layout-card-<?= e($style) ?>">
                                     <?php if (!empty($card['image'])): ?>

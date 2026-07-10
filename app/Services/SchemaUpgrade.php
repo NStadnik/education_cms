@@ -73,6 +73,8 @@ final class SchemaUpgrade
             }
 
             self::createMediaTable($db);
+            self::createFormsTables($db);
+            self::upgradeFormsPermissions($db);
             $mediaDone = $db->fetch('select value from settings where name = ?', ['schema_media_table']);
             if (($mediaDone['value'] ?? '') !== '1') {
                 MediaMetadata::migrateLegacyStorage();
@@ -243,6 +245,47 @@ final class SchemaUpgrade
                 index media_folder_index (folder)
             ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci"
         );
+    }
+
+    private static function createFormsTables(Database $db): void
+    {
+        $db->pdo()->exec("create table if not exists forms (
+            id bigint unsigned primary key auto_increment, created_by bigint unsigned null,
+            title varchar(220) not null, slug varchar(180) not null unique, description text null,
+            type varchar(40) not null default 'generic', fields_json longtext not null,
+            settings_json longtext not null, status varchar(40) not null default 'draft',
+            version int unsigned not null default 1, starts_at varchar(32) null, ends_at varchar(32) null,
+            created_at varchar(32) not null, updated_at varchar(32) not null,
+            index forms_status_index (status)
+        ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci");
+        $db->pdo()->exec("create table if not exists form_submissions (
+            id bigint unsigned primary key auto_increment, form_id bigint unsigned not null,
+            form_version int unsigned not null, answers_json longtext not null,
+            schema_snapshot_json longtext not null, context_json longtext not null,
+            status varchar(40) not null default 'new', submitter_email varchar(180) null,
+            ip_hash varchar(64) null, user_agent varchar(500) null,
+            created_at varchar(32) not null, updated_at varchar(32) not null,
+            index form_submissions_form_id_index (form_id), index form_submissions_status_index (status),
+            constraint form_submissions_form_id_foreign foreign key(form_id) references forms(id) on delete cascade
+        ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci");
+    }
+
+    private static function upgradeFormsPermissions(Database $db): void
+    {
+        $done = $db->fetch('select value from settings where name=?', ['schema_forms_permissions']);
+        if (($done['value'] ?? '') === '1') { return; }
+        $stored = $db->fetch('select value from settings where name=?', ['user_roles']);
+        $roles = json_decode((string) ($stored['value'] ?? ''), true);
+        if (is_array($roles)) {
+            foreach (['editor', 'publisher'] as $role) {
+                if (!isset($roles[$role]['permissions']) || !is_array($roles[$role]['permissions']) || in_array('*', $roles[$role]['permissions'], true)) { continue; }
+                $roles[$role]['permissions'][] = 'forms.manage';
+                $roles[$role]['permissions'] = array_values(array_unique($roles[$role]['permissions']));
+            }
+            $db->execute('update settings set value=? where name=?', [json_encode($roles, JSON_UNESCAPED_UNICODE), 'user_roles']);
+        }
+        $db->execute('delete from settings where name=?', ['schema_forms_permissions']);
+        $db->execute('insert into settings (name,value) values (?,?)', ['schema_forms_permissions', '1']);
     }
 
     private static function seedNewsCategories(Database $db): void

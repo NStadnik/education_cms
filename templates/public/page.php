@@ -11,4 +11,5 @@
     'latestNews' => $latestNews,
     'isHomePage' => $isHomePage ?? false,
     'homeHeroVisible' => $homeHeroVisible ?? false,
+    'formsById' => $formsById ?? [],
 ]) ?>

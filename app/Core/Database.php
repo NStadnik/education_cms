@@ -105,6 +105,6 @@ final class Database
             return false;
         }
 
-        return preg_match('/\b(settings|pages|news|news_categories|news_category_links|media)\b/i', $sql) === 1;
+        return preg_match('/\b(settings|pages|news|news_categories|news_category_links|media|forms|form_submissions)\b/i', $sql) === 1;
     }
 }

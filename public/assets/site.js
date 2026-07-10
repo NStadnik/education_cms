@@ -1,4 +1,24 @@
 document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-public-form]').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            const status = form.querySelector('[data-form-status]');
+            const button = form.querySelector('[type="submit"]');
+            form.querySelectorAll('[data-form-error]').forEach(function (node) { node.textContent = ''; });
+            if (button) button.disabled = true;
+            if (status) status.textContent = 'Надсилання…';
+            fetch(form.action, {method: 'POST', body: new FormData(form), headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                .then(function (response) { return response.json().then(function (data) { return {ok: response.ok, data: data}; }); })
+                .then(function (result) {
+                    if (!result.ok || !result.data.ok) throw result.data;
+                    form.reset(); if (status) status.textContent = result.data.message;
+                })
+                .catch(function (error) {
+                    Object.keys(error.errors || {}).forEach(function (key) { const node=form.querySelector('[data-form-error="'+key+'"]'); if(node) node.textContent=error.errors[key]; });
+                    if (status) status.textContent = error.message || 'Не вдалося надіслати форму.';
+                }).finally(function () { if (button) button.disabled = false; });
+        });
+    });
     function initRichGalleryViewer() {
         const galleries = Array.from(document.querySelectorAll('.rich-gallery'));
         if (!galleries.length) {

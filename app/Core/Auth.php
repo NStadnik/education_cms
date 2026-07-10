@@ -39,6 +39,11 @@ final class Auth
             'label' => 'Медіафайли',
             'description' => 'Перегляд, завантаження, перейменування та видалення файлів.',
         ],
+        'forms.manage' => [
+            'group' => 'Контент',
+            'label' => 'Форми',
+            'description' => 'Створення форм та перегляд надісланих відповідей.',
+        ],
         'users.manage' => [
             'group' => 'Адміністрування',
             'label' => 'Користувачі',
@@ -69,8 +74,8 @@ final class Auth
     {
         return [
             'admin' => ['*'],
-            'editor' => ['pages.manage', 'news.manage', 'media.manage'],
-            'publisher' => ['pages.manage', 'news.manage', 'news.review', 'news.publish', 'media.manage'],
+            'editor' => ['pages.manage', 'news.manage', 'media.manage', 'forms.manage'],
+            'publisher' => ['pages.manage', 'news.manage', 'news.review', 'news.publish', 'media.manage', 'forms.manage'],
             'viewer' => [],
         ];
     }

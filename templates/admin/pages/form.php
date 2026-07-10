@@ -154,6 +154,7 @@
                     </div>
                     <label>Вміст
                         <textarea class="textarea-large" name="blocks_text" data-tiptap-editor placeholder="Введіть текст сторінки. Можна вставляти HTML з базовим форматуванням."><?= e($simpleText) ?></textarea>
+                        <small class="meta">Щоб вставити форму у простому редакторі, використайте код <code>[form id="12"]</code> з ID потрібної форми.</small>
                     </label>
                 </section>
                 <input type="hidden" name="layout_json" data-layout-json>
@@ -550,7 +551,11 @@
                                 <option value="stat">Показник</option>
                                 <option value="quote">Цитата</option>
                                 <option value="contact">Контакти</option>
+                                <option value="form">Форма</option>
                             </select>
+                        </label>
+                        <label>Вбудована форма
+                            <select data-card-modal-field="form_id"><option value="0">Без форми</option><?php foreach (($forms ?? []) as $form): ?><option value="<?= e((string) $form['id']) ?>"><?= e($form['title']) ?><?= $form['status'] !== 'published' ? ' (чернетка)' : '' ?></option><?php endforeach; ?></select>
                         </label>
                         <label>Заголовок
                             <input data-card-modal-field="title" required placeholder="Заголовок картки">

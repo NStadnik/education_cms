@@ -22,7 +22,7 @@
 <?php if ($hasLayoutBlocks): ?>
     <?php foreach ($blocks as $block): ?>
         <?php if (($block['type'] ?? '') !== 'text'): ?>
-            <?= $this->partial('public/partials/page-block', ['page' => $page, 'block' => $block, 'latestNews' => $latestNews, 'homeHeroVisible' => $homeHeroVisible ?? false]) ?>
+            <?= $this->partial('public/partials/page-block', ['page' => $page, 'block' => $block, 'latestNews' => $latestNews, 'homeHeroVisible' => $homeHeroVisible ?? false, 'formsById' => $formsById ?? []]) ?>
         <?php endif; ?>
     <?php endforeach; ?>
 <?php endif; ?>

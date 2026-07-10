@@ -325,13 +325,27 @@ final class PublicController extends BaseController
     private function renderPage(array $page, bool $isHomePage = false, ?array $settings = null): Response
     {
         $settings ??= $this->siteSettings();
+        $blocks = json_decode($page['blocks_json'] ?? '[]', true) ?: [];
+        $formIds = [];
+        array_walk_recursive($blocks, static function ($value, $key) use (&$formIds): void {
+            if ($key === 'form_id' && (int) $value > 0) { $formIds[] = (int) $value; }
+        });
+        $formsById = [];
+        $formIds = array_values(array_unique($formIds));
+        if ($formIds) {
+            $placeholders = implode(',', array_fill(0, count($formIds), '?'));
+            foreach ($this->db()->fetchAll('select * from forms where status=? and id in (' . $placeholders . ')', ['published', ...$formIds]) as $form) {
+                $formsById[(int) $form['id']] = $form;
+            }
+        }
         return $this->render('public/page', [
             'title' => $page['title'],
             'settings' => $settings,
             'page' => $page,
             'isHomePage' => $isHomePage,
             'homeHeroVisible' => $isHomePage && $this->homeHeroVisible($settings),
-            'blocks' => json_decode($page['blocks_json'] ?? '[]', true) ?: [],
+            'blocks' => $blocks,
+            'formsById' => $formsById,
             'menu' => $this->menu(),
             'latestNews' => $this->cachedFetchAll('select * from news where status = ? order by published_at desc, id desc limit 3', ['published']),
         ]);

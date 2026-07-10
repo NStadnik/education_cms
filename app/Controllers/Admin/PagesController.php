@@ -55,7 +55,7 @@ final class PagesController extends \App\Controllers\AdminBaseController
         if ($item && !$this->canManageAllContent() && (int) ($item['created_by'] ?? 0) !== $this->currentUserId()) {
             return \App\Controllers\ErrorController::response(403);
         }
-        return $this->admin('admin/pages/form', ['title' => 'Сторінка', 'item' => $item, 'templates' => $this->pageTemplates()]);
+        return $this->admin('admin/pages/form', ['title' => 'Сторінка', 'item' => $item, 'templates' => $this->pageTemplates(), 'forms' => $this->db()->fetchAll("select id,title,status from forms order by title")]);
     }
 
     public function pageSave(Request $request): Response
@@ -71,7 +71,7 @@ final class PagesController extends \App\Controllers\AdminBaseController
             }
             $editorMode = (string) $request->input('editor_mode', 'simple');
             if ($editorMode === 'simple') {
-                $blocks = $this->blocksFromText((string) $request->input('blocks_text'));
+                $blocks = $this->expandFormShortcodes($this->blocksFromText((string) $request->input('blocks_text')));
             } else {
                 $blocks = $this->blocksFromLayoutJson((string) $request->input('layout_json'));
                 if (!$blocks) {
@@ -154,18 +154,20 @@ final class PagesController extends \App\Controllers\AdminBaseController
                         $image = trim((string) ($card['image'] ?? ''));
                         $buttonText = trim((string) ($card['button_text'] ?? ''));
                         $buttonUrl = trim((string) ($card['button_url'] ?? ''));
+                        $formId = max(0, (int) ($card['form_id'] ?? 0));
                         $links = $this->normalizeCardLinks($card, $buttonText, $buttonUrl);
                         if ($links) {
                             $buttonText = $links[0]['label'];
                             $buttonUrl = $links[0]['url'];
                         }
-                        if ($title === '' && $text === '' && $image === '' && !$links) {
+                        if ($title === '' && $text === '' && $image === '' && !$links && !$formId) {
                             continue;
                         }
 
                         $cards[] = [
                             'type' => 'card',
-                            'style' => $this->layoutChoice((string) ($card['style'] ?? 'default'), ['default', 'accent', 'plain', 'feature', 'media', 'cta', 'stat', 'quote', 'contact'], 'default'),
+                            'style' => $this->layoutChoice((string) ($card['style'] ?? 'default'), ['default', 'accent', 'plain', 'feature', 'media', 'cta', 'stat', 'quote', 'contact', 'form'], 'default'),
+                            'form_id' => $formId,
                             'title' => $title,
                             'text' => $text,
                             'image' => $image,
@@ -199,6 +201,21 @@ final class PagesController extends \App\Controllers\AdminBaseController
         }
 
         return $sections;
+    }
+
+    private function expandFormShortcodes(array $blocks): array
+    {
+        $result = [];
+        foreach ($blocks as $block) {
+            if (($block['type'] ?? '') !== 'text' || !isset($block['text'])) { $result[] = $block; continue; }
+            $parts = preg_split('/(?:<p>\s*)?(\[form\s+id=["\']?(\d+)["\']?\])(?:\s*<\/p>)?/i', (string) $block['text'], -1, PREG_SPLIT_DELIM_CAPTURE);
+            if (!$parts || count($parts) === 1) { $result[] = $block; continue; }
+            for ($i=0; $i<count($parts); $i++) {
+                if (preg_match('/^\[form\s+id=["\']?(\d+)["\']?\]$/i', $parts[$i], $match)) { $result[] = ['type'=>'form','form_id'=>(int)$match[1]]; }
+                elseif ($parts[$i] !== '' && !ctype_digit($parts[$i])) { $result[] = ['type'=>'text','text'=>$parts[$i]]; }
+            }
+        }
+        return $result;
     }
 
     private function layoutChoice(string $value, array $allowed, string $fallback): string

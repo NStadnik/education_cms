@@ -13,6 +13,8 @@ use App\Controllers\Admin\PagesController;
 use App\Controllers\Admin\SettingsController;
 use App\Controllers\Admin\UpdatesController;
 use App\Controllers\Admin\UsersController;
+use App\Controllers\Admin\FormsController;
+use App\Controllers\FormSubmissionController;
 use App\Controllers\ErrorController;
 use App\Controllers\InstallController;
 use App\Controllers\PublicController;
@@ -105,6 +107,8 @@ final class App
         $adminSettings = SettingsController::class;
         $adminImport = ImportController::class;
         $adminUpdates = UpdatesController::class;
+        $adminForms = FormsController::class;
+        $formSubmissions = FormSubmissionController::class;
         $install = InstallController::class;
         $lcloudApi = LcloudApiController::class;
 
@@ -116,6 +120,7 @@ final class App
         $this->router->get('/assets/{path}', [$public, 'asset']);
         $this->router->get('/uploads/{path}', [$public, 'upload']);
         $this->router->get('/debug', [$public, 'debug']);
+        $this->router->post('/forms/{id}/submit', [$formSubmissions, 'submit']);
 
         $this->router->get('/install', [$install, 'show']);
         $this->router->post('/install', [$install, 'store']);
@@ -130,6 +135,11 @@ final class App
         $this->router->get('/admin/pages/edit', [$adminPages, 'pageForm']);
         $this->router->post('/admin/pages/save', [$adminPages, 'pageSave']);
         $this->router->post('/admin/pages/bulk', [$adminPages, 'pagesBulk']);
+        $this->router->get('/admin/forms', [$adminForms, 'index']);
+        $this->router->get('/admin/forms/edit', [$adminForms, 'edit']);
+        $this->router->post('/admin/forms/save', [$adminForms, 'save']);
+        $this->router->post('/admin/forms/delete', [$adminForms, 'delete']);
+        $this->router->get('/admin/forms/submissions', [$adminForms, 'submissions']);
         $this->router->get('/admin/news', [$adminNews, 'news']);
         $this->router->get('/admin/news/edit', [$adminNews, 'newsForm']);
         $this->router->get('/admin/news/categories', [$adminNews, 'newsCategories']);
