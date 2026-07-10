@@ -1,0 +1,33 @@
+/* Keep the required toggle from being covered by card action buttons. */
+.form-field-card-head {
+    grid-template-columns: auto auto minmax(140px, 1fr) max-content 36px 36px;
+}
+.form-field-card-head > .button {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0;
+}
+.form-required-toggle {
+    display: inline-flex !important;
+    width: max-content;
+    min-width: max-content;
+    padding-right: 2px;
+    white-space: nowrap;
+}
+.form-required-toggle input {
+    flex: 0 0 16px;
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    margin: 0;
+}
+@media (max-width: 1100px) {
+    .form-field-card-head {
+        grid-template-columns: auto auto minmax(0, 1fr) 36px 36px;
+    }
+    .form-required-toggle {
+        grid-column: 2 / 4;
+        grid-row: 2;
+    }
+}

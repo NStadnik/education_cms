@@ -12,7 +12,7 @@
             <?php elseif (in_array($type,['select','radio'],true)): ?>
                 <?php if ($type === 'select'): ?><select name="<?= e($name) ?>" <?= $required?'required':'' ?>><option value="">Оберіть…</option><?php foreach(($field['options']??[]) as $option): ?><option value="<?= e($option['value']) ?>"><?= e($option['label']) ?></option><?php endforeach; ?></select>
                 <?php else: ?><span class="form-options"><?php foreach(($field['options']??[]) as $option): ?><label><input type="radio" name="<?= e($name) ?>" value="<?= e($option['value']) ?>" <?= $required?'required':'' ?>> <?= e($option['label']) ?></label><?php endforeach; ?></span><?php endif; ?>
-            <?php elseif (in_array($type,['checkbox','consent'],true)): ?><span><input type="checkbox" name="<?= e($name) ?>" value="1" <?= $required?'required':'' ?>> <?= e($field['label'] ?? '') ?></span>
+            <?php elseif (in_array($type,['checkbox','consent'],true)): ?><span class="form-checkbox-control"><input type="checkbox" name="<?= e($name) ?>" value="1" <?= $required?'required':'' ?>><span>Підтверджую</span></span>
             <?php else: ?><input type="<?= e(in_array($type,['email','tel','number','date'],true)?$type:'text') ?>" name="<?= e($name) ?>" <?= $required?'required':'' ?>><?php endif; ?>
             <small data-form-error="<?= e((string) ($field['id'] ?? '')) ?>"></small></label>
         <?php endforeach; ?>

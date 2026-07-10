@@ -5,18 +5,20 @@ document.addEventListener('DOMContentLoaded', function () {
             const status = form.querySelector('[data-form-status]');
             const button = form.querySelector('[type="submit"]');
             form.querySelectorAll('[data-form-error]').forEach(function (node) { node.textContent = ''; });
-            if (button) button.disabled = true;
+            form.classList.remove('is-success','has-error');
+            if (button) { button.disabled = true; button.dataset.label = button.textContent; button.textContent = 'Надсилання…'; }
             if (status) status.textContent = 'Надсилання…';
             fetch(form.action, {method: 'POST', body: new FormData(form), headers: {'X-Requested-With': 'XMLHttpRequest'}})
                 .then(function (response) { return response.json().then(function (data) { return {ok: response.ok, data: data}; }); })
                 .then(function (result) {
                     if (!result.ok || !result.data.ok) throw result.data;
-                    form.reset(); if (status) status.textContent = result.data.message;
+                    form.reset(); form.classList.add('is-success'); if (status) status.textContent = result.data.message;
                 })
                 .catch(function (error) {
                     Object.keys(error.errors || {}).forEach(function (key) { const node=form.querySelector('[data-form-error="'+key+'"]'); if(node) node.textContent=error.errors[key]; });
-                    if (status) status.textContent = error.message || 'Не вдалося надіслати форму.';
-                }).finally(function () { if (button) button.disabled = false; });
+                    form.classList.add('has-error'); if (status) status.textContent = error.message || 'Не вдалося надіслати форму.';
+                    const firstError=form.querySelector('[data-form-error]:not(:empty)'); if(firstError) firstError.closest('label').querySelector('input,textarea,select')?.focus();
+                }).finally(function () { if (button) { button.disabled = false; button.textContent = button.dataset.label || 'Надіслати'; } });
         });
     });
     function initRichGalleryViewer() {

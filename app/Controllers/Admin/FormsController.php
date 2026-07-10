@@ -97,9 +97,14 @@ final class FormsController extends \App\Controllers\AdminBaseController
         if (!is_array($decoded)) { throw new RuntimeException('Некоректний JSON полів.'); }
         $allowed = ['text','textarea','email','tel','number','date','select','radio','checkbox','consent'];
         $result = [];
+        $usedIds = [];
         foreach ($decoded as $i => $field) {
             if (!is_array($field)) { continue; }
             $id = preg_replace('/[^a-z0-9_\-]/i', '_', (string) ($field['id'] ?? 'field_' . ($i + 1)));
+            $id = trim((string) $id, '_-') ?: 'field_' . ($i + 1);
+            $baseId = $id; $suffix = 2;
+            while (isset($usedIds[$id])) { $id = $baseId . '_' . $suffix++; }
+            $usedIds[$id] = true;
             $label = trim((string) ($field['label'] ?? ''));
             $type = (string) ($field['type'] ?? 'text');
             if ($id === '' || $label === '' || !in_array($type, $allowed, true)) { continue; }

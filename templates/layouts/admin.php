@@ -30,6 +30,7 @@
     <?php if (strpos($currentPath, '/admin/pages') === 0): ?>
         <link rel="stylesheet" href="<?= url('/assets/admin-pages-form.css?v=20260710-2') ?>">
     <?php endif; ?>
+    <?php if (strpos($currentPath, '/admin/forms') === 0): ?><link rel="stylesheet" href="<?= url('/assets/admin-forms.css?v=20260710-1') ?>"><link rel="stylesheet" href="<?= url('/assets/admin-forms-fixes.css?v=20260710-1') ?>"><?php endif; ?>
     <?php if (strpos($currentPath, '/admin/templates') === 0): ?>
         <link rel="stylesheet" href="<?= url('/assets/admin-templates.css') ?>">
     <?php endif; ?>
@@ -232,5 +233,6 @@
     <script src="<?= url('/assets/tiptap-editor.js?v=20260710-6') ?>"></script>
     <script src="<?= url('/assets/admin-link-picker.js') ?>"></script>
     <script src="<?= url('/assets/admin.js?v=20260710-4') ?>"></script>
+    <?php if (strpos($currentPath, '/admin/forms') === 0): ?><script src="<?= url('/assets/admin-forms.js?v=20260710-1') ?>"></script><?php endif; ?>
 </body>
 </html>
