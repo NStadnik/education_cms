@@ -228,7 +228,7 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= url('/assets/tiptap.bundle.20260709-7.js?v=20260709-13') ?>"></script>
-    <script src="<?= url('/assets/tiptap-editor.js?v=20260710-3') ?>"></script>
+    <script src="<?= url('/assets/tiptap-editor.js?v=20260710-5') ?>"></script>
     <script src="<?= url('/assets/admin-link-picker.js') ?>"></script>
     <script src="<?= url('/assets/admin.js?v=20260710-3') ?>"></script>
 </body>

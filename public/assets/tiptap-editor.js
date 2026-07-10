@@ -21,7 +21,7 @@
         bound: false,
         view: 'compact',
         offset: 0,
-        limit: 80,
+        limit: 10,
         total: 0,
         hasMore: false,
         token: 0
@@ -890,7 +890,11 @@
                 return;
             }
             const items = data.items || [];
-            mediaState.items = append ? mediaState.items.concat(items) : items;
+            const existingPaths = new Set(mediaState.items.map(function (item) { return item.path; }));
+            const newItems = append ? items.filter(function (item) {
+                return item && item.path && !existingPaths.has(item.path);
+            }) : items;
+            mediaState.items = append ? mediaState.items.concat(newItems) : newItems;
             mediaState.offset = Number(data.next_offset || 0);
             mediaState.total = Number(data.total || 0);
             mediaState.hasMore = Boolean(data.has_more);
@@ -899,7 +903,7 @@
                     mediaState.selectedItems.set(item.path, item);
                 }
             });
-            renderMediaItems();
+            renderMediaItems(append ? newItems : null);
             status.textContent = mediaState.items.length
                 ? (mediaState.hasMore ? 'Показано файлів: ' + mediaState.items.length + ' з ' + mediaState.total + '.' : 'Знайдено файлів: ' + mediaState.items.length + '.')
                 : 'Файлів не знайдено.';
@@ -926,12 +930,15 @@
         }
     }
 
-    function renderMediaItems() {
+    function renderMediaItems(appendedItems) {
         const modalNode = document.getElementById('richMediaModal');
         const grid = modalNode.querySelector('[data-rich-media-grid]');
-        grid.innerHTML = '';
+        const append = Array.isArray(appendedItems);
+        if (!append) {
+            grid.innerHTML = '';
+        }
         grid.classList.toggle('is-large', mediaState.view === 'large');
-        mediaState.items.forEach(function (item) {
+        (append ? appendedItems : mediaState.items).forEach(function (item) {
             const selectedIndex = Array.from(mediaState.selected).indexOf(item.path);
             const card = document.createElement('button');
             card.type = 'button';

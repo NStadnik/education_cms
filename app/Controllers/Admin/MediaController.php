@@ -45,9 +45,21 @@ final class MediaController extends \App\Controllers\AdminBaseController
         $this->guard('media.manage');
 
         $query = trim((string) $request->input('q', ''));
-        $folder = MediaMetadata::normalizeFolder((string) $request->input('folder', ''));
+        $requestedFolder = (string) $request->input('folder', '');
+        $folder = $requestedFolder === '__none' ? '__none' : MediaMetadata::normalizeFolder($requestedFolder);
         $pagination = $this->pagination($request);
-        $list = $this->mediaListPayload($query, $pagination, $folder);
+        $uploadedBy = $this->canManageAllContent() ? null : $this->currentUserId();
+        $imagesOnly = (string) $request->input('images_only', '') === '1';
+        $total = MediaMetadata::count($query, $folder, $uploadedBy, $imagesOnly);
+        $rows = MediaMetadata::search(
+            $query,
+            $folder,
+            $pagination['limit'],
+            $pagination['offset'],
+            $uploadedBy,
+            $imagesOnly
+        );
+        $mediaItems = Files::fromMetadata($rows);
         $items = array_map(static function (array $item): array {
             return [
                 'path' => (string) ($item['path'] ?? ''),
@@ -68,14 +80,15 @@ final class MediaController extends \App\Controllers\AdminBaseController
                 'url' => url('/uploads/' . (string) ($item['path'] ?? '')),
                 'thumb_url' => !empty($item['is_image']) ? url('/thumb/' . (string) ($item['path'] ?? '') . '?w=360&h=240&fit=crop') : '',
             ];
-        }, $list['items']);
+        }, $mediaItems);
+        $nextOffset = $pagination['offset'] + count($mediaItems);
 
         return $this->json([
             'ok' => true,
             'items' => $items,
-            'total' => $list['total'],
-            'next_offset' => $list['next_offset'],
-            'has_more' => $list['has_more'],
+            'total' => $total,
+            'next_offset' => $nextOffset,
+            'has_more' => $nextOffset < $total,
         ]);
     }
 
@@ -111,14 +124,14 @@ final class MediaController extends \App\Controllers\AdminBaseController
                 return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
             }
 
-            $allItems = $this->filterOwnedMediaItems(Files::all($this->mediaReferences()));
+            $list = $this->mediaListPayload('', ['limit' => self::LIST_LIMIT, 'offset' => 0]);
             return $this->admin('admin/media/index', [
                 'title' => 'Медіафайли',
-                'items' => array_slice($allItems, 0, self::LIST_LIMIT),
-                'total' => count($allItems),
+                'items' => $list['items'],
+                'total' => $list['total'],
                 'limit' => self::LIST_LIMIT,
-                'stats' => $this->mediaStats($allItems),
-                'folders' => MediaMetadata::folders($allItems),
+                'stats' => $list['stats'],
+                'folders' => $list['folders'],
                 'folder' => '',
                 'query' => '',
                 'uploadLimitBytes' => Files::uploadLimitBytes(),
@@ -234,13 +247,18 @@ final class MediaController extends \App\Controllers\AdminBaseController
 
     private function mediaItem(string $path): ?array
     {
-        return $this->mediaItemsByPath()[$path] ?? null;
+        $details = MediaMetadata::details($path);
+        if (!$details) {
+            return null;
+        }
+
+        return Files::fromMetadata([$details], $this->mediaReferences())[0] ?? null;
     }
 
     private function mediaItemsByPath(): array
     {
         $items = [];
-        foreach (Files::all($this->mediaReferences()) as $item) {
+        foreach (Files::fromMetadata(array_values(MediaMetadata::all()), $this->mediaReferences()) as $item) {
             $items[(string) ($item['path'] ?? '')] = $item;
         }
 

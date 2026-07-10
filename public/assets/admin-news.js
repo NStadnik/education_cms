@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const search = modalNode ? modalNode.querySelector('[data-news-image-search]') : null;
         const status = modalNode ? modalNode.querySelector('[data-news-image-status]') : null;
         const more = modalNode ? modalNode.querySelector('[data-news-image-more]') : null;
-        const state = {offset: 0, limit: 24, hasMore: false, loading: false, timer: null};
+        const state = {offset: 0, limit: 10, hasMore: false, loading: false, timer: null};
 
         if (!input || !removeInput || !preview || !name || !openButton || !modal || !grid) {
             return;
@@ -74,6 +74,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const url = new URL(picker.dataset.pickerUrl || '/admin/media/picker', window.location.origin);
             url.searchParams.set('limit', String(state.limit));
             url.searchParams.set('offset', append ? String(state.offset) : '0');
+            url.searchParams.set('images_only', '1');
             if (search && search.value.trim() !== '') {
                 url.searchParams.set('q', search.value.trim());
             }

@@ -644,4 +644,4 @@
     </div>
 </div>
 
-<script src="<?= url('/assets/admin-pages-form.js?v=20260710-2') ?>"></script>
+<script src="<?= url('/assets/admin-pages-form.js?v=20260710-4') ?>"></script>

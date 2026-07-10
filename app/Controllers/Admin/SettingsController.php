@@ -9,6 +9,7 @@ use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Files;
+use App\Services\MediaMetadata;
 use Throwable;
 
 final class SettingsController extends \App\Controllers\AdminBaseController
@@ -410,7 +411,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'url' => url('/news/' . (string) ($item['slug'] ?? '')),
         ], $this->db()->fetchAll('select title, slug from news where status = ? order by coalesce(published_at, created_at) desc, id desc limit 30', ['published']));
 
-        $media = array_values(array_filter(Files::all($this->mediaReferences()), static function (array $item): bool {
+        $media = array_values(array_filter(Files::fromMetadata(array_values(MediaMetadata::all()), $this->mediaReferences()), static function (array $item): bool {
             $extension = strtolower(pathinfo((string) ($item['path'] ?? ''), PATHINFO_EXTENSION));
             return in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true);
         }));
@@ -552,9 +553,13 @@ final class SettingsController extends \App\Controllers\AdminBaseController
 
     private function templateMediaPickerPayload(string $query, array $pagination): array
     {
-        $items = $this->filterMedia(Files::all($this->mediaReferences()), $query);
-        $total = count($items);
-        $slice = array_slice($items, $pagination['offset'], $pagination['limit']);
+        $total = MediaMetadata::count($query);
+        $items = Files::fromMetadata(MediaMetadata::search(
+            $query,
+            '',
+            $pagination['limit'],
+            $pagination['offset']
+        ), $this->mediaReferences());
 
         return $this->templatePickerResponse(array_map(static fn (array $item): array => [
             'label' => (string) ($item['name'] ?? $item['path'] ?? ''),
@@ -563,7 +568,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'meta' => trim((string) ($item['type'] ?? '') . ' · ' . (string) ($item['size_label'] ?? ''), ' ·'),
             'is_image' => !empty($item['is_image']),
             'thumb_url' => !empty($item['is_image']) ? url('/thumb/' . (string) ($item['path'] ?? '') . '?w=360&h=240&fit=crop') : '',
-        ], $slice), $pagination, $total);
+        ], $items), $pagination, $total);
     }
 
     private function templatePickerResponse(array $items, array $pagination, int $total): array

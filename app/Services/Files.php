@@ -100,6 +100,27 @@ final class Files
         return $items;
     }
 
+    public static function fromMetadata(array $rows, array $references = []): array
+    {
+        return array_values(array_map(static function (array $row) use ($references): array {
+            $path = self::normalize((string) ($row['path'] ?? ''));
+            $extension = strtolower((string) ($row['extension'] ?? pathinfo($path, PATHINFO_EXTENSION)));
+            $reference = $references[$path] ?? null;
+
+            return array_replace($row, [
+                'path' => $path,
+                'name' => ((string) ($row['original_name'] ?? '')) ?: basename($path),
+                'extension' => $extension,
+                'type' => self::type($extension),
+                'size' => (int) ($row['size'] ?? 0),
+                'size_label' => self::formatBytes((int) ($row['size'] ?? 0)),
+                'is_image' => in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true),
+                'is_used' => $reference !== null,
+                'reference' => $reference,
+            ]);
+        }, $rows));
+    }
+
     public static function delete(string $path): void
     {
         $path = self::normalize($path);

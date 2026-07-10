@@ -177,4 +177,4 @@
     </div>
 </div>
 
-<script src="<?= url('/assets/admin-settings.js') ?>"></script>
+<script src="<?= url('/assets/admin-settings.js?v=20260710-2') ?>"></script>

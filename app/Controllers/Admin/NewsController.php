@@ -9,6 +9,7 @@ use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Files;
+use App\Services\MediaMetadata;
 use Throwable;
 
 final class NewsController extends \App\Controllers\AdminBaseController
@@ -487,13 +488,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
             throw new \RuntimeException('Оберіть зображення з медіафайлів.');
         }
         if (!$this->canManageAllContent()) {
-            $item = null;
-            foreach (Files::all($this->mediaReferences()) as $mediaItem) {
-                if ((string) ($mediaItem['path'] ?? '') === $path) {
-                    $item = $mediaItem;
-                    break;
-                }
-            }
+            $item = Files::fromMetadata([MediaMetadata::details($path)], $this->mediaReferences())[0] ?? null;
             if (!$item || !$this->canManageMediaItem($item)) {
                 throw new \RuntimeException('Оберіть власне зображення з медіафайлів.');
             }

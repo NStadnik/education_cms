@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let cardModalState = null;
     let imagePickerItems = [];
     let imagePickerSearchTimer = null;
-    const imagePickerState = {offset: 0, limit: 30, total: 0, hasMore: false, loading: false, token: 0};
+    const imagePickerState = {offset: 0, limit: 10, total: 0, hasMore: false, loading: false, token: 0};
     const layoutExample = [{
         type: 'layout',
         title: 'Hero та базова картка',
@@ -1449,6 +1449,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const token = append ? imagePickerState.token : ++imagePickerState.token;
         url.searchParams.set('limit', String(imagePickerState.limit));
         url.searchParams.set('offset', append ? String(imagePickerState.offset) : '0');
+        url.searchParams.set('images_only', '1');
         if (search && search.value.trim() !== '') {
             url.searchParams.set('q', search.value.trim());
         }

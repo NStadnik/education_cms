@@ -219,7 +219,7 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
 
     private function mediaFolderAnalysis(): array
     {
-        $mediaItems = $this->filterOwnedMediaItems(Files::all());
+        $mediaItems = $this->filterOwnedMediaItems(Files::fromMetadata(array_values(MediaMetadata::all())));
         $mediaByPath = [];
         foreach ($mediaItems as $item) {
             $path = (string) ($item['path'] ?? '');

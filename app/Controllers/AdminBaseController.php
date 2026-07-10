@@ -2866,48 +2866,22 @@ abstract class AdminBaseController extends BaseController
         return $references;
     }
 
-    protected function filterMedia(array $items, string $query): array
-    {
-        if ($query === '') {
-            return $items;
-        }
-
-        $needle = function_exists('mb_strtolower') ? mb_strtolower($query) : strtolower($query);
-        return array_values(array_filter($items, static function (array $item) use ($needle): bool {
-            $text = implode(' ', [
-                $item['path'] ?? '',
-                $item['name'] ?? '',
-                $item['original_name'] ?? '',
-                $item['extension'] ?? '',
-                $item['mime_type'] ?? '',
-                $item['type'] ?? '',
-                $item['folder'] ?? '',
-                $item['alt_text'] ?? '',
-                $item['title'] ?? '',
-                $item['caption'] ?? '',
-                $item['description'] ?? '',
-                $item['reference']['label'] ?? '',
-            ]);
-            $text = function_exists('mb_strtolower') ? mb_strtolower($text) : strtolower($text);
-            return strpos($text, $needle) !== false;
-        }));
-    }
-
     protected function mediaListPayload(string $query, array $pagination, string $folder = ''): array
     {
-        $allItems = Files::all($this->mediaReferences());
-        $allItems = $this->filterOwnedMediaItems($allItems);
-        $folders = \App\Services\MediaMetadata::folders($allItems);
-        $filteredItems = $this->filterMedia($allItems, $query);
-        $folder = $folder === '__none' ? '__none' : \App\Services\MediaMetadata::normalizeFolder($folder);
-        if ($folder !== '') {
-            $filteredItems = array_values(array_filter($filteredItems, static fn (array $item): bool => $folder === '__none'
-                ? (string) ($item['folder'] ?? '') === ''
-                : (string) ($item['folder'] ?? '') === $folder));
-        }
-        $total = count($filteredItems);
-        $items = array_slice($filteredItems, $pagination['offset'], $pagination['limit']);
+        $folder = $folder === '__none' ? '__none' : MediaMetadata::normalizeFolder($folder);
+        $uploadedBy = $this->canManageAllContent() ? null : $this->currentUserId();
+        $references = $this->mediaReferences();
+        $total = MediaMetadata::count($query, $folder, $uploadedBy);
+        $items = Files::fromMetadata(MediaMetadata::search(
+            $query,
+            $folder,
+            $pagination['limit'],
+            $pagination['offset'],
+            $uploadedBy
+        ), $references);
         $loaded = $pagination['offset'] + count($items);
+        $stats = MediaMetadata::statistics($uploadedBy);
+        $used = MediaMetadata::countExistingPaths(array_keys($references), $uploadedBy);
 
         return [
             'ok' => true,
@@ -2916,8 +2890,13 @@ abstract class AdminBaseController extends BaseController
             'total' => $total,
             'next_offset' => $loaded,
             'has_more' => $loaded < $total,
-            'stats' => $this->mediaStats($allItems),
-            'folders' => $folders,
+            'stats' => [
+                'total' => $stats['total'],
+                'images' => $stats['images'],
+                'unused' => max(0, $stats['total'] - $used),
+                'size' => $this->formatBytes($stats['size']),
+            ],
+            'folders' => MediaMetadata::folderNames($uploadedBy),
         ];
     }
 
@@ -2934,25 +2913,6 @@ abstract class AdminBaseController extends BaseController
     protected function canManageMediaItem(array $item): bool
     {
         return $this->canManageAllContent() || (int) ($item['uploaded_by'] ?? 0) === $this->currentUserId();
-    }
-
-    protected function mediaStats(array $items): array
-    {
-        $size = 0;
-        $images = 0;
-        $used = 0;
-        foreach ($items as $item) {
-            $size += (int) ($item['size'] ?? 0);
-            $images += !empty($item['is_image']) ? 1 : 0;
-            $used += !empty($item['is_used']) ? 1 : 0;
-        }
-
-        return [
-            'total' => count($items),
-            'images' => $images,
-            'unused' => count($items) - $used,
-            'size' => $this->formatBytes($size),
-        ];
     }
 
     protected function formatBytes(int $bytes): string

@@ -43,7 +43,7 @@ document.querySelectorAll('[data-settings-logo-picker]').forEach(function (picke
     const more = modalNode ? modalNode.querySelector('[data-settings-logo-more]') : null;
     const state = {
         offset: 0,
-        limit: 24,
+        limit: 10,
         hasMore: false,
         loading: false,
         timer: null
@@ -104,6 +104,7 @@ document.querySelectorAll('[data-settings-logo-picker]').forEach(function (picke
         const url = new URL(document.body.dataset.richMediaPickerUrl || '/admin/media/picker', window.location.origin);
         url.searchParams.set('limit', String(state.limit));
         url.searchParams.set('offset', append ? String(state.offset) : '0');
+        url.searchParams.set('images_only', '1');
         if (search && search.value.trim() !== '') {
             url.searchParams.set('q', search.value.trim());
         }

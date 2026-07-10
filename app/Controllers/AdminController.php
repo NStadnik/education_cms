@@ -8,7 +8,7 @@ use App\Core\Container;
 use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
-use App\Services\Files;
+use App\Services\MediaMetadata;
 use Throwable;
 
 final class AdminController extends AdminBaseController
@@ -41,7 +41,7 @@ final class AdminController extends AdminBaseController
         $stats = [
             'pages' => $this->count('pages'),
             'news' => $this->count('news'),
-            'media' => count(Files::all()),
+            'media' => MediaMetadata::count(),
         ];
         return $this->admin('admin/dashboard', ['title' => 'Панель керування', 'stats' => $stats]);
     }

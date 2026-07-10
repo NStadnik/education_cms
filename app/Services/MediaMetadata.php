@@ -36,6 +36,85 @@ final class MediaMetadata
         return $row === null ? [] : self::rowEntry($row);
     }
 
+    public static function search(string $query, string $folder, int $limit, int $offset, ?int $uploadedBy = null, bool $imagesOnly = false): array
+    {
+        [$where, $params] = self::searchWhere($query, $folder, $uploadedBy, $imagesOnly);
+        $limit = max(1, $limit);
+        $offset = max(0, $offset);
+        $rows = self::db()->fetchAll(
+            'select * from media ' . $where . ' order by modified_at desc, id desc limit ' . $limit . ' offset ' . $offset,
+            $params
+        );
+
+        return array_map(static fn (array $row): array => self::rowEntry($row), $rows);
+    }
+
+    public static function count(string $query = '', string $folder = '', ?int $uploadedBy = null, bool $imagesOnly = false): int
+    {
+        [$where, $params] = self::searchWhere($query, $folder, $uploadedBy, $imagesOnly);
+        return (int) (self::db()->fetch('select count(*) as c from media ' . $where, $params)['c'] ?? 0);
+    }
+
+    public static function folderNames(?int $uploadedBy = null): array
+    {
+        $where = "where folder <> ''";
+        $params = [];
+        if ($uploadedBy !== null) {
+            $where .= ' and uploaded_by = ?';
+            $params[] = $uploadedBy;
+        }
+
+        return array_map(
+            static fn (array $row): string => (string) $row['folder'],
+            self::db()->fetchAll('select distinct folder from media ' . $where . ' order by folder asc', $params)
+        );
+    }
+
+    public static function statistics(?int $uploadedBy = null): array
+    {
+        $where = '';
+        $params = [];
+        if ($uploadedBy !== null) {
+            $where = 'where uploaded_by = ?';
+            $params[] = $uploadedBy;
+        }
+
+        $row = self::db()->fetch(
+            "select count(*) as total,
+                    coalesce(sum(size), 0) as size,
+                    coalesce(sum(case when extension in ('jpg', 'jpeg', 'png', 'webp') then 1 else 0 end), 0) as images
+             from media {$where}",
+            $params
+        ) ?? [];
+
+        return [
+            'total' => (int) ($row['total'] ?? 0),
+            'size' => (int) ($row['size'] ?? 0),
+            'images' => (int) ($row['images'] ?? 0),
+        ];
+    }
+
+    public static function countExistingPaths(array $paths, ?int $uploadedBy = null): int
+    {
+        $paths = array_values(array_unique(array_filter(array_map([Files::class, 'normalize'], $paths))));
+        if (!$paths) {
+            return 0;
+        }
+
+        $total = 0;
+        foreach (array_chunk($paths, 500) as $chunk) {
+            $params = $chunk;
+            $where = 'path in (' . implode(',', array_fill(0, count($chunk), '?')) . ')';
+            if ($uploadedBy !== null) {
+                $where .= ' and uploaded_by = ?';
+                $params[] = $uploadedBy;
+            }
+            $total += (int) (self::db()->fetch('select count(*) as c from media where ' . $where, $params)['c'] ?? 0);
+        }
+
+        return $total;
+    }
+
     public static function save(string $path, array $metadata): array
     {
         $path = Files::normalize($path);
@@ -161,21 +240,6 @@ final class MediaMetadata
         }
     }
 
-    public static function folders(array $items): array
-    {
-        $folders = [];
-        foreach ($items as $item) {
-            $folder = trim((string) ($item['folder'] ?? ''));
-            if ($folder !== '') {
-                $folders[$folder] = true;
-            }
-        }
-
-        $folders = array_keys($folders);
-        sort($folders, SORT_NATURAL | SORT_FLAG_CASE);
-        return $folders;
-    }
-
     public static function normalizeEntry(array $metadata): array
     {
         $entry = [];
@@ -206,9 +270,39 @@ final class MediaMetadata
         return $path === '' ? null : self::db()->fetch('select * from media where path = ?', [$path]);
     }
 
+    private static function searchWhere(string $query, string $folder, ?int $uploadedBy, bool $imagesOnly = false): array
+    {
+        $clauses = [];
+        $params = [];
+        $query = trim($query);
+        if ($query !== '') {
+            $clauses[] = "concat_ws(' ', path, original_name, extension, mime_type, folder, alt_text, title, caption, description) like ?";
+            $params[] = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query) . '%';
+        }
+
+        if ($folder === '__none') {
+            $clauses[] = "folder = ''";
+        } elseif ($folder !== '') {
+            $clauses[] = 'folder = ?';
+            $params[] = self::normalizeFolder($folder);
+        }
+
+        if ($uploadedBy !== null) {
+            $clauses[] = 'uploaded_by = ?';
+            $params[] = $uploadedBy;
+        }
+
+        if ($imagesOnly) {
+            $clauses[] = "extension in ('jpg', 'jpeg', 'png', 'webp')";
+        }
+
+        return [$clauses ? 'where ' . implode(' and ', $clauses) : '', $params];
+    }
+
     private static function rowEntry(array $row): array
     {
         return array_replace([
+            'path' => Files::normalize((string) ($row['path'] ?? '')),
             'original_name' => (string) ($row['original_name'] ?? ''),
             'extension' => (string) ($row['extension'] ?? ''),
             'mime_type' => (string) ($row['mime_type'] ?? ''),
