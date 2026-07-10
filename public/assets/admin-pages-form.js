@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const importField = document.querySelector('[data-layout-import-field]');
     const exampleField = document.querySelector('[data-layout-example-field]');
     const importStatus = document.querySelector('[data-layout-import-status]');
+    const sectionCountNode = builder.querySelector('[data-layout-section-count]');
+    const rowCountNode = builder.querySelector('[data-layout-row-count]');
+    const cardCountNode = builder.querySelector('[data-layout-card-count]');
     const importExportNode = document.getElementById('layoutImportExportModal');
     const importExportModal = importExportNode && window.bootstrap ? new window.bootstrap.Modal(importExportNode) : null;
     const cardModalNode = document.getElementById('layoutCardModal');
@@ -881,6 +884,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function render() {
+        const totalRows = sections.reduce(function (total, section) {
+            return total + section.rows.length;
+        }, 0);
+        const totalCards = sections.reduce(function (total, section) {
+            return total + countCards(section);
+        }, 0);
+        if (sectionCountNode) sectionCountNode.textContent = String(sections.length);
+        if (rowCountNode) rowCountNode.textContent = String(totalRows);
+        if (cardCountNode) cardCountNode.textContent = String(totalCards);
+
         list.innerHTML = sections.map(function (section, sectionIndex) {
             const isExpanded = expandedSections.has(sectionIndex);
             const rowCount = section.rows.length;
@@ -901,8 +914,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         '<span class="layout-editor-count">' + cardCount + ' карт.</span>' +
                     '</div>' +
                     '<div class="layout-editor-section-actions">' +
-                        '<button class="button secondary compact" type="button" data-layout-add-row><span class="mdi mdi-view-column-outline"></span><span>Ряд</span></button>' +
-                        '<button class="button danger compact" type="button" data-layout-remove-section title="Видалити секцію"><span class="mdi mdi-delete-outline"></span></button>' +
+                        '<button class="button secondary compact" type="button" data-layout-add-row title="Додати ряд до секції"><span class="mdi mdi-plus"></span><span>Додати ряд</span></button>' +
+                        '<button class="button danger compact" type="button" data-layout-remove-section title="' + (sections.length === 1 ? 'На сторінці має залишитися хоча б одна секція' : 'Видалити секцію') + '"' + (sections.length === 1 ? ' disabled' : '') + '><span class="mdi mdi-delete-outline"></span><span class="visually-hidden">Видалити секцію</span></button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="layout-editor-section-body"' + (isExpanded ? '' : ' hidden') + '>' +
@@ -935,7 +948,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     '<option value="4-4-4">3 колонки</option>' +
                     '<option value="8-4">8 / 4</option>' +
                 '</select>' +
-                '<button class="button danger compact" type="button" data-layout-remove-row title="Видалити ряд"><span class="mdi mdi-delete-outline"></span></button>' +
+                '<button class="button danger compact" type="button" data-layout-remove-row title="' + (sections[sectionIndex].rows.length === 1 ? 'У секції має залишитися хоча б один ряд' : 'Видалити ряд') + '"' + (sections[sectionIndex].rows.length === 1 ? ' disabled' : '') + '><span class="mdi mdi-delete-outline"></span><span class="visually-hidden">Видалити ряд</span></button>' +
             '</div>' +
             '<div class="layout-editor-columns">' + row.columns.map(function (col, colIndex) {
                 return renderColumn(sectionIndex, rowIndex, colIndex, col);
@@ -951,7 +964,7 @@ document.addEventListener('DOMContentLoaded', function () {
             '</div>' +
             (col.cards.length ? col.cards.map(function (card, cardIndex) {
                 return renderCard(cardIndex, card);
-            }).join('') : '<div class="layout-editor-empty">Карток ще немає. Натисніть “Картка”, заповніть поля і додайте її до колонки.</div>') +
+            }).join('') : '<button class="layout-editor-empty" type="button" data-layout-add-card><span class="mdi mdi-card-plus-outline" aria-hidden="true"></span><strong>Додати першу картку</strong><span>Заголовок, текст, фото або кнопка</span></button>') +
         '</div>';
     }
 
@@ -1054,6 +1067,7 @@ document.addEventListener('DOMContentLoaded', function () {
         modeButtons.forEach(function (button) {
             const active = button.dataset.editorModeButton === (isAdvanced ? 'advanced' : 'simple');
             button.classList.toggle('secondary', !active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
     }
 
@@ -1841,6 +1855,16 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             return;
         }
+        if (button.matches('[data-layout-expand-all]')) {
+            expandedSections = new Set(sections.map(function (_, index) { return index; }));
+            render();
+            return;
+        }
+        if (button.matches('[data-layout-collapse-all]')) {
+            expandedSections = new Set();
+            render();
+            return;
+        }
         if (button.matches('[data-layout-toggle-section]')) {
             if (expandedSections.has(i.section)) {
                 expandedSections.delete(i.section);
@@ -1859,6 +1883,9 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         if (button.matches('[data-layout-remove-section]')) {
+            if (!window.confirm('Видалити секцію разом з усіма її рядами та картками?')) {
+                return;
+            }
             sections.splice(i.section, 1);
             expandedSections = new Set([Math.max(0, Math.min(i.section, sections.length - 1))]);
         }
@@ -1866,7 +1893,12 @@ document.addEventListener('DOMContentLoaded', function () {
             sections[i.section].rows.push(rowFromPreset('col-md-12'));
             expandedSections.add(i.section);
         }
-        if (button.matches('[data-layout-remove-row]')) sections[i.section].rows.splice(i.row, 1);
+        if (button.matches('[data-layout-remove-row]')) {
+            if (!window.confirm('Видалити ряд разом з усіма картками в ньому?')) {
+                return;
+            }
+            sections[i.section].rows.splice(i.row, 1);
+        }
         if (button.matches('[data-layout-add-card]')) {
             openCardModal(i, -1);
             return;

@@ -28,7 +28,7 @@
     <div class="form-actions">
         <a class="button secondary" href="<?= url('/admin/news') ?>"><span class="mdi mdi-arrow-left" aria-hidden="true"></span><span>До списку</span></a>
         <?php if (!empty($item['slug']) && ($item['status'] ?? '') === 'published'): ?>
-            <a class="button secondary" href="<?= url('/news/' . $item['slug']) ?>"><span class="mdi mdi-eye-outline" aria-hidden="true"></span><span>Переглянути</span></a>
+            <a class="button secondary" target="_blank" href="<?= url('/news/' . $item['slug']) ?>"><span class="mdi mdi-eye-outline" aria-hidden="true"></span><span>Переглянути</span></a>
         <?php endif; ?>
     </div>
 </div>

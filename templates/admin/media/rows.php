@@ -6,20 +6,20 @@
             <?php endif; ?>
         </td>
         <td>
-            <div class="media-file">
+            <button class="media-file media-file-preview" type="button" data-media-preview title="Переглянути <?= e($item['name']) ?>" aria-label="Переглянути файл <?= e($item['name']) ?>" data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-type="<?= e($item['type']) ?>" data-size="<?= e($item['size_label']) ?>" data-modified="<?= e($item['modified_at']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>" data-is-used="<?= !empty($item['is_used']) ? '1' : '0' ?>" data-reference-label="<?= e((string) ($item['reference']['label'] ?? '')) ?>" data-reference-url="<?= e((string) ($item['reference']['url'] ?? '')) ?>" data-folder="<?= e((string) ($item['folder'] ?? '')) ?>" data-alt-text="<?= e((string) ($item['alt_text'] ?? '')) ?>" data-title="<?= e((string) ($item['title'] ?? '')) ?>" data-caption="<?= e((string) ($item['caption'] ?? '')) ?>" data-description="<?= e((string) ($item['description'] ?? '')) ?>">
                 <?php if (!empty($item['is_image'])): ?>
                     <img class="media-thumb" src="<?= url('/thumb/' . $item['path'] . '?w=360&h=240&fit=crop') ?>" alt="" loading="lazy">
                 <?php else: ?>
                     <span class="media-thumb media-thumb-icon mdi mdi-file-outline" aria-hidden="true"></span>
                 <?php endif; ?>
-                <div>
+                <span class="media-file-copy">
                     <strong><?= e($item['name']) ?></strong><br>
                     <code><?= e($item['path']) ?></code>
                     <?php if ((string) ($item['title'] ?? '') !== ''): ?>
                         <small class="media-file-title"><?= e((string) $item['title']) ?></small>
                     <?php endif; ?>
-                </div>
-            </div>
+                </span>
+            </button>
         </td>
         <td>
             <?php if ((string) ($item['folder'] ?? '') !== ''): ?>
@@ -44,7 +44,7 @@
                 <button class="button secondary compact media-row-action" type="button" data-media-metadata title="Метадані" aria-label="Редагувати метадані файлу <?= e($item['name']) ?>" data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>" data-folder="<?= e((string) ($item['folder'] ?? '')) ?>" data-alt-text="<?= e((string) ($item['alt_text'] ?? '')) ?>" data-title="<?= e((string) ($item['title'] ?? '')) ?>" data-caption="<?= e((string) ($item['caption'] ?? '')) ?>" data-description="<?= e((string) ($item['description'] ?? '')) ?>">
                     <span class="mdi mdi-pencil-outline" aria-hidden="true"></span><span class="media-action-label">Метадані</span>
                 </button>
-                <button class="button secondary compact media-row-action" type="button" data-media-preview title="Переглянути" aria-label="Переглянути файл <?= e($item['name']) ?>" data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-type="<?= e($item['type']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>" data-alt-text="<?= e((string) ($item['alt_text'] ?? '')) ?>" data-title="<?= e((string) ($item['title'] ?? '')) ?>" data-caption="<?= e((string) ($item['caption'] ?? '')) ?>" data-description="<?= e((string) ($item['description'] ?? '')) ?>">
+                <button class="button secondary compact media-row-action" type="button" data-media-preview title="Переглянути" aria-label="Переглянути файл <?= e($item['name']) ?>" data-url="<?= url('/uploads/' . $item['path']) ?>" data-name="<?= e($item['name']) ?>" data-path="<?= e($item['path']) ?>" data-type="<?= e($item['type']) ?>" data-size="<?= e($item['size_label']) ?>" data-modified="<?= e($item['modified_at']) ?>" data-extension="<?= e($item['extension']) ?>" data-is-image="<?= !empty($item['is_image']) ? '1' : '0' ?>" data-is-used="<?= !empty($item['is_used']) ? '1' : '0' ?>" data-reference-label="<?= e((string) ($item['reference']['label'] ?? '')) ?>" data-reference-url="<?= e((string) ($item['reference']['url'] ?? '')) ?>" data-folder="<?= e((string) ($item['folder'] ?? '')) ?>" data-alt-text="<?= e((string) ($item['alt_text'] ?? '')) ?>" data-title="<?= e((string) ($item['title'] ?? '')) ?>" data-caption="<?= e((string) ($item['caption'] ?? '')) ?>" data-description="<?= e((string) ($item['description'] ?? '')) ?>">
                     <span class="mdi mdi-eye-outline" aria-hidden="true"></span><span class="media-action-label">Переглянути</span>
                 </button>
                 <?php if (empty($item['is_used'])): ?>

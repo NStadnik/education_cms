@@ -24,10 +24,10 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260709-11') ?>">
-    <link rel="stylesheet" href="<?= url('/assets/admin.css') ?>">
-    <link rel="stylesheet" href="<?= url('/assets/tiptap-editor.css?v=20260709-12') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/admin.css?v=20260710-1') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/tiptap-editor.css?v=20260710-1') ?>">
     <?php if (strpos($currentPath, '/admin/pages') === 0): ?>
-        <link rel="stylesheet" href="<?= url('/assets/admin-pages-form.css?v=20260709-12') ?>">
+        <link rel="stylesheet" href="<?= url('/assets/admin-pages-form.css?v=20260710-2') ?>">
     <?php endif; ?>
     <?php if (strpos($currentPath, '/admin/templates') === 0): ?>
         <link rel="stylesheet" href="<?= url('/assets/admin-templates.css') ?>">
@@ -154,8 +154,8 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
-                        <h2 class="modal-title h5" id="richMediaTitle">Вставити медіафайл</h2>
-                        <p class="meta mb-0">Оберіть один файл або кілька зображень для галереї.</p>
+                        <h2 class="modal-title h5" id="richMediaTitle">Додати медіа</h2>
+                        <p class="meta mb-0">Оберіть фото чи файл. Для галереї виберіть кілька зображень у потрібному порядку.</p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
                 </div>
@@ -174,11 +174,11 @@
                     <div class="rich-media-options">
                         <label>Режим
                             <select data-rich-media-mode>
-                                <option value="single">Один файл</option>
+                                <option value="single">Одне фото або файл</option>
                                 <option value="gallery">Галерея</option>
                             </select>
                         </label>
-                        <label>Розташування
+                        <label>Ширина і розташування
                             <select data-rich-media-align>
                                 <option value="center">По центру</option>
                                 <option value="left">Ліворуч</option>
@@ -194,7 +194,7 @@
                             </select>
                         </label>
                         <label>Підпис
-                            <input type="text" data-rich-media-caption placeholder="Необов'язково">
+                            <input type="text" data-rich-media-caption placeholder="Короткий опис під медіа">
                         </label>
                     </div>
                     <div class="rich-media-status meta" data-rich-media-status></div>
@@ -204,7 +204,7 @@
                             <div class="rich-media-selection-head">
                                 <div>
                                     <strong data-rich-media-selection-count>Нічого не вибрано</strong>
-                                    <span data-rich-media-selection-help>Оберіть файл у списку.</span>
+                                    <span data-rich-media-selection-help>Оберіть файл у списку. Порядок вибору стане порядком фото.</span>
                                 </div>
                                 <button type="button" class="button secondary compact" data-rich-media-clear hidden>
                                     <span class="mdi mdi-close" aria-hidden="true"></span><span>Очистити</span>
@@ -228,8 +228,8 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= url('/assets/tiptap.bundle.20260709-7.js?v=20260709-13') ?>"></script>
-    <script src="<?= url('/assets/tiptap-editor.js?v=20260709-13') ?>"></script>
+    <script src="<?= url('/assets/tiptap-editor.js?v=20260710-3') ?>"></script>
     <script src="<?= url('/assets/admin-link-picker.js') ?>"></script>
-    <script src="<?= url('/assets/admin.js?v=20260709-12') ?>"></script>
+    <script src="<?= url('/assets/admin.js?v=20260710-1') ?>"></script>
 </body>
 </html>

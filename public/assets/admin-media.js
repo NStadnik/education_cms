@@ -40,14 +40,22 @@ document.addEventListener('click', function (event) {
     const name = button.getAttribute('data-name') || 'Файл';
     const mediaTitle = button.getAttribute('data-title') || '';
     const path = button.getAttribute('data-path') || '';
+    const type = button.getAttribute('data-type') || '';
+    const size = button.getAttribute('data-size') || '';
+    const modified = button.getAttribute('data-modified') || '';
+    const folder = button.getAttribute('data-folder') || '';
     const extension = (button.getAttribute('data-extension') || '').toLowerCase();
     const isImage = button.getAttribute('data-is-image') === '1';
+    const isUsed = button.getAttribute('data-is-used') === '1';
+    const referenceLabel = button.getAttribute('data-reference-label') || '';
+    const referenceUrl = button.getAttribute('data-reference-url') || '';
     const altText = button.getAttribute('data-alt-text') || '';
     const caption = button.getAttribute('data-caption') || '';
     const description = button.getAttribute('data-description') || '';
     const title = mediaPreviewModalNode.querySelector('#mediaPreviewTitle');
     const pathNode = mediaPreviewModalNode.querySelector('[data-media-preview-path]');
     const body = mediaPreviewModalNode.querySelector('[data-media-preview-body]');
+    const details = mediaPreviewModalNode.querySelector('[data-media-preview-details]');
     const openLink = mediaPreviewModalNode.querySelector('[data-media-preview-open]');
 
     title.textContent = mediaTitle || name;
@@ -55,15 +63,26 @@ document.addEventListener('click', function (event) {
     openLink.href = url;
 
     if (isImage) {
-        body.innerHTML =
-            '<img class="media-preview-image" src="' + escapeHtml(url) + '" alt="' + escapeHtml(altText) + '">' +
-            mediaPreviewMeta(caption, description);
+        body.innerHTML = '<img class="media-preview-image" src="' + escapeHtml(url) + '" alt="' + escapeHtml(altText) + '">';
     } else if (extension === 'pdf') {
-        body.innerHTML =
-            '<iframe class="media-preview-pdf" src="' + escapeHtml(url) + '" title="' + escapeHtml(name) + '"></iframe>' +
-            mediaPreviewMeta(caption, description);
+        body.innerHTML = '<iframe class="media-preview-pdf" src="' + escapeHtml(url) + '" title="' + escapeHtml(name) + '"></iframe>';
     } else {
         body.innerHTML = '<div class="empty-state media-preview-empty"><span class="mdi mdi-file-eye-outline" aria-hidden="true"></span><p>Попередній перегляд для цього типу файлу недоступний у браузері.</p></div>';
+    }
+    if (details) {
+        details.innerHTML = mediaPreviewDetails({
+            name: name,
+            type: type,
+            size: size,
+            folder: folder,
+            modified: modified,
+            isUsed: isUsed,
+            referenceLabel: referenceLabel,
+            referenceUrl: referenceUrl,
+            altText: altText,
+            caption: caption,
+            description: description
+        });
     }
 
     mediaPreviewModal.show();
@@ -217,6 +236,7 @@ function updateMediaList(panel, data) {
         updateFolderFilters(data.folders);
     }
     updateMediaSelectedCount();
+    panel.dispatchEvent(new CustomEvent('admin:check-list'));
 }
 
 function updateFolderFilters(folders) {
@@ -238,15 +258,27 @@ function updateFolderFilters(folders) {
     }
 }
 
-function mediaPreviewMeta(caption, description) {
-    if (!caption && !description) {
-        return '';
+function mediaPreviewDetails(item) {
+    const rows = [
+        ['Файл', item.name],
+        ['Тип', item.type],
+        ['Розмір', item.size],
+        ['Папка', item.folder || 'Без папки'],
+        ['Оновлено', item.modified],
+        ['Стан', item.isUsed ? 'Використовується' : 'Вільний'],
+        ['Alt-текст', item.altText],
+        ['Підпис', item.caption],
+        ['Опис', item.description]
+    ];
+    if (item.referenceLabel) {
+        rows.splice(6, 0, ['Використання', item.referenceUrl
+            ? '<a href="' + escapeHtml(item.referenceUrl) + '">' + escapeHtml(item.referenceLabel) + '</a>'
+            : escapeHtml(item.referenceLabel), true]);
     }
-
-    return '<div class="media-preview-meta">' +
-        (caption ? '<strong>' + escapeHtml(caption) + '</strong>' : '') +
-        (description ? '<p>' + escapeHtml(description) + '</p>' : '') +
-    '</div>';
+    const html = rows.filter(function (row) { return String(row[1] || '').trim() !== ''; }).map(function (row) {
+        return '<div class="media-preview-details-row"><dt>' + escapeHtml(row[0]) + '</dt><dd>' + (row[2] ? row[1] : escapeHtml(row[1])) + '</dd></div>';
+    }).join('');
+    return '<h3>Деталі</h3><dl>' + html + '</dl>';
 }
 
 function setMediaMessage(message, isError) {
@@ -256,8 +288,9 @@ function setMediaMessage(message, isError) {
 }
 
 function initMediaViewMode() {
-    const mode = window.localStorage ? (localStorage.getItem('adminMediaViewMode') || 'list') : 'list';
-    setMediaViewMode(mode === 'grid' ? 'grid' : 'list', false);
+    const stored = window.localStorage ? (localStorage.getItem('adminMediaViewMode') || 'compact') : 'compact';
+    const mode = stored === 'large' || stored === 'grid' ? 'large' : 'compact';
+    setMediaViewMode(mode, false);
 }
 
 function initMediaUploadField() {
@@ -332,7 +365,7 @@ function setMediaViewMode(mode, persist) {
     if (!panel) {
         return;
     }
-    const normalized = mode === 'grid' ? 'grid' : 'list';
+    const normalized = mode === 'large' ? 'large' : 'compact';
     panel.dataset.mediaViewMode = normalized;
     document.querySelectorAll('[data-media-view]').forEach(function (button) {
         const active = button.dataset.mediaView === normalized;
@@ -342,6 +375,7 @@ function setMediaViewMode(mode, persist) {
     if (persist && window.localStorage) {
         localStorage.setItem('adminMediaViewMode', normalized);
     }
+    panel.dispatchEvent(new CustomEvent('admin:check-list'));
 }
 
 function escapeHtml(value) {

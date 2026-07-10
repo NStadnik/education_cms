@@ -106,7 +106,7 @@
     <div class="form-actions">
         <a class="button secondary" href="<?= url('/admin/pages') ?>"><span class="mdi mdi-arrow-left" aria-hidden="true"></span><span>До списку</span></a>
         <?php if (!empty($item['slug']) && ($item['status'] ?? '') === 'published'): ?>
-            <a class="button secondary" href="<?= url($item['slug'] === 'home' ? '/' : '/page/' . $item['slug']) ?>"><span class="mdi mdi-eye-outline" aria-hidden="true"></span><span>Переглянути</span></a>
+            <a class="button secondary" target="_blank" href="<?= url($item['slug'] === 'home' ? '/' : '/page/' . $item['slug']) ?>"><span class="mdi mdi-eye-outline" aria-hidden="true"></span><span>Переглянути</span></a>
         <?php endif; ?>
     </div>
 </div>
@@ -137,11 +137,11 @@
                     <label>Короткий опис<textarea class="textarea-small" name="excerpt" placeholder="Опис для першого екрану або списків сторінок"><?= e($item['excerpt'] ?? '') ?></textarea></label>
                 </div>
                 <input type="hidden" name="editor_mode" data-editor-mode value="<?= $hasLayoutBlocks ? 'advanced' : 'simple' ?>">
-                <div class="page-editor-mode-switch" data-editor-mode-switch>
-                    <button class="button <?= $hasLayoutBlocks ? 'secondary' : '' ?> compact" type="button" data-editor-mode-button="simple">
+                <div class="page-editor-mode-switch" data-editor-mode-switch role="group" aria-label="Режим редагування сторінки">
+                    <button class="button <?= $hasLayoutBlocks ? 'secondary' : '' ?> compact" type="button" data-editor-mode-button="simple" aria-pressed="<?= $hasLayoutBlocks ? 'false' : 'true' ?>">
                         <span class="mdi mdi-text-box-edit-outline" aria-hidden="true"></span><span>Простий редактор</span>
                     </button>
-                    <button class="button <?= $hasLayoutBlocks ? '' : 'secondary' ?> compact" type="button" data-editor-mode-button="advanced">
+                    <button class="button <?= $hasLayoutBlocks ? '' : 'secondary' ?> compact" type="button" data-editor-mode-button="advanced" aria-pressed="<?= $hasLayoutBlocks ? 'true' : 'false' ?>">
                         <span class="mdi mdi-view-grid-plus-outline" aria-hidden="true"></span><span>Розширений конструктор</span>
                     </button>
                 </div>
@@ -159,9 +159,13 @@
                 <input type="hidden" name="layout_json" data-layout-json>
                 <div class="layout-builder page-advanced-editor" data-advanced-editor-panel data-layout-builder data-initial="<?= e(json_encode($blocks ?: [], JSON_UNESCAPED_UNICODE) ?: '[]') ?>" <?= $hasLayoutBlocks ? '' : 'hidden' ?>>
                     <div class="layout-builder-head">
-                        <div>
-                            <strong>Редактор секцій</strong>
-                            <p class="meta mb-0">Створюйте секції, ряди, колонки та картки. На сайті вони рендеряться через Bootstrap grid.</p>
+                        <div class="layout-builder-intro">
+                            <span class="layout-builder-icon mdi mdi-view-dashboard-edit-outline" aria-hidden="true"></span>
+                            <div>
+                                <p class="eyebrow mb-1">Структура сторінки</p>
+                                <strong>Редактор секцій</strong>
+                                <p class="meta mb-0">Оберіть готову секцію або зберіть власну з рядів, колонок і карток.</p>
+                            </div>
                         </div>
                         <div class="layout-builder-actions">
                             <button class="button secondary compact" type="button" data-layout-import-export-open>
@@ -169,6 +173,21 @@
                             </button>
                             <button class="button compact" type="button" data-layout-open-section-picker>
                                 <span class="mdi mdi-view-grid-plus-outline" aria-hidden="true"></span><span>Додати секцію</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="layout-builder-toolbar" aria-label="Огляд структури">
+                        <div class="layout-builder-stats" aria-live="polite">
+                            <span><strong data-layout-section-count>0</strong> секц.</span>
+                            <span><strong data-layout-row-count>0</strong> ряд.</span>
+                            <span><strong data-layout-card-count>0</strong> карт.</span>
+                        </div>
+                        <div class="layout-builder-view-actions">
+                            <button class="button secondary compact" type="button" data-layout-expand-all>
+                                <span class="mdi mdi-unfold-more-horizontal" aria-hidden="true"></span><span>Розгорнути всі</span>
+                            </button>
+                            <button class="button secondary compact" type="button" data-layout-collapse-all>
+                                <span class="mdi mdi-unfold-less-horizontal" aria-hidden="true"></span><span>Згорнути всі</span>
                             </button>
                         </div>
                     </div>
@@ -625,4 +644,4 @@
     </div>
 </div>
 
-<script src="<?= url('/assets/admin-pages-form.js?v=20260709-12') ?>"></script>
+<script src="<?= url('/assets/admin-pages-form.js?v=20260710-2') ?>"></script>

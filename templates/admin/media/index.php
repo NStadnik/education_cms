@@ -53,7 +53,7 @@
 <form id="mediaBulkForm" method="post" action="<?= url('/admin/media/bulk') ?>" data-no-ajax data-list-panel="#mediaListPanel">
     <?= \App\Core\Csrf::field() ?>
 </form>
-<div id="mediaListPanel" class="list-panel" data-infinite-list data-list-url="<?= url('/admin/media') ?>" data-list-target="#mediaRows" data-list-offset="<?= e((string) count($items)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($items) < $total ? '1' : '0' ?>" data-list-empty-label="файли" data-media-metadata-url="<?= url('/admin/media/metadata') ?>">
+<div id="mediaListPanel" class="list-panel" data-infinite-list data-media-view-mode="compact" data-list-url="<?= url('/admin/media') ?>" data-list-target="#mediaRows" data-list-offset="<?= e((string) count($items)) ?>" data-list-limit="<?= e((string) $limit) ?>" data-list-has-more="<?= count($items) < $total ? '1' : '0' ?>" data-list-empty-label="файли" data-media-metadata-url="<?= url('/admin/media/metadata') ?>">
     <div class="list-tools list-tools-modern media-list-tools">
         <div class="list-filter-bar">
             <label class="list-search-field">
@@ -71,8 +71,8 @@
                 </select>
             </label>
             <div class="admin-view-switch" role="group" aria-label="Режим перегляду медіафайлів">
-                <button class="button secondary compact" type="button" data-media-view="list" title="Список" aria-label="Список"><span class="mdi mdi-format-list-bulleted" aria-hidden="true"></span></button>
-                <button class="button secondary compact" type="button" data-media-view="grid" title="Великі превʼю" aria-label="Великі превʼю"><span class="mdi mdi-view-grid-outline" aria-hidden="true"></span></button>
+                <button class="button secondary compact" type="button" data-media-view="compact" title="Компактні превʼю" aria-label="Компактні превʼю"><span class="mdi mdi-view-grid-outline" aria-hidden="true"></span></button>
+                <button class="button secondary compact" type="button" data-media-view="large" title="Великі превʼю" aria-label="Великі превʼю"><span class="mdi mdi-view-dashboard-outline" aria-hidden="true"></span></button>
             </div>
         </div>
         <div class="bulk-actions list-bulk-modern media-bulk-actions">
@@ -153,7 +153,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
             </div>
             <div class="modal-body">
-                <div class="media-preview-frame" data-media-preview-body></div>
+                <div class="media-preview-layout">
+                    <div class="media-preview-frame" data-media-preview-body></div>
+                    <aside class="media-preview-details" data-media-preview-details aria-label="Деталі медіафайлу"></aside>
+                </div>
             </div>
             <div class="modal-footer">
                 <a class="button secondary" href="#" target="_blank" rel="noopener" data-media-preview-open>
@@ -167,4 +170,4 @@
     </div>
 </div>
 
-<script src="<?= url('/assets/admin-media.js') ?>"></script>
+<script src="<?= url('/assets/admin-media.js?v=20260710-2') ?>"></script>

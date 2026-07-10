@@ -11,6 +11,7 @@
     const adminCsrfToken = adminBody ? (adminBody.dataset.adminCsrfToken || '') : '';
     const mediaState = {
         editor: null,
+        edit: null,
         modal: null,
         items: [],
         selected: new Set(),
@@ -51,25 +52,31 @@
             toolbar.className = 'tiptap-editor-toolbar';
             const content = document.createElement('div');
             content.className = 'tiptap-editor-content rich-content';
+            const context = document.createElement('div');
+            context.className = 'tiptap-editor-context';
+            context.hidden = true;
             const source = document.createElement('textarea');
             source.className = 'tiptap-editor-source';
             source.hidden = true;
             source.setAttribute('aria-label', 'HTML');
-            shell.append(toolbar, content, source);
+            const footer = document.createElement('div');
+            footer.className = 'tiptap-editor-footer';
+            footer.innerHTML = '<span class="tiptap-editor-hint"><span class="mdi mdi-lightbulb-outline" aria-hidden="true"></span> Виділіть текст або натисніть на медіа, щоб побачити доступні дії</span><span data-tiptap-count>0 слів · 0 символів</span>';
+            shell.append(toolbar, context, content, source, footer);
             insertAfterField(textarea, shell);
             textarea._tiptapShell = shell;
 
             try {
                 let editor;
                 try {
-                    editor = createEditor(textarea, content, toolbar, fullExtensions(textarea));
+                    editor = createEditor(textarea, content, toolbar, context, footer, fullExtensions(textarea));
                 } catch (fullError) {
                     window.console && window.console.warn && window.console.warn('Full Tiptap setup failed, retrying with StarterKit only.', fullError);
-                    editor = createEditor(textarea, content, toolbar, [bundle.StarterKit].filter(Boolean));
+                    editor = createEditor(textarea, content, toolbar, context, footer, [bundle.StarterKit].filter(Boolean));
                 }
                 editors.set(textarea, editor);
                 toolbar.append.apply(toolbar, toolbarButtons(textarea, editor, content, source));
-                updateToolbar(toolbar, editor);
+                updateEditorUi(textarea, toolbar, context, footer, editor);
                 syncOne(textarea);
                 textarea.hidden = true;
                 clearStatus(textarea);
@@ -122,6 +129,7 @@
 
     function fullExtensions(textarea) {
         return [
+            createRichMediaExtension(),
             createRichGalleryExtension(),
             createRichGalleryCaptionExtension(),
             bundle.StarterKit,
@@ -135,6 +143,57 @@
             bundle.TextAlign && bundle.TextAlign.configure({types: ['heading', 'paragraph']}),
             bundle.Placeholder && bundle.Placeholder.configure({placeholder: textarea.getAttribute('placeholder') || ''})
         ].filter(Boolean);
+    }
+
+    function createRichMediaExtension() {
+        if (!bundle.Node) {
+            return null;
+        }
+        return bundle.Node.create({
+            name: 'richMedia',
+            group: 'block',
+            atom: true,
+            selectable: true,
+            draggable: true,
+            addAttributes: function () {
+                return {
+                    src: {default: ''},
+                    alt: {default: ''},
+                    href: {default: ''},
+                    caption: {default: ''},
+                    align: {default: 'center'}
+                };
+            },
+            parseHTML: function () {
+                return [{
+                    tag: 'figure.rich-media-block',
+                    getAttrs: function (element) {
+                        const image = element.querySelector('img');
+                        const link = image ? image.closest('a') : null;
+                        const caption = element.querySelector('figcaption');
+                        const className = element.getAttribute('class') || '';
+                        const alignMatch = className.match(/media-align-(left|center|right|wide)/);
+                        return {
+                            src: image ? (image.getAttribute('src') || '') : '',
+                            alt: image ? (image.getAttribute('alt') || '') : '',
+                            href: link ? (link.getAttribute('href') || '') : '',
+                            caption: caption ? caption.textContent : '',
+                            align: alignMatch ? alignMatch[1] : 'center'
+                        };
+                    }
+                }];
+            },
+            renderHTML: function (props) {
+                const attrs = props.node.attrs || {};
+                const image = ['img', {src: attrs.src || '', alt: attrs.alt || ''}];
+                const media = attrs.href ? ['a', {href: attrs.href}, image] : image;
+                const children = [media];
+                if (attrs.caption) {
+                    children.push(['figcaption', String(attrs.caption)]);
+                }
+                return ['figure', {class: 'rich-media-block media-align-' + normalizeAlign(attrs.align)}].concat(children);
+            }
+        });
     }
 
     function createRichGalleryExtension() {
@@ -160,7 +219,7 @@
                     getAttrs: function (element) {
                         const className = element.getAttribute('class') || '';
                         const columnsMatch = className.match(/rich-gallery-cols-(2|3|4)/);
-                        const alignMatch = className.match(/media-align-(left|center|right|justify)/);
+                        const alignMatch = className.match(/media-align-(left|center|right|wide)/);
                         const images = Array.prototype.slice.call(element.querySelectorAll('img')).map(function (image) {
                             const link = image.closest('a');
                             return {
@@ -213,7 +272,7 @@
                     tag: 'p.rich-gallery-caption',
                     getAttrs: function (element) {
                         const className = element.getAttribute('class') || '';
-                        const alignMatch = className.match(/media-align-(left|center|right|justify)/);
+                        const alignMatch = className.match(/media-align-(left|center|right|wide)/);
                         return {align: alignMatch ? alignMatch[1] : 'center'};
                     }
                 }];
@@ -225,7 +284,7 @@
         });
     }
 
-    function createEditor(textarea, content, toolbar, extensions) {
+    function createEditor(textarea, content, toolbar, context, footer, extensions) {
         let editor;
         editor = new bundle.Editor({
             element: content,
@@ -233,23 +292,24 @@
             extensions: extensions,
             editorProps: {
                 handleDOMEvents: {
-                    click: preventEditorGalleryLinkOpen
+                    click: preventEditorMediaLinkOpen
                 }
             },
             onUpdate: function () {
                 syncOne(textarea);
                 textarea.dispatchEvent(new Event('input', {bubbles: true}));
+                updateEditorUi(textarea, toolbar, context, footer, editor);
             },
             onSelectionUpdate: function () {
-                updateToolbar(toolbar, editor);
+                updateEditorUi(textarea, toolbar, context, footer, editor);
             }
         });
         return editor;
     }
 
-    function preventEditorGalleryLinkOpen(view, event) {
+    function preventEditorMediaLinkOpen(view, event) {
         const target = event.target && event.target.nodeType === 1 ? event.target : null;
-        const link = target && target.closest ? target.closest('.rich-gallery a') : null;
+        const link = target && target.closest ? target.closest('.rich-gallery a, .rich-media-block a') : null;
         if (!link || !view.dom.contains(link)) {
             return false;
         }
@@ -333,6 +393,7 @@
     function toolbarButtons(textarea, editor, content, source) {
         const block = document.createElement('select');
         block.title = 'Формат';
+        block.setAttribute('aria-label', 'Формат тексту');
         [
             ['paragraph', 'Абзац'],
             ['h2', 'Заголовок 2'],
@@ -357,31 +418,77 @@
         });
 
         return [
-            block,
-            button('mdi-format-bold', 'Жирний', function () { editor.chain().focus().toggleBold().run(); }, 'bold'),
-            button('mdi-format-italic', 'Курсив', function () { editor.chain().focus().toggleItalic().run(); }, 'italic'),
-            button('mdi-format-underline', 'Підкреслення', function () { editor.chain().focus().toggleUnderline().run(); }, 'underline'),
-            button('mdi-format-list-bulleted', 'Маркований список', function () { editor.chain().focus().toggleBulletList().run(); }, 'bulletList'),
-            button('mdi-format-list-numbered', 'Нумерований список', function () { editor.chain().focus().toggleOrderedList().run(); }, 'orderedList'),
-            button('mdi-format-align-left', 'Ліворуч', function () { editor.chain().focus().setTextAlign('left').run(); }, 'align-left'),
-            button('mdi-format-align-center', 'По центру', function () { editor.chain().focus().setTextAlign('center').run(); }, 'align-center'),
-            button('mdi-format-align-right', 'Праворуч', function () { editor.chain().focus().setTextAlign('right').run(); }, 'align-right'),
-            button('mdi-format-align-justify', 'По ширині', function () { editor.chain().focus().setTextAlign('justify').run(); }, 'align-justify'),
-            button('mdi-link-variant', 'Покликання', function () { setLink(editor); }, 'link'),
-            button('mdi-link-off', 'Прибрати покликання', function () { editor.chain().focus().unsetLink().run(); }),
-            button('mdi-image', 'Медіафайли', function () { openMediaPicker(textarea); }),
-            button('mdi-code-tags', 'HTML', function (event) { toggleHtmlMode(textarea, editor, content, source, event.currentTarget); }, 'source')
+            toolbarGroup('Історія', [
+                button('mdi-undo', 'Скасувати (Ctrl+Z)', function () { editor.chain().focus().undo().run(); }, '', 'Скасувати'),
+                button('mdi-redo', 'Повторити (Ctrl+Shift+Z)', function () { editor.chain().focus().redo().run(); }, '', 'Повторити')
+            ]),
+            toolbarGroup('Стиль тексту', [
+                block,
+                button('mdi-format-bold', 'Жирний (Ctrl+B)', function () { editor.chain().focus().toggleBold().run(); }, 'bold'),
+                button('mdi-format-italic', 'Курсив (Ctrl+I)', function () { editor.chain().focus().toggleItalic().run(); }, 'italic'),
+                button('mdi-format-underline', 'Підкреслення (Ctrl+U)', function () { editor.chain().focus().toggleUnderline().run(); }, 'underline'),
+                button('mdi-format-clear', 'Очистити форматування виділеного тексту', function () { editor.chain().focus().unsetAllMarks().clearNodes().run(); })
+            ]),
+            toolbarGroup('Структура', [
+                button('mdi-format-list-bulleted', 'Маркований список', function () { editor.chain().focus().toggleBulletList().run(); }, 'bulletList'),
+                button('mdi-format-list-numbered', 'Нумерований список', function () { editor.chain().focus().toggleOrderedList().run(); }, 'orderedList')
+            ]),
+            toolbarGroup('Вирівнювання', [
+                button('mdi-format-align-left', 'Ліворуч', function () { editor.chain().focus().setTextAlign('left').run(); }, 'align-left'),
+                button('mdi-format-align-center', 'По центру', function () { editor.chain().focus().setTextAlign('center').run(); }, 'align-center'),
+                button('mdi-format-align-right', 'Праворуч', function () { editor.chain().focus().setTextAlign('right').run(); }, 'align-right'),
+                button('mdi-format-align-justify', 'По ширині', function () { editor.chain().focus().setTextAlign('justify').run(); }, 'align-justify')
+            ]),
+            toolbarGroup('Вставка', [
+                button('mdi-link-variant', 'Додати або змінити покликання', function () { showLinkEditor(textarea, editor); }, 'link'),
+                button('mdi-link-off', 'Прибрати покликання', function () { editor.chain().focus().unsetLink().run(); }),
+                button('mdi-image-multiple-outline', 'Додати фото, файл або галерею', function () { openMediaPicker(textarea); }, '', 'Медіа', 'is-primary')
+            ]),
+            toolbarGroup('Код', [
+                button('mdi-code-tags', 'Редагувати HTML', function (event) { toggleHtmlMode(textarea, editor, content, source, event.currentTarget); }, 'source')
+            ])
         ];
     }
 
-    function button(icon, title, action, activeName) {
+    function toolbarGroup(label, children) {
+        const group = document.createElement('div');
+        group.className = 'tiptap-toolbar-group';
+        group.setAttribute('role', 'group');
+        group.setAttribute('aria-label', label);
+        children.forEach(function (child) { group.appendChild(child); });
+        return group;
+    }
+
+    function button(icon, title, action, activeName, textLabel, extraClass) {
         const node = document.createElement('button');
         node.type = 'button';
         node.title = title;
+        node.setAttribute('aria-label', title);
         node.dataset.tiptapActive = activeName || '';
-        node.innerHTML = '<span class="mdi ' + icon + '" aria-hidden="true"></span>';
+        node.className = extraClass || '';
+        node.innerHTML = '<span class="mdi ' + icon + '" aria-hidden="true"></span>' + (textLabel ? '<span>' + escapeHtml(textLabel) + '</span>' : '');
         node.addEventListener('click', action);
         return node;
+    }
+
+    function updateEditorUi(textarea, toolbar, context, footer, editor) {
+        updateToolbar(toolbar, editor);
+        updateMediaContext(textarea, context, editor);
+        const count = footer ? footer.querySelector('[data-tiptap-count]') : null;
+        if (count) {
+            const text = editor.getText().trim();
+            const words = text ? text.split(/\s+/u).filter(Boolean).length : 0;
+            count.textContent = words + ' ' + pluralize(words, ['слово', 'слова', 'слів']) + ' · ' + text.length + ' символів';
+        }
+    }
+
+    function pluralize(number, forms) {
+        const value = Math.abs(number) % 100;
+        const last = value % 10;
+        if (value > 10 && value < 20) { return forms[2]; }
+        if (last === 1) { return forms[0]; }
+        if (last > 1 && last < 5) { return forms[1]; }
+        return forms[2];
     }
 
     function updateToolbar(toolbar, editor) {
@@ -413,20 +520,158 @@
         }
     }
 
-    function setLink(editor) {
+    function selectedMediaNode(editor) {
+        const selection = editor && editor.state ? editor.state.selection : null;
+        const node = selection && selection.node ? selection.node : null;
+        if (!node || ['richMedia', 'richGallery', 'image'].indexOf(node.type.name) === -1) {
+            return null;
+        }
+        const result = {node: node, pos: selection.from, type: node.type.name, caption: '', nodeSize: node.nodeSize};
+        if (node.type.name === 'richGallery') {
+            const next = editor.state.doc.nodeAt(selection.from + node.nodeSize);
+            if (next && next.type.name === 'richGalleryCaption') {
+                result.caption = next.textContent || '';
+                result.nodeSize += next.nodeSize;
+            }
+        }
+        return result;
+    }
+
+    function updateMediaContext(textarea, context, editor) {
+        if (!context) {
+            return;
+        }
+        const selected = selectedMediaNode(editor);
+        context.innerHTML = '';
+        context.hidden = !selected;
+        if (!selected) {
+            return;
+        }
+
+        const attrs = selected.node.attrs || {};
+        const title = document.createElement('div');
+        title.className = 'tiptap-context-title';
+        title.innerHTML = '<span class="mdi ' + (selected.type === 'richGallery' ? 'mdi-image-multiple-outline' : 'mdi-image-outline') + '" aria-hidden="true"></span><span><strong>' + (selected.type === 'richGallery' ? 'Галерея' : 'Зображення') + '</strong><small>Зміни застосовуються до вибраного блоку</small></span>';
+        context.appendChild(title);
+
+        const alignGroup = document.createElement('div');
+        alignGroup.className = 'tiptap-context-actions';
+        alignGroup.setAttribute('aria-label', 'Розташування медіа');
+        [['left', 'mdi-align-horizontal-left', 'Ліворуч'], ['center', 'mdi-align-horizontal-center', 'По центру'], ['right', 'mdi-align-horizontal-right', 'Праворуч'], ['wide', 'mdi-arrow-expand-horizontal', 'На всю ширину']].forEach(function (item) {
+            const control = contextButton(item[1], item[2], function () {
+                if (selected.type === 'image') {
+                    return;
+                }
+                updateSelectedMediaAttributes(editor, selected, {align: item[0]});
+            });
+            control.classList.toggle('is-active', normalizeAlign(attrs.align) === item[0]);
+            control.disabled = selected.type === 'image';
+            alignGroup.appendChild(control);
+        });
+        context.appendChild(alignGroup);
+
+        if (selected.type === 'richGallery') {
+            const columnsGroup = document.createElement('div');
+            columnsGroup.className = 'tiptap-context-actions tiptap-context-columns';
+            const label = document.createElement('span');
+            label.textContent = 'Колонки:';
+            columnsGroup.appendChild(label);
+            ['2', '3', '4'].forEach(function (columns) {
+                const control = contextTextButton(columns, columns + ' колонки', function () {
+                    updateSelectedMediaAttributes(editor, selected, {columns: columns});
+                });
+                control.classList.toggle('is-active', normalizeColumns(attrs.columns) === columns);
+                columnsGroup.appendChild(control);
+            });
+            context.appendChild(columnsGroup);
+        }
+
+        const mainActions = document.createElement('div');
+        mainActions.className = 'tiptap-context-actions tiptap-context-main-actions';
+        mainActions.appendChild(contextTextButton('Змінити', 'Змінити фото, порядок або підпис', function () {
+            openMediaPicker(textarea, selected);
+        }, 'mdi-pencil-outline'));
+        mainActions.appendChild(contextButton('mdi-delete-outline', 'Видалити блок', function () {
+            editor.chain().focus().deleteRange({from: selected.pos, to: selected.pos + selected.nodeSize}).run();
+        }, 'is-danger'));
+        context.appendChild(mainActions);
+    }
+
+    function updateSelectedMediaAttributes(editor, selected, attributes) {
+        const transaction = editor.state.tr;
+        transaction.setNodeMarkup(selected.pos, null, Object.assign({}, selected.node.attrs, attributes));
+        if (selected.type === 'richGallery' && Object.prototype.hasOwnProperty.call(attributes, 'align')) {
+            const captionPos = selected.pos + selected.node.nodeSize;
+            const caption = editor.state.doc.nodeAt(captionPos);
+            if (caption && caption.type.name === 'richGalleryCaption') {
+                transaction.setNodeMarkup(captionPos, null, Object.assign({}, caption.attrs, {align: attributes.align}));
+            }
+        }
+        editor.view.dispatch(transaction);
+        editor.commands.focus();
+    }
+
+    function contextButton(icon, title, action, extraClass) {
+        const control = document.createElement('button');
+        control.type = 'button';
+        control.className = extraClass || '';
+        control.title = title;
+        control.setAttribute('aria-label', title);
+        control.innerHTML = '<span class="mdi ' + icon + '" aria-hidden="true"></span>';
+        control.addEventListener('click', action);
+        return control;
+    }
+
+    function contextTextButton(text, title, action, icon) {
+        const control = contextButton(icon || '', title, action);
+        control.classList.add('has-label');
+        control.innerHTML = (icon ? '<span class="mdi ' + icon + '" aria-hidden="true"></span>' : '') + '<span>' + escapeHtml(text) + '</span>';
+        return control;
+    }
+
+    function showLinkEditor(textarea, editor) {
+        const shell = textarea && textarea._tiptapShell;
+        const context = shell ? shell.querySelector('.tiptap-editor-context') : null;
+        if (!context) { return; }
+        const selection = {from: editor.state.selection.from, to: editor.state.selection.to};
         const previous = editor.getAttributes('link').href || '';
-        const href = window.prompt('URL', previous);
-        if (href === null) {
-            return;
+        context.hidden = false;
+        context.innerHTML = '<div class="tiptap-context-title"><span class="mdi mdi-link-variant" aria-hidden="true"></span><span><strong>Покликання</strong><small>Вставте адресу або оберіть матеріал сайту</small></span></div><div class="tiptap-link-editor"><input type="url" data-tiptap-link-url placeholder="https://… або /storinka" aria-label="Адреса покликання"><button type="button" class="has-label" data-tiptap-link-library><span class="mdi mdi-folder-search-outline" aria-hidden="true"></span><span>Обрати зі сайту</span></button><button type="button" class="has-label is-primary" data-tiptap-link-apply><span class="mdi mdi-check" aria-hidden="true"></span><span>Застосувати</span></button><button type="button" data-tiptap-link-cancel aria-label="Скасувати"><span class="mdi mdi-close" aria-hidden="true"></span></button></div>';
+        const input = context.querySelector('[data-tiptap-link-url]');
+        input.value = previous;
+
+        function applyLink(href) {
+            const chain = editor.chain().focus().setTextSelection(selection).extendMarkRange('link');
+            if (String(href || '').trim()) {
+                chain.setLink({href: String(href).trim()}).run();
+            } else {
+                chain.unsetLink().run();
+            }
         }
-        if (href.trim() === '') {
-            editor.chain().focus().unsetLink().run();
-            return;
-        }
-        editor.chain().focus().extendMarkRange('link').setLink({href: href.trim()}).run();
+        context.querySelector('[data-tiptap-link-apply]').addEventListener('click', function () { applyLink(input.value); });
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') { event.preventDefault(); applyLink(input.value); }
+            if (event.key === 'Escape') { event.preventDefault(); editor.commands.focus(); }
+        });
+        context.querySelector('[data-tiptap-link-cancel]').addEventListener('click', function () { editor.commands.focus(); });
+        context.querySelector('[data-tiptap-link-library]').addEventListener('click', function () {
+            if (!window.AdminLinkPicker || !window.AdminLinkPicker.open) { input.focus(); return; }
+            window.AdminLinkPicker.open({
+                type: 'pages',
+                title: 'Обрати покликання',
+                hint: 'Оберіть сторінку, категорію, новину або медіафайл.',
+                onSelect: function (item) {
+                    if (item && item.url) { applyLink(item.url); }
+                }
+            });
+        });
+        window.setTimeout(function () { input.focus(); input.select(); }, 0);
     }
 
     function toggleHtmlMode(textarea, editor, content, source, buttonNode) {
+        const shell = buttonNode.closest('.tiptap-editor');
+        const context = shell ? shell.querySelector('.tiptap-editor-context') : null;
+        const footer = shell ? shell.querySelector('.tiptap-editor-footer') : null;
         const sourceVisible = !source.hidden;
         if (sourceVisible) {
             setContent(textarea, source.value);
@@ -434,7 +679,7 @@
             content.hidden = false;
             buttonNode.setAttribute('aria-pressed', 'false');
             editor.commands.focus();
-            updateToolbar(buttonNode.closest('.tiptap-editor-toolbar'), editor);
+            updateEditorUi(textarea, buttonNode.closest('.tiptap-editor-toolbar'), context, footer, editor);
             return;
         }
 
@@ -443,6 +688,7 @@
         content.hidden = true;
         source.hidden = false;
         buttonNode.setAttribute('aria-pressed', 'true');
+        if (context) { context.hidden = true; }
         source.focus();
         updateToolbar(buttonNode.closest('.tiptap-editor-toolbar'), editor);
     }
@@ -499,19 +745,27 @@
         textarea.dispatchEvent(new Event('input', {bubbles: true}));
     }
 
-    function openMediaPicker(textarea) {
+    function openMediaPicker(textarea, editSelection) {
         const modalNode = document.getElementById('richMediaModal');
         if (!modalNode || !window.bootstrap) {
             return;
         }
         bindMediaPicker(modalNode);
         mediaState.editor = textarea;
-        mediaState.selected = new Set();
-        mediaState.selectedItems = new Map();
-        modalNode.querySelector('[data-rich-media-caption]').value = '';
-        modalNode.querySelector('[data-rich-media-mode]').value = 'single';
-        modalNode.querySelector('[data-rich-media-align]').value = 'center';
+        mediaState.edit = editSelection ? {pos: editSelection.pos, type: editSelection.type, nodeSize: editSelection.nodeSize || editSelection.node.nodeSize} : null;
+        const editItems = editSelection ? mediaItemsFromNode(editSelection.node) : [];
+        mediaState.selected = new Set(editItems.map(function (item) { return item.path; }));
+        mediaState.selectedItems = new Map(editItems.map(function (item) { return [item.path, item]; }));
+        modalNode.querySelector('[data-rich-media-caption]').value = editSelection ? String(editSelection.caption || editSelection.node.attrs.caption || '') : '';
+        modalNode.querySelector('[data-rich-media-mode]').value = editSelection && editSelection.type === 'richGallery' ? 'gallery' : 'single';
+        modalNode.querySelector('[data-rich-media-align]').value = editSelection ? normalizeAlign(editSelection.node.attrs.align) : 'center';
+        modalNode.querySelector('[data-rich-media-columns]').value = editSelection && editSelection.type === 'richGallery' ? normalizeColumns(editSelection.node.attrs.columns) : '3';
         modalNode.querySelector('[data-rich-media-search]').value = '';
+        updateMediaOptionsState();
+        const title = modalNode.querySelector('#richMediaTitle');
+        const insertLabel = modalNode.querySelector('[data-rich-media-insert] span:last-child');
+        if (title) { title.textContent = editSelection ? 'Редагувати медіаблок' : 'Додати медіа'; }
+        if (insertLabel) { insertLabel.textContent = editSelection ? 'Застосувати зміни' : 'Вставити'; }
         mediaState.offset = 0;
         mediaState.total = 0;
         mediaState.hasMore = false;
@@ -524,6 +778,25 @@
             modalBody.scrollTop = 0;
         }
         loadMediaItems(false);
+    }
+
+    function mediaItemsFromNode(node) {
+        const attrs = node.attrs || {};
+        const images = node.type.name === 'richGallery' ? (Array.isArray(attrs.images) ? attrs.images : []) : [{src: attrs.src || '', alt: attrs.alt || '', href: attrs.href || ''}];
+        return images.filter(function (image) { return image && image.src; }).map(function (image) {
+            const path = mediaPathFromUrl(image.src);
+            const name = path.split('/').pop() || 'Зображення';
+            return {path: path, name: name, url: image.src, thumb_url: image.src, alt_text: image.alt || '', title: '', caption: '', size_label: '', type: 'image', is_image: true};
+        });
+    }
+
+    function mediaPathFromUrl(value) {
+        try {
+            const path = new URL(value, window.location.origin).pathname;
+            return decodeURIComponent(path.replace(/^.*\/uploads\//, ''));
+        } catch (error) {
+            return String(value || '').replace(/^.*\/uploads\//, '');
+        }
     }
 
     function bindMediaPicker(modalNode) {
@@ -543,6 +816,7 @@
                 mediaState.selectedItems = new Map(first && mediaState.selectedItems.has(first) ? [[first, mediaState.selectedItems.get(first)]] : []);
             }
             renderMediaItems();
+            updateMediaOptionsState();
         });
         modalNode.querySelector('[data-rich-media-align]').addEventListener('change', updateSelectionPreview);
         modalNode.querySelector('[data-rich-media-columns]').addEventListener('change', updateSelectionPreview);
@@ -550,7 +824,8 @@
         modalNode.querySelector('[data-rich-media-clear]').addEventListener('click', function () {
             mediaState.selected = new Set();
             mediaState.selectedItems = new Map();
-            renderMediaItems();
+            updateMediaCardSelection();
+            updateSelectionPreview();
         });
         modalNode.querySelectorAll('[data-rich-media-view]').forEach(function (viewButton) {
             viewButton.addEventListener('click', function () {
@@ -562,6 +837,19 @@
         const modalBody = modalNode.querySelector('.modal-body');
         if (modalBody) {
             modalBody.addEventListener('scroll', maybeLoadMoreMediaItems, {passive: true});
+        }
+        updateMediaOptionsState();
+    }
+
+    function updateMediaOptionsState() {
+        const modalNode = document.getElementById('richMediaModal');
+        if (!modalNode) { return; }
+        const gallery = modalNode.querySelector('[data-rich-media-mode]').value === 'gallery';
+        const columns = modalNode.querySelector('[data-rich-media-columns]');
+        if (columns) {
+            columns.disabled = !gallery;
+            const label = columns.closest('label');
+            if (label) { label.classList.toggle('is-muted', !gallery); }
         }
     }
 
@@ -648,6 +936,8 @@
             const card = document.createElement('button');
             card.type = 'button';
             card.className = 'rich-media-card' + (mediaState.selected.has(item.path) ? ' is-selected' : '');
+            card.dataset.richMediaCardPath = item.path;
+            card.setAttribute('aria-pressed', mediaState.selected.has(item.path) ? 'true' : 'false');
             card.innerHTML = (item.is_image ? '<img src="' + escapeHtml(item.thumb_url || item.url) + '" alt="">' : '<span class="mdi mdi-file-outline rich-media-file-icon" aria-hidden="true"></span>') +
                 (selectedIndex >= 0 ? '<span class="rich-media-card-check">' + (selectedIndex + 1) + '</span>' : '') +
                 '<span class="rich-media-card-name">' + escapeHtml(item.name) + '</span>' +
@@ -669,11 +959,37 @@
                         mediaState.selectedItems.set(item.path, item);
                     }
                 }
-                renderMediaItems();
+                updateMediaCardSelection();
+                updateSelectionPreview();
             });
             grid.appendChild(card);
         });
         updateSelectionPreview();
+    }
+
+    function updateMediaCardSelection() {
+        const modalNode = document.getElementById('richMediaModal');
+        if (!modalNode) { return; }
+        const selectedPaths = Array.from(mediaState.selected);
+        modalNode.querySelectorAll('[data-rich-media-card-path]').forEach(function (card) {
+            const path = card.dataset.richMediaCardPath || '';
+            const selectedIndex = selectedPaths.indexOf(path);
+            const selected = selectedIndex >= 0;
+            card.classList.toggle('is-selected', selected);
+            card.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            const currentCheck = card.querySelector('.rich-media-card-check');
+            if (selected) {
+                const check = currentCheck || document.createElement('span');
+                check.className = 'rich-media-card-check';
+                check.textContent = String(selectedIndex + 1);
+                if (!currentCheck) {
+                    const image = card.querySelector('img, .rich-media-file-icon');
+                    if (image) { image.insertAdjacentElement('afterend', check); } else { card.prepend(check); }
+                }
+            } else if (currentCheck) {
+                currentCheck.remove();
+            }
+        });
     }
 
     function setRichMediaView(mode, persist) {
@@ -681,6 +997,10 @@
         const normalized = mode === 'large' ? 'large' : 'compact';
         mediaState.view = normalized;
         if (modalNode) {
+            const grid = modalNode.querySelector('[data-rich-media-grid]');
+            if (grid) {
+                grid.classList.toggle('is-large', normalized === 'large');
+            }
             modalNode.querySelectorAll('[data-rich-media-view]').forEach(function (viewButton) {
                 const active = viewButton.dataset.richMediaView === normalized;
                 viewButton.classList.toggle('secondary', !active);
@@ -716,13 +1036,19 @@
         const galleryItems = selected.filter(function (item) { return item.is_image; });
 
         count.textContent = selected.length ? 'Вибрано: ' + selected.length : 'Нічого не вибрано';
-        help.textContent = selected.length ? (mode === 'gallery' ? 'Галерея буде сформована з вибраних зображень.' : 'Буде вставлено перший вибраний файл.') : 'Оберіть файл у списку.';
+        help.textContent = selected.length ? (mode === 'gallery' ? 'Порядок можна змінити стрілками біля вибраних фото.' : 'Буде вставлено вибраний файл.') : 'Оберіть файл у списку.';
         clear.hidden = selected.length === 0;
         list.innerHTML = selected.map(function (item, index) {
             return '<div class="rich-media-selected-item"><span class="rich-media-selected-order">' + (index + 1) + '</span>' +
                 (item.is_image ? '<img src="' + escapeHtml(item.url) + '" alt="">' : '<span class="mdi mdi-file-outline rich-media-selected-file" aria-hidden="true"></span>') +
-                '<span><strong>' + escapeHtml(item.name) + '</strong><small>' + escapeHtml(item.size_label || item.type || '') + '</small></span></div>';
+                '<span><strong>' + escapeHtml(item.name) + '</strong><small>' + escapeHtml(item.size_label || item.type || '') + '</small></span>' +
+                (mode === 'gallery' ? '<span class="rich-media-order-actions"><button type="button" data-rich-media-move="up" data-rich-media-path="' + escapeHtml(item.path) + '" title="Перемістити ліворуч"' + (index === 0 ? ' disabled' : '') + '><span class="mdi mdi-chevron-left" aria-hidden="true"></span></button><button type="button" data-rich-media-move="down" data-rich-media-path="' + escapeHtml(item.path) + '" title="Перемістити праворуч"' + (index === selected.length - 1 ? ' disabled' : '') + '><span class="mdi mdi-chevron-right" aria-hidden="true"></span></button></span>' : '') + '</div>';
         }).join('');
+        list.querySelectorAll('[data-rich-media-move]').forEach(function (control) {
+            control.addEventListener('click', function () {
+                moveSelectedMedia(control.dataset.richMediaPath, control.dataset.richMediaMove === 'up' ? -1 : 1);
+            });
+        });
 
         if (!selected.length) {
             preview.innerHTML = '<div class="rich-media-preview-empty">Попередній перегляд зʼявиться після вибору медіафайлів.</div>';
@@ -731,6 +1057,19 @@
         } else {
             preview.innerHTML = '<div class="rich-media-preview-frame">' + buildMediaHtml(selected[0], align, caption) + '</div>';
         }
+    }
+
+    function moveSelectedMedia(path, delta) {
+        const paths = Array.from(mediaState.selected);
+        const index = paths.indexOf(path);
+        const target = index + delta;
+        if (index < 0 || target < 0 || target >= paths.length) { return; }
+        const swap = paths[target];
+        paths[target] = paths[index];
+        paths[index] = swap;
+        mediaState.selected = new Set(paths);
+        updateMediaCardSelection();
+        updateSelectionPreview();
     }
 
     async function uploadMediaFile(event) {
@@ -781,7 +1120,15 @@
             modalNode.querySelector('[data-rich-media-status]').textContent = 'Для галереї оберіть зображення.';
             return;
         }
+        if (mediaState.edit && replaceMediaContent(mediaState.editor, mode, selected, galleryItems, align, columns, caption)) {
+            mediaState.modal.hide();
+            return;
+        }
         if (mode === 'gallery' && insertGalleryContent(mediaState.editor, galleryItems, align, columns, caption)) {
+            mediaState.modal.hide();
+            return;
+        }
+        if (mode === 'single' && insertRichMediaContent(mediaState.editor, selected[0], align, caption)) {
             mediaState.modal.hide();
             return;
         }
@@ -789,32 +1136,73 @@
         mediaState.modal.hide();
     }
 
-    function insertGalleryContent(textarea, items, align, columns, caption) {
-        const editor = textarea ? editors.get(textarea) : null;
-        if (!editor || !editor.schema.nodes.richGallery) {
-            return false;
-        }
+    function richMediaJson(item, align, caption) {
+        const mediaCaption = caption || item.caption || '';
+        return {
+            type: 'richMedia',
+            attrs: {
+                src: item.url,
+                alt: item.alt_text || mediaCaption || item.title || item.name || '',
+                href: item.url,
+                caption: mediaCaption,
+                align: normalizeAlign(align)
+            }
+        };
+    }
+
+    function galleryJson(items, align, columns, caption, editor) {
         const content = [{
             type: 'richGallery',
             attrs: {
                 columns: normalizeColumns(columns),
                 align: normalizeAlign(align),
                 images: items.map(function (item) {
-                    return {
-                        src: item.url,
-                        alt: item.alt_text || item.title || item.name || '',
-                        href: item.url
-                    };
+                    return {src: item.url, alt: item.alt_text || item.title || item.name || '', href: item.url};
                 })
             }
         }];
         if (caption && editor.schema.nodes.richGalleryCaption) {
-            content.push({
-                type: 'richGalleryCaption',
-                attrs: {align: normalizeAlign(align)},
-                content: [{type: 'text', text: caption}]
-            });
+            content.push({type: 'richGalleryCaption', attrs: {align: normalizeAlign(align)}, content: [{type: 'text', text: caption}]});
         }
+        return content;
+    }
+
+    function insertRichMediaContent(textarea, item, align, caption) {
+        const editor = textarea ? editors.get(textarea) : null;
+        if (!editor || !editor.schema.nodes.richMedia || !item || !item.is_image) { return false; }
+        editor.chain().focus().insertContent(richMediaJson(item, align, caption)).run();
+        syncOne(textarea);
+        textarea.dispatchEvent(new Event('input', {bubbles: true}));
+        return true;
+    }
+
+    function replaceMediaContent(textarea, mode, selected, galleryItems, align, columns, caption) {
+        const editor = textarea ? editors.get(textarea) : null;
+        if (!editor || !mediaState.edit) { return false; }
+        let content;
+        if (mode === 'gallery') {
+            if (!galleryItems.length || !editor.schema.nodes.richGallery) { return false; }
+            content = galleryJson(galleryItems, align, columns, caption, editor);
+        } else if (selected[0] && selected[0].is_image && editor.schema.nodes.richMedia) {
+            content = richMediaJson(selected[0], align, caption);
+        } else if (selected[0]) {
+            content = buildMediaHtml(selected[0], align, caption);
+        } else {
+            return false;
+        }
+        editor.chain().focus().insertContentAt({from: mediaState.edit.pos, to: mediaState.edit.pos + mediaState.edit.nodeSize}, content).run();
+        syncOne(textarea);
+        textarea.dispatchEvent(new Event('input', {bubbles: true}));
+        mediaState.edit = null;
+        return true;
+    }
+
+    function insertGalleryContent(textarea, items, align, columns, caption) {
+        const editor = textarea ? editors.get(textarea) : null;
+        if (!editor || !editor.schema.nodes.richGallery) {
+            return false;
+        }
+        const content = galleryJson(items, align, columns, caption, editor);
         editor.chain().focus().insertContent(content).run();
         syncOne(textarea);
         textarea.dispatchEvent(new Event('input', {bubbles: true}));
@@ -825,8 +1213,8 @@
         const mediaCaption = caption || item.caption || '';
         const mediaAlt = item.alt_text || mediaCaption || item.title || item.name;
         if (item.is_image) {
-            return '<p><img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(mediaAlt) + '"></p>' +
-                (mediaCaption ? '<p class="rich-gallery-caption media-align-' + escapeHtml(align) + '">' + escapeHtml(mediaCaption) + '</p>' : '');
+            return '<figure class="rich-media-block media-align-' + escapeHtml(normalizeAlign(align)) + '"><a href="' + escapeHtml(item.url) + '"><img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(mediaAlt) + '"></a>' +
+                (mediaCaption ? '<figcaption>' + escapeHtml(mediaCaption) + '</figcaption>' : '') + '</figure>';
         }
         return '<p class="rich-file-link media-align-' + escapeHtml(align) + '"><a href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener">' + escapeHtml(mediaCaption || item.title || item.name) + '</a></p>';
     }
@@ -845,7 +1233,7 @@
     }
 
     function normalizeAlign(value) {
-        return ['left', 'center', 'right', 'justify'].indexOf(value) === -1 ? 'center' : value;
+        return ['left', 'center', 'right', 'wide'].indexOf(value) === -1 ? 'center' : value;
     }
 
     function normalizeColumns(value) {

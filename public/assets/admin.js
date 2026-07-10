@@ -26,6 +26,7 @@
         let loading = false;
         let searchTimer = null;
         let activeRequest = null;
+        let visibilityCheckScheduled = false;
 
         function setStatus(message) {
             if (status) {
@@ -37,6 +38,30 @@
             if (empty) {
                 empty.classList.toggle('d-none', target.querySelector('[data-list-row]') !== null);
             }
+        }
+
+        function isSentinelNearViewport() {
+            const rect = sentinel.getBoundingClientRect();
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+            return rect.top <= viewportHeight + 320;
+        }
+
+        function checkForNextPage() {
+            visibilityCheckScheduled = false;
+            if (loading || panel.getAttribute('data-list-has-more') !== '1') {
+                return;
+            }
+            if (isSentinelNearViewport()) {
+                loadList(false);
+            }
+        }
+
+        function scheduleNextPageCheck() {
+            if (visibilityCheckScheduled) {
+                return;
+            }
+            visibilityCheckScheduled = true;
+            window.requestAnimationFrame(checkForNextPage);
         }
 
         async function loadList(reset) {
@@ -54,6 +79,7 @@
             }
 
             loading = true;
+            let loadedSuccessfully = false;
             setStatus('Завантаження...');
 
             const controller = new AbortController();
@@ -93,14 +119,18 @@
                 }
                 syncEmpty();
                 setStatus(data.has_more ? 'Прокрутіть нижче, щоб завантажити ще.' : 'Усі записи завантажено.');
+                loadedSuccessfully = true;
             } catch (error) {
                 if (error.name !== 'AbortError') {
                     setStatus(error.message || 'Помилка завантаження.');
                 }
             } finally {
-                loading = false;
                 if (activeRequest === controller) {
+                    loading = false;
                     activeRequest = null;
+                    if (loadedSuccessfully) {
+                        scheduleNextPageCheck();
+                    }
                 }
             }
         }
@@ -126,9 +156,13 @@
 
         const observer = new IntersectionObserver(function (entries) {
             if (entries.some(function (entry) { return entry.isIntersecting; })) {
-                loadList(false);
+                scheduleNextPageCheck();
             }
-        }, {rootMargin: '240px'});
+        }, {rootMargin: '320px'});
+
+        window.addEventListener('scroll', scheduleNextPageCheck, {passive: true});
+        window.addEventListener('resize', scheduleNextPageCheck, {passive: true});
+        panel.addEventListener('admin:check-list', scheduleNextPageCheck);
 
         panel.addEventListener('admin:reload-list', function () {
             panel.setAttribute('data-list-offset', '0');
@@ -138,6 +172,7 @@
 
         observer.observe(sentinel);
         syncEmpty();
+        scheduleNextPageCheck();
     });
 
     document.querySelectorAll('[data-filter-list]').forEach(function (panel) {
@@ -434,6 +469,7 @@
                 });
             });
         }
+        panel.dispatchEvent(new CustomEvent('admin:check-list'));
     }
 
     function bulkChecksForForm(form, checkedOnly, scope) {
