@@ -333,10 +333,15 @@
         syncTiptapEditors(form);
         const button = form.querySelector('button[type="submit"]');
         const originalHtml = button ? button.innerHTML : '';
-        setAjaxFormMessage(form, 'Збереження...', false);
+        const isOptimizerServiceAction = form.matches('[data-optimizer-service-action]');
+        const pendingMessage = form.dataset.pendingMessage || 'Збереження...';
+        const pendingButtonLabel = form.dataset.pendingButtonLabel || pendingMessage;
+        if (!isOptimizerServiceAction) {
+            setAjaxFormMessage(form, pendingMessage, false, true);
+        }
         if (button) {
             button.disabled = true;
-            button.innerHTML = '<span class="mdi mdi-loading mdi-spin" aria-hidden="true"></span><span>Збереження...</span>';
+            button.innerHTML = '<span class="mdi mdi-loading mdi-spin" aria-hidden="true"></span><span>' + escapeHtml(pendingButtonLabel) + '</span>';
         }
 
         try {
@@ -407,9 +412,16 @@
             }
 
             document.dispatchEvent(new CustomEvent('admin:form-saved', {detail: {form: form, data: data}}));
-            setAjaxFormMessage(form, data.message || 'Збережено.', false);
+            if (!isOptimizerServiceAction) {
+                setAjaxFormMessage(form, data.message || 'Збережено.', false);
+            }
         } catch (error) {
-            setAjaxFormMessage(form, error.message || 'Помилка збереження.', true);
+            const errorMessage = error.message || 'Помилка збереження.';
+            if (isOptimizerServiceAction) {
+                document.dispatchEvent(new CustomEvent('admin:form-error', {detail: {form: form, message: errorMessage}}));
+            } else {
+                setAjaxFormMessage(form, errorMessage, true);
+            }
         } finally {
             if (button) {
                 button.disabled = false;
@@ -418,7 +430,7 @@
         }
     });
 
-    function setAjaxFormMessage(form, message, isError) {
+    function setAjaxFormMessage(form, message, isError, isPending) {
         let node = form.querySelector('[data-ajax-message]');
         if (!node) {
             node = document.createElement('div');
@@ -430,7 +442,7 @@
                 form.appendChild(node);
             }
         }
-        node.className = isError ? 'alert alert-warning mt-3 mb-0' : 'alert alert-success mt-3 mb-0';
+        node.className = isError ? 'alert alert-warning mt-3 mb-0' : (isPending ? 'alert alert-info mt-3 mb-0' : 'alert alert-success mt-3 mb-0');
         node.textContent = message;
     }
 
@@ -712,26 +724,74 @@
     function initOptimizerTabs() {
         const buttons = Array.from(document.querySelectorAll('[data-optimizer-tab]'));
         const panels = Array.from(document.querySelectorAll('[data-optimizer-tab-panel]'));
+        const openMediaButton = document.querySelector('[data-optimizer-open-media]');
+        const mediaLaunch = document.querySelector('[data-optimizer-media-launch]');
         if (buttons.length === 0 || panels.length === 0) {
             return;
         }
 
-        function setServiceMessage(grid, message, isError) {
+        buttons.forEach(function (button) {
+            button.dataset.optimizerPermanentlyDisabled = button.disabled ? '1' : '0';
+        });
+
+        function setAnalysisButtonLoading(isLoading) {
+            buttons.forEach(function (button) {
+                const icon = button.querySelector('.mdi');
+                const label = button.querySelector('[data-optimizer-media-button-label]');
+                button.disabled = isLoading || button.dataset.optimizerPermanentlyDisabled === '1';
+                button.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+                if (icon) {
+                    icon.className = isLoading ? 'mdi mdi-loading mdi-spin' : 'mdi mdi-refresh';
+                }
+                if (label) {
+                    label.textContent = isLoading ? 'Аналізуємо…' : 'Оновити аналіз';
+                }
+            });
+        }
+
+        function showAnalysisLoading(panel) {
+            panel.innerHTML = '<div class="list-panel optimizer-analysis-placeholder"><div class="empty-state optimizer-loading-state" data-optimizer-tab-status><span class="optimizer-loader" aria-hidden="true"></span><strong>Аналізуємо медіафайли</strong><span>Це може зайняти кілька секунд.</span></div></div>';
+        }
+
+        function setServiceMessage(grid, payload, isError) {
             document.querySelectorAll('[data-optimizer-service-message]').forEach(function (node) {
                 node.remove();
             });
+            const message = typeof payload === 'string' ? payload : (payload && payload.message ? payload.message : '');
             if (!grid || !message) {
                 return;
             }
 
             const node = document.createElement('div');
             node.setAttribute('data-optimizer-service-message', '');
-            node.className = isError ? 'alert alert-warning mb-4' : 'alert alert-success mb-4';
-            node.textContent = message;
-            grid.insertAdjacentElement('afterend', node);
+            node.className = 'optimizer-service-notice ' + (isError ? 'is-danger' : 'is-' + ((payload && payload.message_tone) || 'success'));
+            node.setAttribute('role', isError ? 'alert' : 'status');
+
+            const icon = document.createElement('span');
+            icon.className = 'mdi ' + (isError ? 'mdi-alert-circle-outline' : ((payload && payload.message_icon) || 'mdi-check-circle-outline'));
+            icon.setAttribute('aria-hidden', 'true');
+
+            const copy = document.createElement('div');
+            const title = document.createElement('strong');
+            title.textContent = isError ? 'Не вдалося виконати дію' : ((payload && payload.message_title) || 'Дію виконано');
+            const detail = document.createElement('span');
+            detail.textContent = message;
+            copy.append(title, detail);
+
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'optimizer-service-notice-close';
+            close.setAttribute('aria-label', 'Закрити повідомлення');
+            close.innerHTML = '<span class="mdi mdi-close" aria-hidden="true"></span>';
+            close.addEventListener('click', function () {
+                node.remove();
+            });
+
+            node.append(icon, copy, close);
+            grid.insertAdjacentElement('beforebegin', node);
         }
 
-        async function refreshServiceGrid(message) {
+        async function refreshServiceGrid(payload) {
             const grid = document.querySelector('.optimizer-service-grid');
             if (!grid) {
                 return;
@@ -752,7 +812,7 @@
             }
 
             grid.replaceWith(freshGrid);
-            setServiceMessage(freshGrid, message || '', false);
+            setServiceMessage(freshGrid, payload || {}, false);
         }
 
         async function loadPanel(panel, force) {
@@ -760,10 +820,8 @@
                 return;
             }
 
-            const status = panel.querySelector('[data-optimizer-tab-status]');
-            if (status) {
-                status.textContent = 'Завантаження...';
-            }
+            showAnalysisLoading(panel);
+            setAnalysisButtonLoading(true);
 
             try {
                 const response = await fetch(panel.dataset.loadUrl || '', {
@@ -779,37 +837,63 @@
                 document.dispatchEvent(new CustomEvent('admin:content-replaced', {detail: {target: panel}}));
             } catch (error) {
                 panel.dataset.loaded = '0';
-                if (status) {
-                    status.textContent = error.message || 'Помилка завантаження.';
-                } else {
-                    panel.innerHTML = '<div class="alert">' + escapeHtml(error.message || 'Помилка завантаження.') + '</div>';
-                }
+                panel.innerHTML = '<div class="optimizer-analysis-error" role="alert"><span class="mdi mdi-alert-circle-outline" aria-hidden="true"></span><div><strong>Не вдалося виконати аналіз</strong><span>' + escapeHtml(error.message || 'Спробуйте ще раз.') + '</span></div><button class="button secondary compact" type="button" data-optimizer-retry><span class="mdi mdi-refresh" aria-hidden="true"></span><span>Повторити</span></button></div>';
+            } finally {
+                setAnalysisButtonLoading(false);
             }
         }
 
-        function activate(name) {
+        function activate(name, force) {
             buttons.forEach(function (button) {
                 const active = button.dataset.optimizerTab === name;
-                button.setAttribute('aria-selected', active ? 'true' : 'false');
-                button.classList.toggle('secondary', !active);
+                button.setAttribute('aria-expanded', active ? 'true' : 'false');
             });
             panels.forEach(function (panel) {
                 const active = panel.dataset.optimizerTabPanel === name;
                 panel.hidden = !active;
                 if (active) {
-                    loadPanel(panel, false);
+                    loadPanel(panel, !!force);
                 }
             });
+            if (mediaLaunch) {
+                mediaLaunch.classList.toggle('is-active', name === 'media');
+            }
         }
 
         buttons.forEach(function (button) {
             button.addEventListener('click', function () {
-                activate(button.dataset.optimizerTab || '');
+                const panel = panels.find(function (item) {
+                    return item.dataset.optimizerTabPanel === button.dataset.optimizerTab;
+                });
+                activate(button.dataset.optimizerTab || '', !!panel && panel.dataset.loaded === '1');
             });
         });
 
+        if (openMediaButton) {
+            openMediaButton.addEventListener('click', function () {
+                const mediaButton = buttons.find(function (button) {
+                    return button.dataset.optimizerTab === 'media';
+                });
+                if (mediaLaunch) {
+                    mediaLaunch.scrollIntoView({behavior: 'smooth', block: 'center'});
+                }
+                if (mediaButton && !mediaButton.disabled) {
+                    mediaButton.click();
+                }
+            });
+        }
+
+        document.addEventListener('click', function (event) {
+            const retry = event.target.closest('[data-optimizer-retry]');
+            if (!retry) {
+                return;
+            }
+            const panel = retry.closest('[data-optimizer-tab-panel]');
+            loadPanel(panel, true);
+        });
+
         const activeButton = buttons.find(function (button) {
-            return button.getAttribute('aria-selected') === 'true';
+            return button.getAttribute('aria-expanded') === 'true';
         });
         if (activeButton) {
             activate(activeButton.dataset.optimizerTab || '');
@@ -831,10 +915,18 @@
 
             if (form.matches('[data-optimizer-service-action]')) {
                 const data = event.detail && event.detail.data ? event.detail.data : {};
-                refreshServiceGrid(data.message || '').catch(function (error) {
+                refreshServiceGrid(data).catch(function (error) {
                     setServiceMessage(document.querySelector('.optimizer-service-grid'), error.message || 'Не вдалося оновити стан карток.', true);
                 });
             }
+        });
+
+        document.addEventListener('admin:form-error', function (event) {
+            const form = event.detail && event.detail.form;
+            if (!form || !form.matches('[data-optimizer-service-action]')) {
+                return;
+            }
+            setServiceMessage(document.querySelector('.optimizer-service-grid'), event.detail.message || 'Спробуйте ще раз.', true);
         });
     }
 

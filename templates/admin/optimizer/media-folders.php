@@ -10,10 +10,10 @@
     $conflictCount = count($conflicts);
 ?>
 <div class="metrics optimizer-analysis-metrics">
-    <div class="metric"><div><span>Медіафайлів</span><strong><?= e((string) ($stats['media_total'] ?? 0)) ?></strong></div><span class="mdi mdi-image-multiple-outline metric-icon" aria-hidden="true"></span></div>
-    <div class="metric"><div><span>Знайдено в новинах</span><strong><?= e((string) ($stats['news_media'] ?? 0)) ?></strong></div><span class="mdi mdi-newspaper-variant-outline metric-icon" aria-hidden="true"></span></div>
-    <div class="metric"><div><span>Буде змінено</span><strong><?= e((string) ($stats['updates'] ?? 0)) ?></strong></div><span class="mdi mdi-folder-sync-outline metric-icon" aria-hidden="true"></span></div>
-    <div class="metric"><div><span>Конфлікти</span><strong><?= e((string) ($stats['conflicts'] ?? 0)) ?></strong></div><span class="mdi mdi-alert-circle-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric"><div><span>Усього у медіатеці</span><strong><?= e((string) ($stats['media_total'] ?? 0)) ?></strong></div><span class="mdi mdi-image-multiple-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric"><div><span>Використано в новинах</span><strong><?= e((string) ($stats['news_media'] ?? 0)) ?></strong></div><span class="mdi mdi-newspaper-variant-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric is-accent"><div><span>Готово до оновлення</span><strong><?= e((string) ($stats['updates'] ?? 0)) ?></strong></div><span class="mdi mdi-folder-sync-outline metric-icon" aria-hidden="true"></span></div>
+    <div class="metric <?= !empty($stats['conflicts']) ? 'is-warning' : '' ?>"><div><span>Потребують уваги</span><strong><?= e((string) ($stats['conflicts'] ?? 0)) ?></strong></div><span class="mdi mdi-alert-circle-outline metric-icon" aria-hidden="true"></span></div>
 </div>
 
 <section class="card admin-form-card optimizer-media-card">
@@ -23,12 +23,12 @@
                 <span class="optimizer-icon mdi mdi-folder-sync-outline" aria-hidden="true"></span>
                 <h2>Сортування медіафайлів новин</h2>
             </div>
-            <p class="meta">Оптимізатор не переміщує файли фізично. Він змінює тільки поле “Віртуальна папка” у медіатеці, наприклад: “Новини: Оголошення”.</p>
+            <p class="meta">Файли залишаться на місці. Зміниться лише поле «Віртуальна папка» у медіатеці, наприклад «Новини: Оголошення».</p>
         </div>
         <form method="post" action="<?= url('/admin/optimizer/media-folders/apply') ?>" data-optimizer-media-apply data-optimizer-confirm="Застосувати сортування для <?= e((string) $suggestionCount) ?> файлів?">
             <?= \App\Core\Csrf::field() ?>
             <button type="submit" <?= (!$canManageMedia || !$suggestions) ? 'disabled' : '' ?>>
-                <span class="mdi mdi-auto-fix" aria-hidden="true"></span><span>Застосувати сортування</span>
+                <span class="mdi mdi-check-all" aria-hidden="true"></span><span>Застосувати <?= e((string) $suggestionCount) ?> змін</span>
             </button>
         </form>
     </div>
@@ -49,7 +49,8 @@
     </div>
     <div class="table-scroll">
         <table class="optimizer-table">
-            <thead><tr><th>Файл</th><th>Поточна папка</th><th>Нова папка</th><th>Новина</th></tr></thead>
+            <caption class="visually-hidden">Заплановані зміни віртуальних папок медіафайлів</caption>
+            <thead><tr><th scope="col">Файл</th><th scope="col">Поточна папка</th><th scope="col">Нова папка</th><th scope="col">Новина</th></tr></thead>
             <tbody>
                 <?php foreach ($visibleSuggestions as $item): ?>
                     <tr>
@@ -104,7 +105,8 @@
         </div>
         <div class="table-scroll">
             <table class="optimizer-table">
-                <thead><tr><th>Файл</th><th>Поточна папка</th><th>Можливі папки</th><th>Новини</th></tr></thead>
+                <caption class="visually-hidden">Медіафайли з конфліктами категорій</caption>
+                <thead><tr><th scope="col">Файл</th><th scope="col">Поточна папка</th><th scope="col">Можливі папки</th><th scope="col">Новини</th></tr></thead>
                 <tbody>
                     <?php foreach ($visibleConflicts as $item): ?>
                         <tr>

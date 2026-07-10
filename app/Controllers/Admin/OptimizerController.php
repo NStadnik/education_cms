@@ -35,6 +35,7 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
             'mediaTabActive' => (string) $request->input('tab', '') === 'media' || (int) $request->input('applied', 0) > 0,
             'applied' => max(0, (int) $request->input('applied', 0)),
             'cacheCleared' => max(0, (int) $request->input('cache_cleared', 0)),
+            'cacheChecked' => (string) $request->input('cache_checked', '') === '1',
             'debugChanged' => (string) $request->input('debug', ''),
         ]);
     }
@@ -129,13 +130,16 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
             if ($this->isAjax($request)) {
                 return $this->json([
                     'ok' => true,
-                    'message' => $deleted > 0 ? 'Кеш очищено. Видалено файлів: ' . $deleted . '.' : 'Кеш уже порожній.',
+                    'message_title' => $deleted > 0 ? 'Кеш сайту очищено' : 'Кеш уже порожній',
+                    'message' => $deleted > 0 ? 'Видалено файлів: ' . $deleted . '. Нові превʼю створяться автоматично.' : 'Файлів для видалення не знайдено. Додаткових дій не потрібно.',
+                    'message_tone' => 'success',
+                    'message_icon' => $deleted > 0 ? 'mdi-check-circle-outline' : 'mdi-information-outline',
                     'deleted' => $deleted,
                     'cacheInfo' => $this->cacheInfo(),
                 ]);
             }
 
-            redirect('/admin/optimizer?cache_cleared=' . $deleted);
+            redirect('/admin/optimizer?cache_checked=1&cache_cleared=' . $deleted);
         } catch (Throwable $e) {
             if ($this->isAjax($request)) {
                 return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
@@ -182,7 +186,12 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
             if ($this->isAjax($request)) {
                 return $this->json([
                     'ok' => true,
-                    'message' => $enabled ? 'Debug режим увімкнено.' : 'Debug режим вимкнено.',
+                    'message_title' => $enabled ? 'Debug режим увімкнено' : 'Debug режим вимкнено',
+                    'message' => $enabled
+                        ? 'Технічні помилки можуть відображатися відвідувачам. Вимкніть режим після завершення діагностики.'
+                        : 'Технічні повідомлення більше не відображатимуться відвідувачам.',
+                    'message_tone' => $enabled ? 'warning' : 'success',
+                    'message_icon' => $enabled ? 'mdi-alert-outline' : 'mdi-shield-check-outline',
                     'debugInfo' => $this->debugInfo(),
                 ]);
             }

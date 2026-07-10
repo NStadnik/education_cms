@@ -98,6 +98,8 @@ final class LcloudApiController extends BaseController
                 'alt_name' => (string) ($item['alt_name'] ?? ''),
                 'comm_num' => '0',
                 'approve' => (string) ($item['approve'] ?? 'pending'),
+                'view_url' => url('/news/' . (string) ($item['alt_name'] ?? '')),
+                'edit_url' => url('/admin/news/edit?id=' . (int) ($item['id'] ?? 0)),
             ];
         }, $items);
     }
