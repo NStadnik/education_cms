@@ -82,6 +82,18 @@ final class Database
         return $ok;
     }
 
+    public function executeAffected(string $sql, array $params = []): int
+    {
+        $stmt = $this->pdo()->prepare($sql);
+        $stmt->execute($params);
+        $affected = $stmt->rowCount();
+        if ($affected > 0 && $this->invalidatesPublicQueryCache($sql)) {
+            QueryCache::flush();
+        }
+
+        return $affected;
+    }
+
     public function lastInsertId(): string
     {
         return $this->pdo()->lastInsertId();

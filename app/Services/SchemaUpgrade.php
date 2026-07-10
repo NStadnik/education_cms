@@ -64,6 +64,14 @@ final class SchemaUpgrade
                 $db->execute('insert into settings (name, value) values (?, ?)', ['schema_content_ownership', '1']);
             }
 
+            $newsModerationDone = $db->fetch('select value from settings where name = ?', ['schema_news_moderation']);
+            if (($newsModerationDone['value'] ?? '') !== '1') {
+                self::addNewsModerationSchema($db);
+                self::upgradePublisherRole($db);
+                $db->execute('delete from settings where name = ?', ['schema_news_moderation']);
+                $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_moderation', '1']);
+            }
+
             self::createMediaTable($db);
             $mediaDone = $db->fetch('select value from settings where name = ?', ['schema_media_table']);
             if (($mediaDone['value'] ?? '') !== '1') {
@@ -157,6 +165,56 @@ final class SchemaUpgrade
         }
         if (!self::hasColumn($db, 'news', 'created_by')) {
             $db->pdo()->exec('alter table news add column created_by bigint unsigned null after id');
+        }
+    }
+
+    private static function addNewsModerationSchema(Database $db): void
+    {
+        $columns = [
+            'submitted_at' => 'alter table news add column submitted_at varchar(32) null after published_at',
+            'submitted_by' => 'alter table news add column submitted_by bigint unsigned null after submitted_at',
+            'reviewed_at' => 'alter table news add column reviewed_at varchar(32) null after submitted_by',
+            'reviewed_by' => 'alter table news add column reviewed_by bigint unsigned null after reviewed_at',
+            'review_comment' => 'alter table news add column review_comment text null after reviewed_by',
+            'version' => 'alter table news add column version int unsigned not null default 1 after review_comment',
+        ];
+        foreach ($columns as $column => $sql) {
+            if (!self::hasColumn($db, 'news', $column)) {
+                $db->pdo()->exec($sql);
+            }
+        }
+
+        $db->pdo()->exec(
+            "create table if not exists news_moderation_events (
+                id bigint unsigned primary key auto_increment,
+                news_id bigint unsigned not null,
+                user_id bigint unsigned null,
+                action varchar(40) not null,
+                from_status varchar(40) not null,
+                to_status varchar(40) not null,
+                comment text null,
+                created_at varchar(32) not null,
+                index news_moderation_events_news_id_index (news_id),
+                constraint news_moderation_events_news_id_foreign foreign key(news_id) references news(id) on delete cascade
+            ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci"
+        );
+    }
+
+    private static function upgradePublisherRole(Database $db): void
+    {
+        $stored = $db->fetch('select value from settings where name = ?', ['user_roles']);
+        $roles = json_decode((string) ($stored['value'] ?? ''), true);
+        if (!is_array($roles) || !isset($roles['publisher']) || !is_array($roles['publisher'])) {
+            return;
+        }
+        $permissions = $roles['publisher']['permissions'] ?? [];
+        if (!is_array($permissions) || in_array('*', $permissions, true) || !in_array('news.manage', $permissions, true)) {
+            return;
+        }
+        $roles['publisher']['permissions'] = array_values(array_unique([...$permissions, 'news.review', 'news.publish']));
+        $encoded = json_encode($roles, JSON_UNESCAPED_UNICODE);
+        if ($encoded !== false) {
+            $db->execute('update settings set value = ? where name = ?', [$encoded, 'user_roles']);
         }
     }
 

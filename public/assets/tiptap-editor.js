@@ -289,6 +289,7 @@
         editor = new bundle.Editor({
             element: content,
             content: textarea.value || '',
+            editable: !textarea.disabled,
             extensions: extensions,
             editorProps: {
                 handleDOMEvents: {

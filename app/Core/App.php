@@ -134,6 +134,10 @@ final class App
         $this->router->get('/admin/news/edit', [$adminNews, 'newsForm']);
         $this->router->get('/admin/news/categories', [$adminNews, 'newsCategories']);
         $this->router->post('/admin/news/save', [$adminNews, 'newsSave']);
+        $this->router->post('/admin/news/submit', [$adminNews, 'newsSubmit']);
+        $this->router->post('/admin/news/request-changes', [$adminNews, 'newsRequestChanges']);
+        $this->router->post('/admin/news/publish', [$adminNews, 'newsPublish']);
+        $this->router->post('/admin/news/unpublish', [$adminNews, 'newsUnpublish']);
         $this->router->post('/admin/news/categories/save', [$adminNews, 'newsCategorySave']);
         $this->router->post('/admin/news/categories/delete', [$adminNews, 'newsCategoryDelete']);
         $this->router->post('/admin/news/bulk', [$adminNews, 'newsBulk']);

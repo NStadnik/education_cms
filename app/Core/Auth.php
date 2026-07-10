@@ -22,7 +22,17 @@ final class Auth
         'news.manage' => [
             'group' => 'Контент',
             'label' => 'Новини',
-            'description' => 'Керування новинами, категоріями та статусами публікації.',
+            'description' => 'Створення та редагування власних новин.',
+        ],
+        'news.review' => [
+            'group' => 'Контент',
+            'label' => 'Модерація новин',
+            'description' => 'Перегляд черги новин і повернення матеріалів на доопрацювання.',
+        ],
+        'news.publish' => [
+            'group' => 'Контент',
+            'label' => 'Публікація новин',
+            'description' => 'Публікація та зняття новин з публікації.',
         ],
         'media.manage' => [
             'group' => 'Медіа',
@@ -60,7 +70,7 @@ final class Auth
         return [
             'admin' => ['*'],
             'editor' => ['pages.manage', 'news.manage', 'media.manage'],
-            'publisher' => ['pages.manage', 'news.manage', 'media.manage'],
+            'publisher' => ['pages.manage', 'news.manage', 'news.review', 'news.publish', 'media.manage'],
             'viewer' => [],
         ];
     }

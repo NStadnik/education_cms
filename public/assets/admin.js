@@ -293,6 +293,10 @@
                 window.location.href = form.dataset.afterSuccessUrl;
                 return;
             }
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+                return;
+            }
 
             updateListFromPayload(panel, data);
             bulkChecksForForm(form, false).forEach(function (checkbox) {
@@ -331,7 +335,7 @@
 
         event.preventDefault();
         syncTiptapEditors(form);
-        const button = form.querySelector('button[type="submit"]');
+        const button = event.submitter || form.querySelector('button[type="submit"]');
         const originalHtml = button ? button.innerHTML : '';
         const isOptimizerServiceAction = form.matches('[data-optimizer-service-action]');
         const pendingMessage = form.dataset.pendingMessage || 'Збереження...';
@@ -344,10 +348,15 @@
             button.innerHTML = '<span class="mdi mdi-loading mdi-spin" aria-hidden="true"></span><span>' + escapeHtml(pendingButtonLabel) + '</span>';
         }
 
+        const formData = new FormData(form);
+        if (button && button.name) {
+            formData.set(button.name, button.value || '1');
+        }
+
         try {
             const response = await fetch(form.action, {
                 method: 'POST',
-                body: new FormData(form),
+                body: formData,
                 headers: {'X-Requested-With': 'XMLHttpRequest'}
             });
             const text = await response.text();
@@ -365,6 +374,10 @@
             const idInput = form.querySelector('input[name="id"]');
             if (idInput && data.id) {
                 idInput.value = data.id;
+            }
+            const versionInput = form.querySelector('input[name="version"]');
+            if (versionInput && data.version) {
+                versionInput.value = data.version;
             }
             if (data.edit_url && window.history && window.history.replaceState) {
                 window.history.replaceState(null, '', data.edit_url);

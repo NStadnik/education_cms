@@ -1,4 +1,11 @@
 document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('submit', function (event) {
+        const form = event.target.closest('[data-moderation-confirm]');
+        if (form && !window.confirm(form.dataset.moderationConfirm || 'Виконати дію?')) {
+            event.preventDefault();
+        }
+    }, true);
+
     document.querySelectorAll('[data-news-image-picker]').forEach(function (picker) {
         const input = picker.querySelector('[data-news-image-input]');
         const removeInput = picker.querySelector('[data-news-image-remove]');

@@ -147,13 +147,13 @@ abstract class AdminBaseController extends BaseController
                 ))';
                 array_push($params, $like, $like, $like, $like, $like, $like);
             }
-            [$ownerWhere, $ownerParams] = $this->ownedContentWhere('n');
+            [$ownerWhere, $ownerParams] = $this->ownedContentWhere('n', 'news');
             if ($ownerWhere !== '') {
                 $clauses[] = $ownerWhere;
                 array_push($params, ...$ownerParams);
             }
             $status = (string) $request->input('status', '');
-            if (in_array($status, ['published', 'draft'], true)) {
+            if (in_array($status, ['published', 'draft', 'pending_review', 'changes_requested'], true)) {
                 $clauses[] = 'n.status = ?';
                 $params[] = $status;
             }
@@ -174,9 +174,10 @@ abstract class AdminBaseController extends BaseController
                 'title_desc' => 'n.title desc, n.id desc',
                 'updated_desc' => 'n.updated_at desc, n.id desc',
                 'created_desc' => 'n.created_at desc, n.id desc',
+                'moderation' => 'n.submitted_at asc, n.id asc',
             ][(string) $request->input('sort', 'newest')] ?? $config['order'];
             $items = $this->db()->fetchAll(
-                'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
+                'select n.*, (select u.name from users u where u.id = n.created_by limit 1) as author_name, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
                  from news n
                  left join news_category_links l on l.news_id = n.id
                  left join news_categories c on c.id = l.category_id
@@ -208,6 +209,7 @@ abstract class AdminBaseController extends BaseController
             'html' => $this->view()->partial($config['template'], [
                 'items' => $items,
                 'roleLabels' => $resource === 'users' ? Container::get('auth')->roleLabels() : [],
+                'canModerate' => $resource === 'news' && (Container::get('auth')->can('news.review') || Container::get('auth')->can('news.publish')),
             ]),
             'total' => $total,
             'next_offset' => $loaded,
@@ -250,7 +252,7 @@ abstract class AdminBaseController extends BaseController
         $where = '';
         $params = [];
         if (in_array($table, ['pages', 'news'], true)) {
-            [$ownerWhere, $ownerParams] = $this->ownedContentWhere();
+            [$ownerWhere, $ownerParams] = $this->ownedContentWhere('', $table);
             if ($ownerWhere !== '') {
                 $where = ' where ' . $ownerWhere;
                 $params = $ownerParams;
@@ -260,7 +262,14 @@ abstract class AdminBaseController extends BaseController
         $total = (int) ($this->db()->fetch("select count(*) as c from {$table}" . $where, $params)['c'] ?? 0);
         $publishedWhere = $where === '' ? " where status = 'published'" : $where . " and status = 'published'";
         $published = (int) ($this->db()->fetch("select count(*) as c from {$table}" . $publishedWhere, $params)['c'] ?? 0);
-        return ['total' => $total, 'published' => $published, 'drafts' => $total - $published];
+        $countStatus = function (string $status) use ($table, $where, $params): int {
+            $statusWhere = $where === '' ? ' where status = ?' : $where . ' and status = ?';
+            return (int) ($this->db()->fetch("select count(*) as c from {$table}" . $statusWhere, [...$params, $status])['c'] ?? 0);
+        };
+        $pending = $table === 'news' ? $countStatus('pending_review') : 0;
+        $changes = $table === 'news' ? $countStatus('changes_requested') : 0;
+        $drafts = $countStatus('draft');
+        return ['total' => $total, 'published' => $published, 'drafts' => $drafts, 'pending_review' => $pending, 'changes_requested' => $changes];
     }
 
     protected function pageTemplates(): array
@@ -355,9 +364,9 @@ abstract class AdminBaseController extends BaseController
         return Container::get('auth')->can('content.manage_all');
     }
 
-    protected function ownedContentWhere(string $alias = ''): array
+    protected function ownedContentWhere(string $alias = '', string $resource = ''): array
     {
-        if ($this->canManageAllContent()) {
+        if ($this->canManageAllContent() || ($resource === 'news' && (Container::get('auth')->can('news.review') || Container::get('auth')->can('news.publish')))) {
             return ['', []];
         }
 
@@ -367,7 +376,7 @@ abstract class AdminBaseController extends BaseController
 
     protected function filterOwnedContentIds(string $table, array $ids): array
     {
-        if ($this->canManageAllContent() || !$ids || !in_array($table, ['pages', 'news'], true)) {
+        if ($this->canManageAllContent() || ($table === 'news' && (Container::get('auth')->can('news.review') || Container::get('auth')->can('news.publish'))) || !$ids || !in_array($table, ['pages', 'news'], true)) {
             return $ids;
         }
 
@@ -2451,6 +2460,9 @@ abstract class AdminBaseController extends BaseController
             }
 
             $status = $this->importStatus($this->importValue($row, ['status', 'статус']), 'draft');
+            if ($status === 'published' && !Container::get('auth')->can('news.publish')) {
+                $status = Container::get('auth')->can('news.manage') ? 'pending_review' : 'draft';
+            }
             $publishedAt = $this->importValue($row, ['published_at', 'дата_публікації', 'дата']);
             if ($status === 'published' && $publishedAt === '') {
                 $publishedAt = $now;
@@ -2794,7 +2806,7 @@ abstract class AdminBaseController extends BaseController
     protected function importStatus(string $status, string $default): string
     {
         $status = strtolower(trim($status));
-        return in_array($status, ['draft', 'published'], true) ? $status : $default;
+        return in_array($status, ['draft', 'pending_review', 'changes_requested', 'published'], true) ? $status : $default;
     }
 
     protected function importBool(string $value, bool $default): bool

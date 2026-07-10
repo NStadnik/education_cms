@@ -16,13 +16,13 @@ final class NewsController extends \App\Controllers\AdminBaseController
 {
     public function news(Request $request): Response
     {
-        $this->guard('news.manage');
+        $this->guardNewsAccessPermission();
         $query = trim((string) $request->input('q', ''));
         [$where, $params] = $this->newsListFilters($request, $query);
         $sort = $this->newsListOrder((string) $request->input('sort', 'newest'));
         $pagination = $this->pagination($request);
         $items = $this->db()->fetchAll(
-            'select n.*, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
+            'select n.*, (select u.name from users u where u.id = n.created_by limit 1) as author_name, group_concat(c.title order by c.sort_order asc, c.title asc separator ", ") as category_titles
              from news n
              left join news_category_links l on l.news_id = n.id
              left join news_categories c on c.id = l.category_id
@@ -42,7 +42,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
         )['c'] ?? 0);
 
         if ($this->isAjaxRequest()) {
-            return $this->listJson('admin/news/rows', ['items' => $items], $pagination, $total);
+            return $this->listJson('admin/news/rows', ['items' => $items, 'canModerate' => $this->canReviewNews() || $this->canPublishNews()], $pagination, $total);
         }
 
         $stats = $this->statusStats('news');
@@ -59,15 +59,18 @@ final class NewsController extends \App\Controllers\AdminBaseController
                 'sort' => (string) $request->input('sort', 'newest'),
             ],
             'categories' => $this->newsCategoryOptions(),
+            'canPublish' => $this->canPublishNews(),
+            'canReview' => $this->canReviewNews(),
+            'canManage' => Container::get('auth')->can('news.manage'),
         ]);
     }
 
     public function newsForm(Request $request): Response
     {
-        $this->guard('news.manage');
+        $this->guardNewsAccessPermission();
         $id = (int) $request->input('id', 0);
-        $item = $id ? $this->db()->fetch('select * from news where id = ?', [$id]) : null;
-        if ($item && !$this->canManageAllContent() && (int) ($item['created_by'] ?? 0) !== $this->currentUserId()) {
+        $item = $id ? $this->db()->fetch('select n.*, u.name as author_name from news n left join users u on u.id = n.created_by where n.id = ?', [$id]) : null;
+        if ($item && !$this->canAccessNews($item)) {
             return \App\Controllers\ErrorController::response(403);
         }
         return $this->admin('admin/news/form', [
@@ -75,6 +78,10 @@ final class NewsController extends \App\Controllers\AdminBaseController
             'item' => $item,
             'categories' => $this->newsCategoryOptions(),
             'selectedCategoryIds' => $id ? $this->newsCategoryIds($id) : [],
+            'canReview' => $this->canReviewNews(),
+            'canPublish' => $this->canPublishNews(),
+            'canEdit' => $item ? $this->canEditNews($item) : Container::get('auth')->can('news.manage'),
+            'moderationEvents' => $id ? $this->newsModerationEvents($id) : [],
         ]);
     }
 
@@ -92,15 +99,23 @@ final class NewsController extends \App\Controllers\AdminBaseController
     {
         $this->guard('news.manage');
         Csrf::verify();
+        $transactionStarted = false;
         try {
             $now = date('c');
             $id = (int) $request->input('id', 0);
-            $existing = $id ? $this->db()->fetch('select id, created_by from news where id = ?', [$id]) : null;
-            if ($id && (!$existing || (!$this->canManageAllContent() && (int) ($existing['created_by'] ?? 0) !== $this->currentUserId()))) {
-                throw new \RuntimeException('Доступ заборонено.');
+            $existing = $id ? $this->db()->fetch('select * from news where id = ?', [$id]) : null;
+            if ($id && (!$existing || !$this->canEditNews($existing))) {
+                throw new \RuntimeException('Доступ заборонено. Матеріал у цьому статусі не можна редагувати.');
             }
-            $slug = $this->slug((string) $request->input('slug', $request->input('title')));
-            $publishedAt = $request->input('status') === 'published' ? ($request->input('published_at') ?: $now) : null;
+            $title = trim((string) $request->input('title', ''));
+            $body = trim((string) $request->input('body', ''));
+            if ($title === '' || $body === '') {
+                throw new \RuntimeException('Заповніть назву та текст новини.');
+            }
+            $slugInput = trim((string) $request->input('slug', ''));
+            $slug = $this->slug($slugInput !== '' ? $slugInput : $title);
+            $status = (string) ($existing['status'] ?? 'draft');
+            $publishedAt = $existing['published_at'] ?? null;
             $categoryIds = $this->selectedCategoryIds($request);
             if (!$categoryIds) {
                 $categoryIds = [$this->ensureNewsCategory('Загальні')];
@@ -108,55 +123,115 @@ final class NewsController extends \App\Controllers\AdminBaseController
             $primaryCategory = $this->categoryTitleById($categoryIds[0]) ?: 'Загальні';
             $imagePath = $this->newsImagePath($request, $id);
             $data = [
-                $request->input('title'),
+                $title,
                 $slug,
                 $primaryCategory,
                 $imagePath,
-                $request->input('body'),
-                $request->input('status', 'draft'),
+                $body,
+                $status,
                 $publishedAt,
                 $now,
             ];
+            $this->db()->pdo()->beginTransaction();
+            $transactionStarted = true;
             if ($id) {
-                $this->db()->execute('update news set title=?, slug=?, category=?, image_path=?, body=?, status=?, published_at=?, updated_at=? where id=?', [...$data, $id]);
+                $version = (int) $request->input('version', 0);
+                $affected = $this->db()->executeAffected(
+                    'update news set title=?, slug=?, category=?, image_path=?, body=?, status=?, published_at=?, updated_at=?, version=version+1 where id=? and version=?',
+                    [...$data, $id, $version]
+                );
+                if ($version <= 0 || $affected !== 1) {
+                    throw new \RuntimeException('Новину вже змінив інший користувач. Оновіть сторінку й повторіть дію.');
+                }
             } else {
                 $this->db()->execute('insert into news (created_by, title, slug, category, image_path, body, status, published_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [$this->currentUserId(), ...$data, $now]);
                 $id = (int) $this->db()->lastInsertId();
             }
             $this->syncNewsCategories($id, $categoryIds);
+            if ($request->input('submit_for_review') && in_array($status, ['draft', 'changes_requested'], true)) {
+                $saved = $this->db()->fetch('select * from news where id = ?', [$id]);
+                if (!$saved) {
+                    throw new \RuntimeException('Не вдалося підготувати новину до модерації.');
+                }
+                $this->applyNewsTransition($saved, 'submit', '');
+                $status = 'pending_review';
+            }
             $this->audit('save', 'news', $id);
+            $savedVersion = (int) ($this->db()->fetch('select version from news where id = ?', [$id])['version'] ?? 1);
+            $this->db()->pdo()->commit();
+            $transactionStarted = false;
 
             if ($this->isAjax($request)) {
                 return $this->json([
                     'ok' => true,
                     'message' => 'Новину збережено.',
                     'id' => $id,
+                    'version' => $savedVersion,
                     'published_at' => $publishedAt,
                     'edit_url' => url('/admin/news/edit?id=' . $id),
-                    'view_url' => $request->input('status') === 'published' ? url('/news/' . $slug) : null,
+                    'redirect_url' => ($existing || $request->input('submit_for_review')) ? url('/admin/news/edit?id=' . $id) : null,
+                    'view_url' => $status === 'published' ? url('/news/' . $slug) : null,
                 ]);
             }
 
             redirect('/admin/news');
         } catch (Throwable $e) {
+            if ($transactionStarted && $this->db()->pdo()->inTransaction()) {
+                $this->db()->pdo()->rollBack();
+            }
             return $this->ajaxError($request, $e);
         }
     }
 
+    public function newsSubmit(Request $request): Response
+    {
+        return $this->moderateNews($request, 'submit');
+    }
+
+    public function newsRequestChanges(Request $request): Response
+    {
+        return $this->moderateNews($request, 'request_changes');
+    }
+
+    public function newsPublish(Request $request): Response
+    {
+        return $this->moderateNews($request, 'publish');
+    }
+
+    public function newsUnpublish(Request $request): Response
+    {
+        return $this->moderateNews($request, 'unpublish');
+    }
+
     public function newsBulk(Request $request): Response
     {
-        $this->guard('news.manage');
+        $this->guardNewsAccessPermission();
         Csrf::verify();
-        $ids = $this->filterOwnedContentIds('news', $this->bulkIds($request));
         $action = (string) $request->input('bulk_action', '');
-        if ($ids && in_array($action, ['publish', 'draft'], true)) {
-            $status = $action === 'publish' ? 'published' : 'draft';
-            $this->bulkUpdateStatus('news', $ids, $status);
-            if ($status === 'published') {
-                $this->bulkFillPublishedAt('news', $ids);
+        $ids = $this->bulkIds($request);
+        if ($action !== 'publish') {
+            $ids = $this->filterStrictOwnedNewsIds($ids);
+        }
+        if ($ids && $action === 'submit' && Container::get('auth')->can('news.manage')) {
+            $ids = $this->filterNewsIdsByStatuses($ids, ['draft', 'changes_requested']);
+            foreach ($ids as $id) {
+                $item = $this->db()->fetch('select * from news where id = ?', [$id]);
+                if ($item) {
+                    $this->applyNewsTransition($item, 'submit', '');
+                }
             }
-            $this->audit('bulk_' . $action, 'news', null, 'ids: ' . implode(',', $ids));
-        } elseif ($ids && $action === 'delete') {
+            $this->audit('bulk_submit', 'news', null, 'ids: ' . implode(',', $ids));
+        } elseif ($ids && $action === 'publish' && $this->canPublishNews()) {
+            $ids = $this->filterNewsIdsByStatuses($ids, ['pending_review']);
+            foreach ($ids as $id) {
+                $item = $this->db()->fetch('select * from news where id = ?', [$id]);
+                if ($item) {
+                    $this->applyNewsTransition($item, 'publish', '');
+                }
+            }
+            $this->audit('bulk_publish', 'news', null, 'ids: ' . implode(',', $ids));
+        } elseif ($ids && $action === 'delete' && Container::get('auth')->can('news.manage')) {
+            $ids = $this->filterNewsIdsByStatuses($ids, ['draft', 'changes_requested']);
             $this->bulkDelete('news', $ids);
             $this->audit('bulk_delete', 'news', null, 'ids: ' . implode(',', $ids));
         }
@@ -511,14 +586,14 @@ final class NewsController extends \App\Controllers\AdminBaseController
             array_push($params, $like, $like, $like, $like, $like, $like);
         }
 
-        [$ownerWhere, $ownerParams] = $this->ownedContentWhere('n');
+        [$ownerWhere, $ownerParams] = $this->ownedContentWhere('n', 'news');
         if ($ownerWhere !== '') {
             $clauses[] = $ownerWhere;
             array_push($params, ...$ownerParams);
         }
 
         $status = (string) $request->input('status', '');
-        if (in_array($status, ['published', 'draft'], true)) {
+        if (in_array($status, ['published', 'draft', 'pending_review', 'changes_requested'], true)) {
             $clauses[] = 'n.status = ?';
             $params[] = $status;
         }
@@ -545,7 +620,198 @@ final class NewsController extends \App\Controllers\AdminBaseController
             'title_desc' => 'n.title desc, n.id desc',
             'updated_desc' => 'n.updated_at desc, n.id desc',
             'created_desc' => 'n.created_at desc, n.id desc',
+            'moderation' => 'n.submitted_at asc, n.id asc',
         ][$sort] ?? 'coalesce(n.published_at, n.created_at) desc, n.id desc';
+    }
+
+    private function canReviewNews(): bool
+    {
+        return Container::get('auth')->can('news.review');
+    }
+
+    private function guardNewsAccessPermission(): void
+    {
+        $this->guard();
+        $auth = Container::get('auth');
+        if ($auth->can('news.manage') || $auth->can('news.review') || $auth->can('news.publish')) {
+            return;
+        }
+
+        \App\Controllers\ErrorController::response(403)->send();
+        exit;
+    }
+
+    private function canPublishNews(): bool
+    {
+        return Container::get('auth')->can('news.publish');
+    }
+
+    private function canAccessNews(array $item): bool
+    {
+        return $this->canReviewNews()
+            || $this->canPublishNews()
+            || $this->canManageAllContent()
+            || (int) ($item['created_by'] ?? 0) === $this->currentUserId();
+    }
+
+    private function canEditNews(array $item): bool
+    {
+        if (!$this->canAccessNews($item) || !Container::get('auth')->can('news.manage')) {
+            return false;
+        }
+
+        $status = (string) ($item['status'] ?? 'draft');
+        if ($status === 'published') {
+            return $this->canPublishNews();
+        }
+        if ($status === 'pending_review') {
+            return $this->canReviewNews() || $this->canPublishNews();
+        }
+
+        return (int) ($item['created_by'] ?? 0) === $this->currentUserId() || $this->canReviewNews() || $this->canManageAllContent();
+    }
+
+    private function moderateNews(Request $request, string $action): Response
+    {
+        $this->guardNewsAccessPermission();
+        Csrf::verify();
+        $transactionStarted = false;
+
+        try {
+            $id = (int) $request->input('id', 0);
+            $item = $id ? $this->db()->fetch('select * from news where id = ?', [$id]) : null;
+            if (!$item || !$this->canAccessNews($item)) {
+                throw new \RuntimeException('Новину не знайдено або доступ заборонено.');
+            }
+
+            $version = (int) $request->input('version', 0);
+            if ($version <= 0 || $version !== (int) ($item['version'] ?? 1)) {
+                throw new \RuntimeException('Новину вже змінив інший користувач. Оновіть сторінку й повторіть дію.');
+            }
+
+            $comment = trim((string) $request->input('review_comment', ''));
+            if ($action === 'request_changes' && (!$this->canReviewNews() || $comment === '')) {
+                throw new \RuntimeException($comment === '' ? 'Додайте коментар із переліком необхідних змін.' : 'Недостатньо прав для модерації.');
+            }
+            if (in_array($action, ['publish', 'unpublish'], true) && !$this->canPublishNews()) {
+                throw new \RuntimeException('Недостатньо прав для публікації.');
+            }
+            if ($action === 'submit' && !in_array((string) $item['status'], ['draft', 'changes_requested'], true)) {
+                throw new \RuntimeException('Цю новину неможливо надіслати на модерацію.');
+            }
+            if ($action === 'submit' && !Container::get('auth')->can('news.manage')) {
+                throw new \RuntimeException('Недостатньо прав для надсилання новини.');
+            }
+
+            $publishedAt = trim((string) $request->input('published_at', ''));
+            if ($action === 'publish' && $publishedAt !== '' && strtotime($publishedAt) === false) {
+                throw new \RuntimeException('Вкажіть коректну дату публікації.');
+            }
+            if ($action === 'publish' && $publishedAt !== '' && (int) strtotime($publishedAt) > time()) {
+                throw new \RuntimeException('Запланована публікація ще не підтримується. Оберіть поточну або минулу дату.');
+            }
+            if ($action === 'publish' && (trim((string) ($item['title'] ?? '')) === '' || trim((string) ($item['body'] ?? '')) === '')) {
+                throw new \RuntimeException('Новина без назви або тексту не може бути опублікована.');
+            }
+
+            $this->db()->pdo()->beginTransaction();
+            $transactionStarted = true;
+            $this->applyNewsTransition($item, $action, $comment, $publishedAt);
+            $this->audit($action, 'news', $id, $comment);
+            $this->db()->pdo()->commit();
+            $transactionStarted = false;
+
+            if ($this->isAjax($request)) {
+                return $this->json([
+                    'ok' => true,
+                    'message' => 'Статус новини оновлено.',
+                    'edit_url' => url('/admin/news/edit?id=' . $id),
+                    'redirect_url' => url('/admin/news/edit?id=' . $id),
+                ]);
+            }
+
+            redirect('/admin/news/edit?id=' . $id);
+        } catch (Throwable $e) {
+            if ($transactionStarted && $this->db()->pdo()->inTransaction()) {
+                $this->db()->pdo()->rollBack();
+            }
+            return $this->ajaxError($request, $e);
+        }
+    }
+
+    private function applyNewsTransition(array $item, string $action, string $comment, string $publishedAt = ''): void
+    {
+        $from = (string) ($item['status'] ?? 'draft');
+        $allowed = [
+            'submit' => ['from' => ['draft', 'changes_requested'], 'to' => 'pending_review'],
+            'request_changes' => ['from' => ['pending_review'], 'to' => 'changes_requested'],
+            'publish' => ['from' => ['pending_review'], 'to' => 'published'],
+            'unpublish' => ['from' => ['published'], 'to' => 'draft'],
+        ];
+        if (!isset($allowed[$action]) || !in_array($from, $allowed[$action]['from'], true)) {
+            throw new \RuntimeException('Недопустимий перехід статусу новини.');
+        }
+
+        $to = $allowed[$action]['to'];
+        $now = date('c');
+        $userId = $this->currentUserId();
+        if ($action === 'submit') {
+            $sql = 'update news set status=?, submitted_at=?, submitted_by=?, reviewed_at=null, reviewed_by=null, review_comment=null, updated_at=?, version=version+1 where id=? and version=?';
+            $params = [$to, $now, $userId, $now, $item['id'], $item['version']];
+        } elseif ($action === 'request_changes') {
+            $sql = 'update news set status=?, reviewed_at=?, reviewed_by=?, review_comment=?, updated_at=?, version=version+1 where id=? and version=?';
+            $params = [$to, $now, $userId, $comment, $now, $item['id'], $item['version']];
+        } elseif ($action === 'publish') {
+            $publicationDate = $publishedAt !== '' ? date('c', (int) strtotime($publishedAt)) : $now;
+            $sql = 'update news set status=?, published_at=?, reviewed_at=?, reviewed_by=?, review_comment=null, updated_at=?, version=version+1 where id=? and version=?';
+            $params = [$to, $publicationDate, $now, $userId, $now, $item['id'], $item['version']];
+        } else {
+            $sql = 'update news set status=?, published_at=null, reviewed_at=?, reviewed_by=?, review_comment=?, updated_at=?, version=version+1 where id=? and version=?';
+            $params = [$to, $now, $userId, $comment, $now, $item['id'], $item['version']];
+        }
+
+        if ($this->db()->executeAffected($sql, $params) !== 1) {
+            throw new \RuntimeException('Новину вже змінив інший користувач. Оновіть сторінку й повторіть дію.');
+        }
+        $this->db()->execute(
+            'insert into news_moderation_events (news_id, user_id, action, from_status, to_status, comment, created_at) values (?, ?, ?, ?, ?, ?, ?)',
+            [$item['id'], $userId, $action, $from, $to, $comment !== '' ? $comment : null, $now]
+        );
+    }
+
+    private function filterNewsIdsByStatuses(array $ids, array $statuses): array
+    {
+        if (!$ids || !$statuses) {
+            return [];
+        }
+        $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+        $statusPlaceholders = implode(',', array_fill(0, count($statuses), '?'));
+        $rows = $this->db()->fetchAll(
+            "select id from news where id in ({$idPlaceholders}) and status in ({$statusPlaceholders})",
+            [...$ids, ...$statuses]
+        );
+        return array_map(static fn (array $row): int => (int) $row['id'], $rows);
+    }
+
+    private function filterStrictOwnedNewsIds(array $ids): array
+    {
+        if (!$ids || $this->canManageAllContent()) {
+            return $ids;
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $rows = $this->db()->fetchAll(
+            "select id from news where id in ({$placeholders}) and created_by = ?",
+            [...$ids, $this->currentUserId()]
+        );
+        return array_map(static fn (array $row): int => (int) $row['id'], $rows);
+    }
+
+    private function newsModerationEvents(int $newsId): array
+    {
+        return $this->db()->fetchAll(
+            'select e.*, u.name as user_name from news_moderation_events e left join users u on u.id = e.user_id where e.news_id = ? order by e.id desc limit 20',
+            [$newsId]
+        );
     }
 
     private function uniqueNewsCategorySlug(string $slug, int $ignoreId = 0): string

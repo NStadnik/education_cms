@@ -32,10 +32,10 @@ final class LcloudApiController extends BaseController
                 0 as comm_num,
                 case when n.status = ? then ? else ? end as approve
              from news n
-             where n.status in (?, ?)
+             where n.status = ?
              order by coalesce(n.published_at, n.created_at) desc, n.id desc
              limit ' . $start . ', ' . $limit,
-            ['published', 'publish', 'pending', 'published', 'draft']
+            ['published', 'publish', 'pending', 'published']
         );
 
         return $this->jsonResponse($this->normalizeItems($items));
@@ -77,9 +77,9 @@ final class LcloudApiController extends BaseController
                 0 as comm_num,
                 case when n.status = ? then ? else ? end as approve
              from news n
-             where n.id in (' . $placeholders . ')
+             where n.id in (' . $placeholders . ') and n.status = ?
              order by coalesce(n.published_at, n.created_at) desc, n.id desc',
-            array_merge(['published', 'publish', 'pending'], $ids)
+            array_merge(['published', 'publish', 'pending'], $ids, ['published'])
         );
 
         return $this->normalizeItems($items);

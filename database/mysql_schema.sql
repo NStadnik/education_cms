@@ -59,8 +59,27 @@ create table if not exists news (
     body longtext not null,
     status varchar(40) not null default 'draft',
     published_at varchar(32) null,
+    submitted_at varchar(32) null,
+    submitted_by bigint unsigned null,
+    reviewed_at varchar(32) null,
+    reviewed_by bigint unsigned null,
+    review_comment text null,
+    version int unsigned not null default 1,
     created_at varchar(32) not null,
     updated_at varchar(32) not null
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
+create table if not exists news_moderation_events (
+    id bigint unsigned primary key auto_increment,
+    news_id bigint unsigned not null,
+    user_id bigint unsigned null,
+    action varchar(40) not null,
+    from_status varchar(40) not null,
+    to_status varchar(40) not null,
+    comment text null,
+    created_at varchar(32) not null,
+    index news_moderation_events_news_id_index (news_id),
+    constraint news_moderation_events_news_id_foreign foreign key(news_id) references news(id) on delete cascade
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
 create table if not exists news_categories (
