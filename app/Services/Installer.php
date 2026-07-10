@@ -79,6 +79,7 @@ final class Installer
 
         foreach ([
             'audit_logs',
+            'media',
             'news_category_links',
             'news_categories',
             'news',

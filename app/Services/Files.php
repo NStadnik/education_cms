@@ -8,7 +8,7 @@ final class Files
 {
     private const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'webp'];
 
-    public static function upload(array $file): ?string
+    public static function upload(array $file, array $metadata = []): ?string
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
             return null;
@@ -39,6 +39,15 @@ final class Files
             throw new \RuntimeException('Could not save uploaded file');
         }
 
+        try {
+            MediaMetadata::save($name, array_replace([
+                'original_name' => (string) ($file['name'] ?? ''),
+            ], $metadata));
+        } catch (\Throwable $exception) {
+            @unlink($target);
+            throw $exception;
+        }
+
         return $name;
     }
 
@@ -67,19 +76,24 @@ final class Files
 
             $extension = strtolower($file->getExtension());
             $reference = $references[$relative] ?? null;
-            $meta = MediaMetadata::normalizeEntry($metadata[$relative] ?? []);
-            $items[] = array_replace([
+            $meta = $metadata[$relative] ?? null;
+            $actualModifiedAt = date('c', $file->getMTime());
+            if ($meta === null || (int) ($meta['size'] ?? -1) !== $file->getSize() || (string) ($meta['modified_at'] ?? '') !== $actualModifiedAt) {
+                MediaMetadata::save($relative, []);
+                $meta = MediaMetadata::details($relative);
+            }
+            $items[] = array_replace($meta, [
                 'path' => $relative,
-                'name' => basename($relative),
+                'name' => ((string) ($meta['original_name'] ?? '')) ?: basename($relative),
                 'extension' => $extension,
                 'type' => self::type($extension),
                 'size' => $file->getSize(),
                 'size_label' => self::formatBytes($file->getSize()),
-                'modified_at' => date('c', $file->getMTime()),
+                'modified_at' => $actualModifiedAt,
                 'is_image' => in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true),
                 'is_used' => $reference !== null,
                 'reference' => $reference,
-            ], $meta);
+            ]);
         }
 
         usort($items, static fn (array $a, array $b): int => strcmp((string) $b['modified_at'], (string) $a['modified_at']));
@@ -101,6 +115,8 @@ final class Files
         if (!unlink($target)) {
             throw new \RuntimeException('Could not delete file');
         }
+
+        MediaMetadata::delete($path);
     }
 
     public static function normalize(string $path): string

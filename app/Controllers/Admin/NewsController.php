@@ -9,7 +9,6 @@ use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Files;
-use App\Services\MediaMetadata;
 use Throwable;
 
 final class NewsController extends \App\Controllers\AdminBaseController
@@ -442,7 +441,9 @@ final class NewsController extends \App\Controllers\AdminBaseController
         }
 
         $this->assertNewsImageUpload($request->files['image'] ?? []);
-        $uploaded = Files::upload($request->files['image'] ?? []);
+        $uploaded = Files::upload($request->files['image'] ?? [], [
+            'uploaded_by' => (string) $this->currentUserId(),
+        ]);
         if (!$uploaded) {
             if ((string) $request->input('remove_image', '') === '1') {
                 return null;
@@ -464,8 +465,6 @@ final class NewsController extends \App\Controllers\AdminBaseController
             Files::delete($uploaded);
             throw new \RuntimeException('Головне зображення має бути JPG, PNG або WebP.');
         }
-        MediaMetadata::save($uploaded, ['uploaded_by' => (string) $this->currentUserId()]);
-
         return $uploaded;
     }
 

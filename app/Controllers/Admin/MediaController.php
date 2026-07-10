@@ -52,7 +52,11 @@ final class MediaController extends \App\Controllers\AdminBaseController
             return [
                 'path' => (string) ($item['path'] ?? ''),
                 'name' => (string) ($item['name'] ?? ''),
+                'original_name' => (string) ($item['original_name'] ?? ''),
                 'extension' => (string) ($item['extension'] ?? ''),
+                'mime_type' => (string) ($item['mime_type'] ?? ''),
+                'width' => isset($item['width']) ? (int) $item['width'] : null,
+                'height' => isset($item['height']) ? (int) $item['height'] : null,
                 'type' => (string) ($item['type'] ?? ''),
                 'folder' => (string) ($item['folder'] ?? ''),
                 'alt_text' => (string) ($item['alt_text'] ?? ''),
@@ -81,12 +85,14 @@ final class MediaController extends \App\Controllers\AdminBaseController
         Csrf::verify();
 
         try {
-            $filePath = Files::upload($request->files['file'] ?? []);
+            $folder = MediaMetadata::normalizeFolder((string) $request->input('folder', ''));
+            $filePath = Files::upload($request->files['file'] ?? [], [
+                'folder' => $folder,
+                'uploaded_by' => (string) $this->currentUserId(),
+            ]);
             if (!$filePath) {
                 throw new \RuntimeException('Оберіть файл для завантаження.');
             }
-            $folder = MediaMetadata::normalizeFolder((string) $request->input('folder', ''));
-            MediaMetadata::save($filePath, ['folder' => $folder, 'uploaded_by' => (string) $this->currentUserId()]);
 
             $this->audit('upload', 'media', null, $filePath);
             if ($this->isAjax($request)) {
@@ -139,7 +145,6 @@ final class MediaController extends \App\Controllers\AdminBaseController
         }
 
         Files::delete($path);
-        MediaMetadata::delete($path);
         $this->audit('delete', 'media', null, $path);
         if ($this->isAjax($request)) {
             return $this->json(array_replace($this->mediaListPayload(trim((string) $request->input('q', '')), [
@@ -175,7 +180,6 @@ final class MediaController extends \App\Controllers\AdminBaseController
                 }
                 try {
                     Files::delete($path);
-                    MediaMetadata::delete($path);
                     $deleted++;
                 } catch (Throwable) {
                     continue;

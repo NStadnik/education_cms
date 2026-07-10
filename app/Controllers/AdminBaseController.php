@@ -1451,10 +1451,10 @@ abstract class AdminBaseController extends BaseController
             return;
         }
 
-        $imported = $this->wordPressMediaMetadataFromAttachment($attachment);
-        if (implode('', $imported) === '') {
-            return;
-        }
+        $imported = array_replace($this->wordPressMediaMetadataFromAttachment($attachment), [
+            'original_name' => basename((string) ($attachment['attached_file'] ?? '')),
+            'uploaded_by' => (string) $this->currentUserId(),
+        ]);
 
         try {
             $current = MediaMetadata::get($path);
@@ -1998,11 +1998,27 @@ abstract class AdminBaseController extends BaseController
         $targetRelative = date('Y/m/') . 'wp-' . $id . '-' . $safeName . '.' . $extension;
         $target = base_path('storage/uploads/' . $targetRelative);
         if (is_file($target)) {
+            try {
+                MediaMetadata::ensure($targetRelative, [
+                    'original_name' => $name,
+                    'uploaded_by' => (string) $this->currentUserId(),
+                ]);
+            } catch (Throwable) {
+                return '';
+            }
             return $targetRelative;
         }
 
         $existingPath = $this->existingImportedMediaPath($safeName, $extension);
         if ($existingPath !== '') {
+            try {
+                MediaMetadata::ensure($existingPath, [
+                    'original_name' => $name,
+                    'uploaded_by' => (string) $this->currentUserId(),
+                ]);
+            } catch (Throwable) {
+                return '';
+            }
             return $existingPath;
         }
 
@@ -2062,6 +2078,16 @@ abstract class AdminBaseController extends BaseController
         fclose($sourceStream);
         fclose($targetStream);
         if ($bytes === false || $bytes <= 0) {
+            @unlink($target);
+            return '';
+        }
+
+        try {
+            MediaMetadata::ensure($targetRelative, [
+                'original_name' => $name,
+                'uploaded_by' => (string) $this->currentUserId(),
+            ]);
+        } catch (Throwable) {
             @unlink($target);
             return '';
         }
@@ -2851,7 +2877,9 @@ abstract class AdminBaseController extends BaseController
             $text = implode(' ', [
                 $item['path'] ?? '',
                 $item['name'] ?? '',
+                $item['original_name'] ?? '',
                 $item['extension'] ?? '',
+                $item['mime_type'] ?? '',
                 $item['type'] ?? '',
                 $item['folder'] ?? '',
                 $item['alt_text'] ?? '',

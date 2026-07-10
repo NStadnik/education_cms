@@ -64,6 +64,14 @@ final class SchemaUpgrade
                 $db->execute('insert into settings (name, value) values (?, ?)', ['schema_content_ownership', '1']);
             }
 
+            self::createMediaTable($db);
+            $mediaDone = $db->fetch('select value from settings where name = ?', ['schema_media_table']);
+            if (($mediaDone['value'] ?? '') !== '1') {
+                MediaMetadata::migrateLegacyStorage();
+                $db->execute('delete from settings where name = ?', ['schema_media_table']);
+                $db->execute('insert into settings (name, value) values (?, ?)', ['schema_media_table', '1']);
+            }
+
             self::ensureSetting($db, 'site_template', 'official');
             self::ensureSetting($db, 'site_mode', 'online');
             self::ensureSetting($db, 'site_mode_title', '');
@@ -150,6 +158,33 @@ final class SchemaUpgrade
         if (!self::hasColumn($db, 'news', 'created_by')) {
             $db->pdo()->exec('alter table news add column created_by bigint unsigned null after id');
         }
+    }
+
+    private static function createMediaTable(Database $db): void
+    {
+        $db->pdo()->exec(
+            "create table if not exists media (
+                id bigint unsigned primary key auto_increment,
+                path varchar(255) not null unique,
+                original_name varchar(255) not null default '',
+                extension varchar(20) not null default '',
+                mime_type varchar(120) not null default '',
+                size bigint unsigned not null default 0,
+                width int unsigned null,
+                height int unsigned null,
+                modified_at varchar(32) not null,
+                folder varchar(80) not null default '',
+                alt_text varchar(160) not null default '',
+                title varchar(160) not null default '',
+                caption varchar(160) not null default '',
+                description text null,
+                uploaded_by bigint unsigned null,
+                created_at varchar(32) not null,
+                updated_at varchar(32) not null,
+                index media_uploaded_by_index (uploaded_by),
+                index media_folder_index (folder)
+            ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci"
+        );
     }
 
     private static function seedNewsCategories(Database $db): void
