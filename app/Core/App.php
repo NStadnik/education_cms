@@ -15,6 +15,7 @@ use App\Controllers\Admin\UpdatesController;
 use App\Controllers\Admin\UsersController;
 use App\Controllers\ErrorController;
 use App\Controllers\InstallController;
+use App\Controllers\LcloudApiController;
 use App\Controllers\PublicController;
 use App\Services\Installer;
 use App\Services\SchemaUpgrade;
@@ -94,6 +95,7 @@ final class App
     private function routes(): void
     {
         $public = PublicController::class;
+        $lcloudApi = LcloudApiController::class;
         $admin = AdminController::class;
         $adminPages = PagesController::class;
         $adminNews = NewsController::class;
@@ -109,6 +111,7 @@ final class App
         $this->router->get('/page/{slug}', [$public, 'page']);
         $this->router->get('/news', [$public, 'news']);
         $this->router->get('/news/{slug}', [$public, 'newsShow']);
+        $this->router->get('/api/lcloud/publications', [$lcloudApi, 'publications']);
         $this->router->get('/thumb/{path}', [$public, 'thumb']);
         $this->router->get('/assets/{path}', [$public, 'asset']);
         $this->router->get('/uploads/{path}', [$public, 'upload']);
