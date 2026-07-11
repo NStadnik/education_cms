@@ -10,6 +10,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Services\Files;
 use App\Services\MediaMetadata;
+use App\Services\Notifications;
 use Throwable;
 
 final class NewsController extends \App\Controllers\AdminBaseController
@@ -102,6 +103,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
         $this->guard('news.manage');
         Csrf::verify();
         $transactionStarted = false;
+        $submittedForReview = false;
         try {
             $now = date('c');
             $id = (int) $request->input('id', 0);
@@ -157,11 +159,16 @@ final class NewsController extends \App\Controllers\AdminBaseController
                 }
                 $this->applyNewsTransition($saved, 'submit', '');
                 $status = 'pending_review';
+                $submittedForReview = true;
             }
             $this->audit('save', 'news', $id);
             $savedVersion = (int) ($this->db()->fetch('select version from news where id = ?', [$id])['version'] ?? 1);
             $this->db()->pdo()->commit();
             $transactionStarted = false;
+            if ($submittedForReview) {
+                $notificationItem = $this->db()->fetch('select * from news where id=?', [$id]);
+                if ($notificationItem) { Notifications::news($notificationItem, 'submit'); }
+            }
 
             if ($this->isAjax($request)) {
                 return $this->json([
@@ -170,6 +177,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
                     'id' => $id,
                     'version' => $savedVersion,
                     'published_at' => $publishedAt,
+                    'moderation_transition' => $submittedForReview ? 'submit' : null,
                     'edit_url' => url('/admin/news/edit?id=' . $id),
                     'redirect_url' => ($existing || $request->input('submit_for_review')) ? url('/admin/news/edit?id=' . $id) : null,
                     'view_url' => $status === 'published' ? url('/news/' . $slug) : null,
@@ -220,6 +228,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
                 $item = $this->db()->fetch('select * from news where id = ?', [$id]);
                 if ($item) {
                     $this->applyNewsTransition($item, 'submit', '');
+                    Notifications::news($item, 'submit');
                 }
             }
             $this->audit('bulk_submit', 'news', null, 'ids: ' . implode(',', $ids));
@@ -229,6 +238,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
                 $item = $this->db()->fetch('select * from news where id = ?', [$id]);
                 if ($item) {
                     $this->applyNewsTransition($item, 'publish', '');
+                    Notifications::news($item, 'publish');
                 }
             }
             $this->audit('bulk_publish', 'news', null, 'ids: ' . implode(',', $ids));
@@ -722,6 +732,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
             $this->audit($action, 'news', $id, $comment);
             $this->db()->pdo()->commit();
             $transactionStarted = false;
+            Notifications::news($item, $action, $comment);
 
             if ($this->isAjax($request)) {
                 return $this->json([

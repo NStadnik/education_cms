@@ -11,6 +11,8 @@ use App\Core\Response;
 use App\Services\Files;
 use App\Services\MediaMetadata;
 use App\Services\LcloudConfig;
+use App\Services\MailConfig;
+use App\Services\Mailer;
 use Throwable;
 
 final class SettingsController extends \App\Controllers\AdminBaseController
@@ -25,6 +27,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'homePages' => $this->homePageOptions(),
             'siteTemplates' => $this->siteTemplates(),
             'lcloud' => LcloudConfig::get(),
+            'mail' => MailConfig::get(),
         ]);
     }
 
@@ -41,16 +44,51 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             $this->saveSetting('site_mode_title', $this->limitString(trim((string) $request->input('site_mode_title', '')), 140));
             $this->saveSetting('site_mode_message', $this->limitString(trim((string) $request->input('site_mode_message', '')), 600));
             $this->saveLcloudSettings($request);
+            $this->saveMailSettings($request);
             $globalFields = json_encode($this->normalizeGlobalFields($request), JSON_UNESCAPED_UNICODE);
             $this->saveSetting('global_fields', $globalFields === false ? '[]' : $globalFields);
 
             if ($this->isAjax($request)) {
-                return $this->json(['ok' => true, 'message' => 'Налаштування збережено.']);
+                $mail = MailConfig::get();
+                return $this->json([
+                    'ok' => true,
+                    'message' => 'Налаштування збережено.',
+                    'site_mode' => (string) ($this->siteSettings()['site_mode'] ?? 'online'),
+                    'mail_enabled' => (bool) $mail['enabled'],
+                    'mail_notify_news' => (bool) $mail['notify_news'],
+                    'mail_notify_forms' => (bool) $mail['notify_forms'],
+                    'mail_password_configured' => (string) $mail['smtp_password'] !== '',
+                ]);
             }
 
             redirect('/admin/settings');
         } catch (Throwable $e) {
             return $this->ajaxError($request, $e);
+        }
+    }
+
+    public function mailTest(Request $request): Response
+    {
+        $this->guard('settings.manage');
+        Csrf::verify();
+        try {
+            $config = MailConfig::get();
+            if (empty($config['enabled'])) {
+                throw new \RuntimeException('Спочатку увімкніть пошту та збережіть налаштування.');
+            }
+            $email = strtolower(trim((string) $request->input('email', '')));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new \InvalidArgumentException('Вкажіть коректну email-адресу для тесту.');
+            }
+            $institution = trim((string) ($this->siteSettings()['institution_name'] ?? 'Education CMS')) ?: 'Education CMS';
+            Mailer::send(
+                $email,
+                'Тестове повідомлення — ' . $institution,
+                '<h2>Надсилання пошти працює</h2><p>Це тестовий лист із системи <strong>' . e($institution) . '</strong>.</p><p>Час перевірки: ' . e(date('d.m.Y H:i:s')) . '</p>'
+            );
+            return $this->json(['ok' => true, 'message' => 'Тестовий лист надіслано на ' . $email . '.']);
+        } catch (Throwable $e) {
+            return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
         }
     }
 
@@ -85,6 +123,63 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'lcloud_allowed_origin' => $origin,
             'lcloud_sso_secret' => $ssoSecret,
             'lcloud_api_key' => $apiKey,
+        ] as $name => $value) {
+            $this->saveSetting($name, $value);
+        }
+    }
+
+    private function saveMailSettings(Request $request): void
+    {
+        $enabled = $request->input('mail_enabled') ? '1' : '0';
+        $transport = (string) $request->input('mail_transport', 'mail');
+        $encryption = (string) $request->input('mail_smtp_encryption', 'tls');
+        if (!in_array($transport, ['mail', 'smtp'], true)) {
+            throw new \InvalidArgumentException('Оберіть коректний спосіб надсилання пошти.');
+        }
+        if (!in_array($encryption, ['none', 'tls', 'ssl'], true)) {
+            throw new \InvalidArgumentException('Оберіть коректне шифрування SMTP.');
+        }
+
+        $fromEmail = strtolower(trim((string) $request->input('mail_from_email', '')));
+        $replyTo = strtolower(trim((string) $request->input('mail_reply_to', '')));
+        $fromName = $this->limitString(trim((string) $request->input('mail_from_name', '')), 160);
+        $host = $this->limitString(trim((string) $request->input('mail_smtp_host', '')), 190);
+        $port = (int) $request->input('mail_smtp_port', 587);
+        $username = $this->limitString(trim((string) $request->input('mail_smtp_username', '')), 190);
+        if ($fromEmail !== '' && !filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('Вкажіть коректний email відправника.');
+        }
+        if ($replyTo !== '' && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('Вкажіть коректний Reply-To email.');
+        }
+        if ($port < 1 || $port > 65535) {
+            throw new \InvalidArgumentException('SMTP-порт має бути від 1 до 65535.');
+        }
+        if ($enabled === '1' && $fromEmail === '') {
+            throw new \InvalidArgumentException('Для надсилання пошти вкажіть email відправника.');
+        }
+        if ($enabled === '1' && $transport === 'smtp' && $host === '') {
+            throw new \InvalidArgumentException('Для SMTP вкажіть адресу сервера.');
+        }
+
+        $current = MailConfig::get();
+        $password = (string) $request->input('mail_smtp_password', '');
+        if ($request->input('mail_clear_smtp_password')) { $password = ''; }
+        elseif ($password === '') { $password = (string) $current['smtp_password']; }
+
+        foreach ([
+            'mail_enabled' => $enabled,
+            'mail_notify_news' => $request->input('mail_notify_news') ? '1' : '0',
+            'mail_notify_forms' => $request->input('mail_notify_forms') ? '1' : '0',
+            'mail_transport' => $transport,
+            'mail_from_email' => $fromEmail,
+            'mail_from_name' => $fromName,
+            'mail_reply_to' => $replyTo,
+            'mail_smtp_host' => $host,
+            'mail_smtp_port' => (string) $port,
+            'mail_smtp_encryption' => $encryption,
+            'mail_smtp_username' => $username,
+            'mail_smtp_password' => $password,
         ] as $name => $value) {
             $this->saveSetting($name, $value);
         }

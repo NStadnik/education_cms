@@ -184,6 +184,7 @@ final class App
         $this->router->post('/admin/updates/install', [$adminUpdates, 'install']);
         $this->router->get('/admin/settings', [$adminSettings, 'settings']);
         $this->router->post('/admin/settings/save', [$adminSettings, 'settingsSave']);
+        $this->router->post('/admin/settings/mail/test', [$adminSettings, 'mailTest']);
         $this->router->get('/api/lcloud/publications',[$lcloudApi, 'publications']);
         $this->router->get('/auth/lcloud', [$lcloudAuth, 'login']);
     }

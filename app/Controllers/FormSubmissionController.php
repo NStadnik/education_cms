@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
+use App\Services\Notifications;
 
 final class FormSubmissionController extends BaseController
 {
@@ -46,6 +47,7 @@ final class FormSubmissionController extends BaseController
             $id, (int) $form['version'], json_encode($answers, JSON_UNESCAPED_UNICODE), $form['fields_json'], json_encode($context, JSON_UNESCAPED_UNICODE), 'new', $email,
             $ipHash, substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500), $now, $now
         ]);
+        Notifications::formSubmission($form, $fields, $answers);
         $settings = json_decode((string) $form['settings_json'], true) ?: [];
         return $this->json(['ok' => true, 'message' => (string) ($settings['success_message'] ?? 'Дякуємо! Відповідь надіслано.')]);
     }

@@ -6,7 +6,14 @@
 </div>
 <form class="form-grid wide" method="post" action="<?= url('/admin/settings/save') ?>">
     <?= \App\Core\Csrf::field() ?>
-    <section class="card admin-form-card">
+    <nav class="settings-tabs" role="tablist" aria-label="Розділи налаштувань" data-settings-tabs>
+        <button type="button" role="tab" aria-selected="true" data-settings-tab="general"><span class="mdi mdi-office-building-cog-outline" aria-hidden="true"></span><span>Загальні</span></button>
+        <button type="button" role="tab" aria-selected="false" data-settings-tab="site"><span class="mdi mdi-web" aria-hidden="true"></span><span>Сайт</span></button>
+        <button type="button" role="tab" aria-selected="false" data-settings-tab="mail"><span class="mdi mdi-email" aria-hidden="true"></span><span>Пошта</span></button>
+        <button type="button" role="tab" aria-selected="false" data-settings-tab="integrations"><span class="mdi mdi-connection" aria-hidden="true"></span><span>Інтеграції</span></button>
+    </nav>
+
+    <section class="card admin-form-card" data-settings-panel="site" hidden>
         <div class="form-section-head">
             <div>
                 <h2>Шаблон сайту</h2>
@@ -24,18 +31,18 @@
         </label>
     </section>
 
-    <section class="card admin-form-card">
+    <section class="card admin-form-card" data-settings-panel="site" hidden>
         <div class="form-section-head">
             <div>
                 <h2>Режим сайту</h2>
                 <p class="meta">Неавторизовані відвідувачі побачать сучасну заглушку. Адміністратори після входу можуть переглядати сайт без обмежень.</p>
             </div>
             <?php $siteMode = (string) ($settings['site_mode'] ?? 'online'); ?>
-            <span class="status <?= $siteMode === 'online' ? 'ok' : 'warn' ?>"><?= $siteMode === 'online' ? 'Сайт відкритий' : 'Заглушка активна' ?></span>
+            <span class="status <?= $siteMode === 'online' ? 'ok' : 'warn' ?>" data-site-mode-status><?= $siteMode === 'online' ? 'Сайт відкритий' : 'Заглушка активна' ?></span>
         </div>
         <div class="site-mode-grid">
             <label>Публічний доступ
-                <select name="site_mode">
+                <select name="site_mode" data-site-mode-select>
                     <option value="online" <?= selected($siteMode, 'online') ?>>Звичайний режим</option>
                     <option value="maintenance" <?= selected($siteMode, 'maintenance') ?>>Режим обслуговування</option>
                     <option value="coming_soon" <?= selected($siteMode, 'coming_soon') ?>>Скоро відкриття</option>
@@ -51,7 +58,7 @@
         </label>
     </section>
 
-    <section class="card admin-form-card">
+    <section class="card admin-form-card" data-settings-panel="site" hidden>
         <div class="form-section-head">
             <div>
                 <h2>Головна сторінка</h2>
@@ -76,7 +83,7 @@
         </label>
     </section>
 
-    <section class="card admin-form-card">
+    <section class="card admin-form-card" data-settings-panel="general">
         <div class="form-section-head">
             <div>
                 <h2>Дані закладу</h2>
@@ -109,8 +116,78 @@
         </div>
     </section>
 
+    <?php $mail = is_array($mail ?? null) ? $mail : []; ?>
+    <section class="card admin-form-card" data-settings-panel="mail" hidden>
+        <div class="form-section-head">
+            <div>
+                <h2>Надсилання пошти</h2>
+                <p class="meta">Параметри для системних повідомлень, відповідей форм і сповіщень про модерацію.</p>
+            </div>
+            <span class="status <?= !empty($mail['enabled']) ? 'ok' : 'warn' ?>" data-mail-status><?= !empty($mail['enabled']) ? 'Увімкнено' : 'Вимкнено' ?></span>
+        </div>
+        <label class="check-row"><input type="checkbox" name="mail_enabled" value="1" <?= checked(!empty($mail['enabled'])) ?> data-mail-enabled> Увімкнути надсилання пошти</label>
+        <div class="form-grid wide">
+            <label class="check-row"><input type="checkbox" name="mail_notify_news" value="1" <?= checked(!empty($mail['notify_news'])) ?>> Сповіщати про модерацію новин</label>
+            <label class="check-row"><input type="checkbox" name="mail_notify_forms" value="1" <?= checked(!empty($mail['notify_forms'])) ?>> Сповіщати про нові відповіді форм</label>
+        </div>
+        <div class="form-grid wide">
+            <label>Спосіб надсилання
+                <select name="mail_transport" data-mail-transport>
+                    <option value="mail" <?= selected($mail['transport'] ?? 'mail', 'mail') ?>>PHP mail()</option>
+                    <option value="smtp" <?= selected($mail['transport'] ?? 'mail', 'smtp') ?>>SMTP-сервер</option>
+                </select>
+            </label>
+            <label>Email відправника
+                <input type="email" name="mail_from_email" value="<?= e((string) ($mail['from_email'] ?? '')) ?>" placeholder="noreply@example.edu.ua" autocomplete="off" data-mail-from-email <?= !empty($mail['enabled']) ? 'required' : '' ?>>
+            </label>
+            <label>Ім’я відправника
+                <input name="mail_from_name" value="<?= e((string) ($mail['from_name'] ?? '')) ?>" placeholder="Назва закладу" autocomplete="off">
+            </label>
+            <label>Reply-To
+                <input type="email" name="mail_reply_to" value="<?= e((string) ($mail['reply_to'] ?? '')) ?>" placeholder="office@example.edu.ua" autocomplete="off">
+            </label>
+        </div>
+        <div class="form-section-head">
+            <div><h3>SMTP</h3><p class="meta">Ці поля використовуються, коли вибрано SMTP-сервер.</p></div>
+        </div>
+        <div class="form-grid wide">
+            <label>SMTP-сервер
+                <input name="mail_smtp_host" value="<?= e((string) ($mail['smtp_host'] ?? '')) ?>" placeholder="smtp.example.edu.ua" autocomplete="off" data-mail-smtp-host <?= !empty($mail['enabled']) && ($mail['transport'] ?? 'mail') === 'smtp' ? 'required' : '' ?>>
+            </label>
+            <label>Порт
+                <input type="number" name="mail_smtp_port" value="<?= e((string) ($mail['smtp_port'] ?? 587)) ?>" min="1" max="65535">
+            </label>
+            <label>Шифрування
+                <select name="mail_smtp_encryption">
+                    <option value="tls" <?= selected($mail['smtp_encryption'] ?? 'tls', 'tls') ?>>STARTTLS / TLS</option>
+                    <option value="ssl" <?= selected($mail['smtp_encryption'] ?? 'tls', 'ssl') ?>>SSL</option>
+                    <option value="none" <?= selected($mail['smtp_encryption'] ?? 'tls', 'none') ?>>Без шифрування</option>
+                </select>
+            </label>
+            <label>SMTP-логін
+                <input name="mail_smtp_username" value="<?= e((string) ($mail['smtp_username'] ?? '')) ?>" autocomplete="off">
+            </label>
+            <label>Новий SMTP-пароль
+                <input type="password" name="mail_smtp_password" value="" placeholder="<?= !empty($mail['smtp_password']) ? 'Пароль уже налаштовано' : 'Введіть пароль' ?>" autocomplete="new-password" data-mail-password>
+                <small class="meta">Залиште порожнім, щоб не змінювати поточний пароль.</small>
+            </label>
+        </div>
+        <label class="check-row"><input type="checkbox" name="mail_clear_smtp_password" value="1"> Видалити збережений SMTP-пароль</label>
+        <div class="mail-test-panel" data-mail-test-panel>
+            <div>
+                <strong>Перевірити надсилання</strong>
+                <p class="meta">Спочатку збережіть параметри вище, потім надішліть тестовий лист.</p>
+            </div>
+            <div class="mail-test-controls">
+                <input type="email" data-mail-test-email value="<?= e((string) ($user['email'] ?? '')) ?>" placeholder="recipient@example.edu.ua" aria-label="Email для тестового листа">
+                <button class="button secondary" type="button" data-mail-test-button data-test-url="<?= url('/admin/settings/mail/test') ?>"><span class="mdi mdi-email-fast-outline" aria-hidden="true"></span><span>Надіслати тест</span></button>
+            </div>
+            <div class="meta" data-mail-test-status aria-live="polite"></div>
+        </div>
+    </section>
+
     <?php $lcloud = is_array($lcloud ?? null) ? $lcloud : []; ?>
-    <section class="card admin-form-card">
+    <section class="card admin-form-card" data-settings-panel="integrations" hidden>
         <div class="form-section-head">
             <div>
                 <h2>Інтеграція з ЛКЛАУД</h2>
@@ -146,7 +223,7 @@
         </div>
     </section>
 
-    <section class="card admin-form-card" data-global-fields>
+    <section class="card admin-form-card" data-global-fields data-settings-panel="general">
         <div class="form-section-head">
             <div>
                 <h2>Глобальні поля</h2>
@@ -214,4 +291,4 @@
     </div>
 </div>
 
-<script src="<?= url('/assets/admin-settings.js?v=20260710-2') ?>"></script>
+<script src="<?= url('/assets/admin-settings.js?v=20260711-4') ?>"></script>

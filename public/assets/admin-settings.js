@@ -29,6 +29,132 @@ document.querySelectorAll('[data-global-fields]').forEach(function (panel) {
 });
 
 document.addEventListener('DOMContentLoaded', function () {
+const settingsTabs = document.querySelector('[data-settings-tabs]');
+if (settingsTabs) {
+    const tabButtons = Array.from(settingsTabs.querySelectorAll('[data-settings-tab]'));
+    const panels = Array.from(document.querySelectorAll('[data-settings-panel]'));
+    const available = tabButtons.map(function (button) { return button.dataset.settingsTab; });
+
+    function activateSettingsTab(tab) {
+        if (!available.includes(tab)) {
+            tab = 'general';
+        }
+        tabButtons.forEach(function (button) {
+            const active = button.dataset.settingsTab === tab;
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+            button.classList.toggle('is-active', active);
+            button.tabIndex = active ? 0 : -1;
+        });
+        panels.forEach(function (panel) {
+            panel.hidden = panel.dataset.settingsPanel !== tab;
+        });
+        try { window.localStorage.setItem('education-cms-settings-tab', tab); } catch (error) {}
+    }
+
+    tabButtons.forEach(function (button, index) {
+        button.addEventListener('click', function () { activateSettingsTab(button.dataset.settingsTab); });
+        button.addEventListener('keydown', function (event) {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') { return; }
+            event.preventDefault();
+            const direction = event.key === 'ArrowRight' ? 1 : -1;
+            const next = tabButtons[(index + direction + tabButtons.length) % tabButtons.length];
+            activateSettingsTab(next.dataset.settingsTab);
+            next.focus();
+        });
+    });
+    const settingsForm = settingsTabs.closest('form');
+    if (settingsForm) {
+        settingsForm.addEventListener('invalid', function (event) {
+            const panel = event.target.closest('[data-settings-panel]');
+            if (panel && panel.hidden) { activateSettingsTab(panel.dataset.settingsPanel); }
+        }, true);
+    }
+    let initialTab = 'general';
+    try { initialTab = window.localStorage.getItem('education-cms-settings-tab') || initialTab; } catch (error) {}
+    activateSettingsTab(initialTab);
+}
+
+const mailEnabled = document.querySelector('[data-mail-enabled]');
+const mailStatus = document.querySelector('[data-mail-status]');
+const mailTransport = document.querySelector('[data-mail-transport]');
+const mailFromEmail = document.querySelector('[data-mail-from-email]');
+const mailSmtpHost = document.querySelector('[data-mail-smtp-host]');
+const siteModeSelect = document.querySelector('[data-site-mode-select]');
+const siteModeStatus = document.querySelector('[data-site-mode-status]');
+function renderSiteModeStatus(mode) {
+    if (!siteModeStatus) { return; }
+    const online = mode === 'online';
+    siteModeStatus.textContent = online ? 'Сайт відкритий' : 'Заглушка активна';
+    siteModeStatus.classList.toggle('ok', online);
+    siteModeStatus.classList.toggle('warn', !online);
+}
+function renderMailStatus(enabled) {
+    if (!mailStatus) { return; }
+    mailStatus.textContent = enabled ? 'Увімкнено' : 'Вимкнено';
+    mailStatus.classList.toggle('ok', enabled);
+    mailStatus.classList.toggle('warn', !enabled);
+}
+function syncMailRequirements() {
+    const enabled = Boolean(mailEnabled && mailEnabled.checked);
+    if (mailFromEmail) { mailFromEmail.required = enabled; }
+    if (mailSmtpHost) { mailSmtpHost.required = enabled && Boolean(mailTransport && mailTransport.value === 'smtp'); }
+}
+if (mailEnabled) { mailEnabled.addEventListener('change', syncMailRequirements); }
+if (mailTransport) { mailTransport.addEventListener('change', syncMailRequirements); }
+syncMailRequirements();
+document.addEventListener('admin:form-saved', function (event) {
+    const form = event.detail && event.detail.form;
+    const data = event.detail && event.detail.data ? event.detail.data : {};
+    if (!form || !form.matches('form[action*="/admin/settings/save"]') || typeof data.mail_enabled !== 'boolean') { return; }
+    if (typeof data.site_mode === 'string') {
+        if (siteModeSelect) { siteModeSelect.value = data.site_mode; }
+        renderSiteModeStatus(data.site_mode);
+    }
+    if (mailEnabled) { mailEnabled.checked = data.mail_enabled; }
+    const newsToggle = form.querySelector('[name="mail_notify_news"]');
+    const formsToggle = form.querySelector('[name="mail_notify_forms"]');
+    if (newsToggle) { newsToggle.checked = Boolean(data.mail_notify_news); }
+    if (formsToggle) { formsToggle.checked = Boolean(data.mail_notify_forms); }
+    const password = form.querySelector('[data-mail-password]');
+    if (password) {
+        password.value = '';
+        password.placeholder = data.mail_password_configured ? 'Пароль уже налаштовано' : 'Введіть пароль';
+    }
+    syncMailRequirements();
+    renderMailStatus(data.mail_enabled);
+});
+
+const mailTestButton = document.querySelector('[data-mail-test-button]');
+if (mailTestButton) {
+    mailTestButton.addEventListener('click', async function () {
+        const emailInput = document.querySelector('[data-mail-test-email]');
+        const status = document.querySelector('[data-mail-test-status]');
+        const email = emailInput ? emailInput.value.trim() : '';
+        if (!emailInput || !emailInput.checkValidity()) {
+            if (emailInput) { emailInput.reportValidity(); }
+            return;
+        }
+        const originalHtml = mailTestButton.innerHTML;
+        mailTestButton.disabled = true;
+        mailTestButton.innerHTML = '<span class="mdi mdi-loading mdi-spin" aria-hidden="true"></span><span>Надсилання...</span>';
+        if (status) { status.textContent = 'Перевіряємо поштове підключення...'; status.className = 'meta'; }
+        try {
+            const body = new FormData();
+            body.set('_csrf', document.body.dataset.adminCsrfToken || '');
+            body.set('email', email);
+            const response = await fetch(mailTestButton.dataset.testUrl, {method: 'POST', body: body, headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            const data = await response.json();
+            if (!response.ok || !data.ok) { throw new Error(data.message || 'Не вдалося надіслати тестовий лист.'); }
+            if (status) { status.textContent = data.message; status.className = 'alert alert-success'; }
+        } catch (error) {
+            if (status) { status.textContent = error.message || 'Помилка надсилання.'; status.className = 'alert alert-danger'; }
+        } finally {
+            mailTestButton.disabled = false;
+            mailTestButton.innerHTML = originalHtml;
+        }
+    });
+}
+
 document.querySelectorAll('[data-settings-logo-picker]').forEach(function (picker) {
     const input = picker.querySelector('[data-settings-logo-input]');
     const preview = picker.querySelector('[data-settings-logo-preview]');

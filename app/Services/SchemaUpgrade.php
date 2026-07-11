@@ -90,6 +90,7 @@ final class SchemaUpgrade
             self::ensureSetting($db, 'site_mode_title', '');
             self::ensureSetting($db, 'site_mode_message', '');
             self::migrateLcloudConfig($db);
+            self::ensureMailSettings($db);
             self::ensureSetting($db, 'user_roles', json_encode(Auth::defaultRolesConfig(), JSON_UNESCAPED_UNICODE) ?: '{}');
             self::migrateGlobalFields($db);
         } catch (Throwable) {
@@ -421,6 +422,26 @@ final class SchemaUpgrade
             'lcloud_allowed_origin' => (string) ($legacy['allowed_origin'] ?? ''),
             'lcloud_sso_secret' => (string) ($legacy['sso_secret'] ?? ''),
             'lcloud_api_key' => (string) ($legacy['api_key'] ?? ''),
+        ] as $name => $value) {
+            self::ensureSetting($db, $name, $value);
+        }
+    }
+
+    private static function ensureMailSettings(Database $db): void
+    {
+        foreach ([
+            'mail_enabled' => '0',
+            'mail_notify_news' => '1',
+            'mail_notify_forms' => '1',
+            'mail_transport' => 'mail',
+            'mail_from_email' => '',
+            'mail_from_name' => '',
+            'mail_reply_to' => '',
+            'mail_smtp_host' => '',
+            'mail_smtp_port' => '587',
+            'mail_smtp_encryption' => 'tls',
+            'mail_smtp_username' => '',
+            'mail_smtp_password' => '',
         ] as $name => $value) {
             self::ensureSetting($db, $name, $value);
         }

@@ -6,6 +6,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }, true);
 
+    document.addEventListener('admin:form-saved', function (event) {
+        const form = event.detail && event.detail.form;
+        const data = event.detail && event.detail.data ? event.detail.data : {};
+        const isDecision = form && form.matches('.news-decision-form');
+        const isSubmittedForReview = data.moderation_transition === 'submit';
+        if (!form || (!isDecision && !isSubmittedForReview) || !data.redirect_url) {
+            return;
+        }
+        window.location.href = data.redirect_url;
+    });
+
     document.querySelectorAll('[data-news-image-picker]').forEach(function (picker) {
         const input = picker.querySelector('[data-news-image-input]');
         const removeInput = picker.querySelector('[data-news-image-remove]');
