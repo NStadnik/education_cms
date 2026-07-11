@@ -1,17 +1,31 @@
 <!doctype html>
 <?php
     $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/admin', PHP_URL_PATH) ?: '/admin';
+    $auth = \App\Core\Container::get('auth');
+    $isSuperAdmin = (string) (($auth->user()['role'] ?? '')) === 'super_admin';
+    $canAny = static function (array $permissions) use ($auth, $isSuperAdmin): bool {
+        foreach ($permissions as $permission) {
+            if ($permission === '__super_admin') {
+                return $isSuperAdmin;
+            }
+            if ($auth->can($permission)) {
+                return true;
+            }
+        }
+        return false;
+    };
     $adminNav = [
-        ['/admin', 'Огляд', 'mdi-view-dashboard-outline'],
-        ['/admin/pages', 'Сторінки', 'mdi-file-document-edit-outline'],
-        ['/admin/forms', 'Форми', 'mdi-form-select'],
-        ['/admin/news', 'Новини', 'mdi-newspaper-variant-outline'],
-        ['/admin/media', 'Медіафайли', 'mdi-image-multiple-outline'],
-        ['/admin/optimizer', 'Оптимізатор', 'mdi-auto-fix'],
-        ['/admin/users', 'Користувачі', 'mdi-account-group-outline'],
-        ['/admin/templates', 'Шаблони', 'mdi-palette-outline'],
-        ['/admin/import', 'Імпорт', 'mdi-database-import-outline'],
+        ['/admin', 'Огляд', 'mdi-view-dashboard-outline', []],
+        ['/admin/pages', 'Сторінки', 'mdi-file-document-edit-outline', ['pages.manage']],
+        ['/admin/forms', 'Форми', 'mdi-form-select', ['forms.manage']],
+        ['/admin/news', 'Новини', 'mdi-newspaper-variant-outline', ['news.manage', 'news.review', 'news.publish']],
+        ['/admin/media', 'Медіафайли', 'mdi-image-multiple-outline', ['media.manage']],
+        ['/admin/optimizer', 'Оптимізатор', 'mdi-auto-fix', ['__super_admin']],
+        ['/admin/users', 'Користувачі', 'mdi-account-group-outline', ['users.manage']],
+        ['/admin/templates', 'Шаблони', 'mdi-palette-outline', ['settings.manage']],
+        ['/admin/import', 'Імпорт', 'mdi-database-import-outline', ['settings.manage']],
     ];
+    $adminNav = array_values(array_filter($adminNav, static fn (array $item): bool => $item[3] === [] || $canAny($item[3])));
 
     $isActiveAdminNav = static function (string $path) use ($currentPath): bool {
         return $path === '/admin' ? $currentPath === '/admin' : strpos($currentPath, $path) === 0;
@@ -67,14 +81,14 @@
                         <span class="mdi mdi-account-cog-outline" aria-hidden="true"></span>
                         <span>Профіль</span>
                     </a>
-                    <a class="admin-header-button" href="<?= url('/admin/updates') ?>" title="Оновлення">
+                    <?php if ($auth->can('updates.manage')): ?><a class="admin-header-button" href="<?= url('/admin/updates') ?>" title="Оновлення">
                         <span class="mdi mdi-update" aria-hidden="true"></span>
                         <span>Оновлення</span>
-                    </a>
-                    <a class="admin-header-button" href="<?= url('/admin/settings') ?>" title="Налаштування">
+                    </a><?php endif; ?>
+                    <?php if ($auth->can('settings.manage')): ?><a class="admin-header-button" href="<?= url('/admin/settings') ?>" title="Налаштування">
                         <span class="mdi mdi-cog-outline" aria-hidden="true"></span>
                         <span>Налаштування</span>
-                    </a>
+                    </a><?php endif; ?>
                     <a class="admin-header-button" href="<?= url('/') ?>" target="_blank" rel="noopener" title="Переглянути сайт">
                         <span class="mdi mdi-open-in-new" aria-hidden="true"></span>
                         <span>Сайт</span>

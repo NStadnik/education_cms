@@ -38,11 +38,31 @@ final class AdminController extends AdminBaseController
     public function dashboard(): Response
     {
         $this->guard();
-        $stats = [
-            'pages' => $this->count('pages'),
-            'news' => $this->count('news'),
-            'media' => MediaMetadata::count(),
+        $auth = Container::get('auth');
+        $visibility = [
+            'pages' => $auth->can('pages.manage'),
+            'news' => $auth->can('news.manage') || $auth->can('news.review') || $auth->can('news.publish'),
+            'media' => $auth->can('media.manage'),
         ];
+        $stats = [];
+        $userId = (int) (($auth->user()['id'] ?? 0));
+        $canManageAll = $auth->can('content.manage_all');
+        if ($visibility['pages']) {
+            $stats['pages'] = $canManageAll
+                ? $this->count('pages')
+                : (int) ($this->db()->fetch('select count(*) as c from pages where created_by=?', [$userId])['c'] ?? 0);
+        }
+        if ($visibility['news']) {
+            $canSeeAllNews = $canManageAll || $auth->can('news.review') || $auth->can('news.publish');
+            $stats['news'] = $canSeeAllNews
+                ? $this->count('news')
+                : (int) ($this->db()->fetch('select count(*) as c from news where created_by=?', [$userId])['c'] ?? 0);
+        }
+        if ($visibility['media']) {
+            $stats['media'] = $canManageAll
+                ? MediaMetadata::count()
+                : (int) ($this->db()->fetch('select count(*) as c from media where uploaded_by=?', [$userId])['c'] ?? 0);
+        }
         return $this->admin('admin/dashboard', ['title' => 'Панель керування', 'stats' => $stats]);
     }
 }

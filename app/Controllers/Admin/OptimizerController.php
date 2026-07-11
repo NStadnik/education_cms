@@ -23,7 +23,7 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
 
     public function index(Request $request): Response
     {
-        $this->guardOptimizer();
+        $this->guardSuperAdmin();
 
         return $this->admin('admin/optimizer/index', [
             'title' => 'Оптимізатор',
@@ -42,7 +42,7 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
 
     public function mediaFolders(Request $request): Response
     {
-        $this->guard('media.manage');
+        $this->guardSuperAdmin();
 
         try {
             $analysis = $this->mediaFolderAnalysis();
@@ -64,7 +64,7 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
 
     public function applyMediaFolders(Request $request): Response
     {
-        $this->guard('media.manage');
+        $this->guardSuperAdmin();
         Csrf::verify();
 
         try {
@@ -117,7 +117,7 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
 
     public function clearCache(Request $request): Response
     {
-        $this->guard('settings.manage');
+        $this->guardSuperAdmin();
         Csrf::verify();
 
         try {
@@ -162,7 +162,7 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
 
     public function toggleDebug(Request $request): Response
     {
-        $this->guard('settings.manage');
+        $this->guardSuperAdmin();
         Csrf::verify();
 
         try {
@@ -303,11 +303,11 @@ final class OptimizerController extends \App\Controllers\AdminBaseController
         ];
     }
 
-    private function guardOptimizer(): void
+    private function guardSuperAdmin(): void
     {
         $this->guard();
         $auth = Container::get('auth');
-        if ($auth->can('media.manage') || $auth->can('settings.manage')) {
+        if ((string) (($auth->user()['role'] ?? '')) === 'super_admin') {
             return;
         }
 
