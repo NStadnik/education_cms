@@ -10,6 +10,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Services\Files;
 use App\Services\MediaMetadata;
+use App\Services\LcloudConfig;
 use Throwable;
 
 final class SettingsController extends \App\Controllers\AdminBaseController
@@ -23,6 +24,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'globalFields' => $this->globalFields(),
             'homePages' => $this->homePageOptions(),
             'siteTemplates' => $this->siteTemplates(),
+            'lcloud' => LcloudConfig::get(),
         ]);
     }
 
@@ -38,6 +40,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             $this->saveSetting('site_mode', $this->normalizeSiteMode((string) $request->input('site_mode', 'online')));
             $this->saveSetting('site_mode_title', $this->limitString(trim((string) $request->input('site_mode_title', '')), 140));
             $this->saveSetting('site_mode_message', $this->limitString(trim((string) $request->input('site_mode_message', '')), 600));
+            $this->saveLcloudSettings($request);
             $globalFields = json_encode($this->normalizeGlobalFields($request), JSON_UNESCAPED_UNICODE);
             $this->saveSetting('global_fields', $globalFields === false ? '[]' : $globalFields);
 
@@ -48,6 +51,42 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             redirect('/admin/settings');
         } catch (Throwable $e) {
             return $this->ajaxError($request, $e);
+        }
+    }
+
+    private function saveLcloudSettings(Request $request): void
+    {
+        $enabled = $request->input('lcloud_enabled') ? '1' : '0';
+        $issuer = $this->limitString(trim((string) $request->input('lcloud_issuer', 'lcloud')), 120);
+        $audience = $this->limitString(trim((string) $request->input('lcloud_audience', 'education-cms')), 190);
+        $origin = rtrim($this->limitString(trim((string) $request->input('lcloud_allowed_origin', '')), 255), '/');
+        if ($issuer === '' || $audience === '') {
+            throw new \InvalidArgumentException('Для ЛКЛАУД вкажіть issuer та audience.');
+        }
+        if ($origin !== '' && (!filter_var($origin, FILTER_VALIDATE_URL) || !in_array((string) parse_url($origin, PHP_URL_SCHEME), ['http', 'https'], true))) {
+            throw new \InvalidArgumentException('Вкажіть коректний URL джерела ЛКЛАУД.');
+        }
+
+        $current = LcloudConfig::get();
+        $ssoSecret = trim((string) $request->input('lcloud_sso_secret', ''));
+        $apiKey = trim((string) $request->input('lcloud_api_key', ''));
+        if ($request->input('lcloud_clear_sso_secret')) { $ssoSecret = ''; }
+        elseif ($ssoSecret === '') { $ssoSecret = (string) $current['sso_secret']; }
+        if ($request->input('lcloud_clear_api_key')) { $apiKey = ''; }
+        elseif ($apiKey === '') { $apiKey = (string) $current['api_key']; }
+        if ($enabled === '1' && strlen($ssoSecret) < 32) {
+            throw new \InvalidArgumentException('SSO-секрет ЛКЛАУД має містити щонайменше 32 символи.');
+        }
+
+        foreach ([
+            'lcloud_enabled' => $enabled,
+            'lcloud_issuer' => $issuer,
+            'lcloud_audience' => $audience,
+            'lcloud_allowed_origin' => $origin,
+            'lcloud_sso_secret' => $ssoSecret,
+            'lcloud_api_key' => $apiKey,
+        ] as $name => $value) {
+            $this->saveSetting($name, $value);
         }
     }
 

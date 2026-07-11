@@ -38,6 +38,7 @@
             <div class="form-grid wide">
                 <label>Ім'я<input name="name" value="<?= e($item['name'] ?? '') ?>" required></label>
                 <label>Email<input type="email" name="email" value="<?= e($item['email'] ?? '') ?>" required></label>
+                <label>ID викладача в ЛКЛАУД<input name="lcloud_user_id" value="<?= e($item['lcloud_user_id'] ?? '') ?>" autocomplete="off"><small class="meta">Заповніть для прив’язки вже наявного користувача до SSO.</small></label>
                 <label>Пароль<input type="password" name="password" <?= $isEdit ? '' : 'required' ?>></label>
                 <?php if ($isEdit): ?><div class="hint-box">Залиште пароль порожнім, щоб не змінювати його.</div><?php endif; ?>
             </div>

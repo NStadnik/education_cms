@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Auth;
+use App\Core\Container;
 use App\Core\Database;
 use Throwable;
 
@@ -75,6 +76,8 @@ final class SchemaUpgrade
             self::createMediaTable($db);
             self::createFormsTables($db);
             self::upgradeFormsPermissions($db);
+            self::createLcloudIntegrationTables($db);
+            self::upgradeLcloudPermissions($db);
             $mediaDone = $db->fetch('select value from settings where name = ?', ['schema_media_table']);
             if (($mediaDone['value'] ?? '') !== '1') {
                 MediaMetadata::migrateLegacyStorage();
@@ -86,6 +89,7 @@ final class SchemaUpgrade
             self::ensureSetting($db, 'site_mode', 'online');
             self::ensureSetting($db, 'site_mode_title', '');
             self::ensureSetting($db, 'site_mode_message', '');
+            self::migrateLcloudConfig($db);
             self::ensureSetting($db, 'user_roles', json_encode(Auth::defaultRolesConfig(), JSON_UNESCAPED_UNICODE) ?: '{}');
             self::migrateGlobalFields($db);
         } catch (Throwable) {
@@ -288,6 +292,54 @@ final class SchemaUpgrade
         $db->execute('insert into settings (name,value) values (?,?)', ['schema_forms_permissions', '1']);
     }
 
+    private static function createLcloudIntegrationTables(Database $db): void
+    {
+        $db->pdo()->exec("create table if not exists external_identities (
+            id bigint unsigned primary key auto_increment,
+            provider varchar(40) not null,
+            external_user_id varchar(190) not null,
+            user_id bigint unsigned not null,
+            external_institution_id varchar(190) null,
+            created_at varchar(32) not null,
+            updated_at varchar(32) not null,
+            unique key external_identities_provider_user_unique (provider, external_user_id),
+            index external_identities_user_id_index (user_id),
+            constraint external_identities_user_id_foreign foreign key(user_id) references users(id) on delete cascade
+        ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci");
+        $db->pdo()->exec("create table if not exists external_auth_nonces (
+            id bigint unsigned primary key auto_increment,
+            provider varchar(40) not null,
+            nonce_hash varchar(64) not null,
+            expires_at varchar(32) not null,
+            used_at varchar(32) not null,
+            unique key external_auth_nonces_provider_nonce_unique (provider, nonce_hash),
+            index external_auth_nonces_expires_at_index (expires_at)
+        ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci");
+    }
+
+    private static function upgradeLcloudPermissions(Database $db): void
+    {
+        $done = $db->fetch('select value from settings where name=?', ['schema_lcloud_permissions']);
+        if (($done['value'] ?? '') === '1') { return; }
+        $stored = $db->fetch('select value from settings where name=?', ['user_roles']);
+        $roles = json_decode((string) ($stored['value'] ?? ''), true);
+        if (!is_array($roles) || $roles === []) {
+            $roles = Auth::defaultRolesConfig();
+        }
+        foreach (['editor', 'publisher'] as $role) {
+            if (isset($roles[$role]['permissions']) && is_array($roles[$role]['permissions']) && !in_array('*', $roles[$role]['permissions'], true)) {
+                $roles[$role]['permissions'][] = 'news.categories.manage';
+                $roles[$role]['permissions'] = array_values(array_unique($roles[$role]['permissions']));
+            }
+        }
+        if (!isset($roles['teacher'])) {
+            $roles['teacher'] = ['label' => 'Викладач', 'permissions' => ['news.manage', 'media.manage']];
+        }
+        $db->execute('delete from settings where name=?', ['user_roles']);
+        $db->execute('insert into settings (name,value) values (?,?)', ['user_roles', json_encode($roles, JSON_UNESCAPED_UNICODE) ?: '{}']);
+        $db->execute('insert into settings (name,value) values (?,?)', ['schema_lcloud_permissions', '1']);
+    }
+
     private static function seedNewsCategories(Database $db): void
     {
         $now = date('c');
@@ -357,6 +409,21 @@ final class SchemaUpgrade
         }
 
         $db->execute('insert into settings (name, value) values (?, ?)', [$name, $value]);
+    }
+
+    private static function migrateLcloudConfig(Database $db): void
+    {
+        $legacy = (array) (Container::get('config')['app']['lcloud'] ?? []);
+        foreach ([
+            'lcloud_enabled' => !empty($legacy['enabled']) ? '1' : '0',
+            'lcloud_issuer' => (string) ($legacy['issuer'] ?? 'lcloud'),
+            'lcloud_audience' => (string) ($legacy['audience'] ?? 'education-cms'),
+            'lcloud_allowed_origin' => (string) ($legacy['allowed_origin'] ?? ''),
+            'lcloud_sso_secret' => (string) ($legacy['sso_secret'] ?? ''),
+            'lcloud_api_key' => (string) ($legacy['api_key'] ?? ''),
+        ] as $name => $value) {
+            self::ensureSetting($db, $name, $value);
+        }
     }
 
     private static function migrateGlobalFields(Database $db): void

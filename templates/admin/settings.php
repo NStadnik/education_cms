@@ -109,6 +109,43 @@
         </div>
     </section>
 
+    <?php $lcloud = is_array($lcloud ?? null) ? $lcloud : []; ?>
+    <section class="card admin-form-card">
+        <div class="form-section-head">
+            <div>
+                <h2>Інтеграція з ЛКЛАУД</h2>
+                <p class="meta">Налаштуйте SSO-вхід викладачів і захист API публікацій. Секрети після збереження не відображаються.</p>
+            </div>
+            <span class="status <?= !empty($lcloud['enabled']) ? 'ok' : 'warn' ?>"><?= !empty($lcloud['enabled']) ? 'Увімкнено' : 'Вимкнено' ?></span>
+        </div>
+        <label class="check-row"><input type="checkbox" name="lcloud_enabled" value="1" <?= checked(!empty($lcloud['enabled'])) ?>> Увімкнути SSO ЛКЛАУД</label>
+        <div class="form-grid wide">
+            <label>Issuer
+                <input name="lcloud_issuer" value="<?= e((string) ($lcloud['issuer'] ?? 'lcloud')) ?>" required autocomplete="off">
+                <small class="meta">Значення claim <code>iss</code> у JWT.</small>
+            </label>
+            <label>Audience
+                <input name="lcloud_audience" value="<?= e((string) ($lcloud['audience'] ?? 'education-cms')) ?>" required autocomplete="off">
+                <small class="meta">Значення claim <code>aud</code> для цієї інсталяції CMS.</small>
+            </label>
+            <label>URL ЛКЛАУД для CORS
+                <input type="url" name="lcloud_allowed_origin" value="<?= e((string) ($lcloud['allowed_origin'] ?? '')) ?>" placeholder="https://lcloud.example" autocomplete="off">
+            </label>
+            <label>Новий SSO-секрет
+                <input type="password" name="lcloud_sso_secret" value="" minlength="32" placeholder="<?= !empty($lcloud['sso_secret']) ? 'Секрет уже налаштовано' : 'Щонайменше 32 символи' ?>" autocomplete="new-password">
+                <small class="meta">Залиште порожнім, щоб не змінювати поточний секрет.</small>
+            </label>
+            <label>Новий API-ключ
+                <input type="password" name="lcloud_api_key" value="" placeholder="<?= !empty($lcloud['api_key']) ? 'API-ключ уже налаштовано' : 'Введіть окремий API-ключ' ?>" autocomplete="new-password">
+                <small class="meta">Залиште порожнім, щоб не змінювати поточний ключ.</small>
+            </label>
+        </div>
+        <div class="form-grid wide">
+            <label class="check-row"><input type="checkbox" name="lcloud_clear_sso_secret" value="1"> Видалити збережений SSO-секрет</label>
+            <label class="check-row"><input type="checkbox" name="lcloud_clear_api_key" value="1"> Видалити збережений API-ключ</label>
+        </div>
+    </section>
+
     <section class="card admin-form-card" data-global-fields>
         <div class="form-section-head">
             <div>

@@ -19,6 +19,7 @@ use App\Controllers\ErrorController;
 use App\Controllers\InstallController;
 use App\Controllers\PublicController;
 use App\Controllers\LcloudApiController;
+use App\Controllers\LcloudAuthController;
 use App\Services\Installer;
 use App\Services\SchemaUpgrade;
 use Throwable;
@@ -111,6 +112,7 @@ final class App
         $formSubmissions = FormSubmissionController::class;
         $install = InstallController::class;
         $lcloudApi = LcloudApiController::class;
+        $lcloudAuth = LcloudAuthController::class;
 
         $this->router->get('/', [$public, 'home']);
         $this->router->get('/page/{slug}', [$public, 'page']);
@@ -183,6 +185,7 @@ final class App
         $this->router->get('/admin/settings', [$adminSettings, 'settings']);
         $this->router->post('/admin/settings/save', [$adminSettings, 'settingsSave']);
         $this->router->get('/api/lcloud/publications',[$lcloudApi, 'publications']);
+        $this->router->get('/auth/lcloud', [$lcloudAuth, 'login']);
     }
 
     private function loadConfig(string $name): array

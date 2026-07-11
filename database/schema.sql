@@ -103,6 +103,29 @@ create table if not exists news_category_links (
     constraint news_category_links_category_id_foreign foreign key(category_id) references news_categories(id) on delete cascade
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
+create table if not exists external_identities (
+    id bigint unsigned primary key auto_increment,
+    provider varchar(40) not null,
+    external_user_id varchar(190) not null,
+    user_id bigint unsigned not null,
+    external_institution_id varchar(190) null,
+    created_at varchar(32) not null,
+    updated_at varchar(32) not null,
+    unique key external_identities_provider_user_unique (provider, external_user_id),
+    index external_identities_user_id_index (user_id),
+    constraint external_identities_user_id_foreign foreign key(user_id) references users(id) on delete cascade
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
+create table if not exists external_auth_nonces (
+    id bigint unsigned primary key auto_increment,
+    provider varchar(40) not null,
+    nonce_hash varchar(64) not null,
+    expires_at varchar(32) not null,
+    used_at varchar(32) not null,
+    unique key external_auth_nonces_provider_nonce_unique (provider, nonce_hash),
+    index external_auth_nonces_expires_at_index (expires_at)
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
 create table if not exists audit_logs (
     id bigint unsigned primary key auto_increment,
     user_id bigint unsigned null,

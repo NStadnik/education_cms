@@ -62,6 +62,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
             'canPublish' => $this->canPublishNews(),
             'canReview' => $this->canReviewNews(),
             'canManage' => Container::get('auth')->can('news.manage'),
+            'canManageCategories' => Container::get('auth')->can('news.categories.manage'),
         ]);
     }
 
@@ -82,12 +83,13 @@ final class NewsController extends \App\Controllers\AdminBaseController
             'canPublish' => $this->canPublishNews(),
             'canEdit' => $item ? $this->canEditNews($item) : Container::get('auth')->can('news.manage'),
             'moderationEvents' => $id ? $this->newsModerationEvents($id) : [],
+            'canManageCategories' => Container::get('auth')->can('news.categories.manage'),
         ]);
     }
 
     public function newsCategories(Request $request): Response
     {
-        $this->guard('news.manage');
+        $this->guard('news.categories.manage');
         return $this->admin('admin/news/categories', [
             'title' => 'Категорії новин',
             'categories' => $this->newsCategoriesWithCounts(),
@@ -245,7 +247,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
 
     public function newsCategorySave(Request $request): Response
     {
-        $this->guard('news.manage');
+        $this->guard('news.categories.manage');
         Csrf::verify();
 
         try {
@@ -310,7 +312,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
 
     public function newsCategoryDelete(Request $request): Response
     {
-        $this->guard('news.manage');
+        $this->guard('news.categories.manage');
         Csrf::verify();
 
         try {

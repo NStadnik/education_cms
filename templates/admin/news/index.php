@@ -6,7 +6,7 @@
     </div>
     <div class="form-actions">
         <?php if ((($canReview ?? false) || ($canPublish ?? false)) && (int) ($stats['pending_review'] ?? 0) > 0): ?><a class="button news-queue-button" href="<?= url('/admin/news?status=pending_review&sort=moderation') ?>"><span class="mdi mdi-inbox-arrow-down-outline" aria-hidden="true"></span><span>Черга модерації</span><strong data-stat="pending_review"><?= e((string) $stats['pending_review']) ?></strong></a><?php endif; ?>
-        <?php if ($canManage ?? false): ?><a class="button secondary" href="<?= url('/admin/news/categories') ?>">
+        <?php if ($canManageCategories ?? false): ?><a class="button secondary" href="<?= url('/admin/news/categories') ?>">
             <span class="mdi mdi-shape-outline" aria-hidden="true"></span>
             <span>Категорії</span>
         </a><?php endif; ?>

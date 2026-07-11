@@ -10,6 +10,7 @@ final class Auth
         'admin' => 'Адміністратор',
         'editor' => 'Редактор',
         'publisher' => 'Публікатор',
+        'teacher' => 'Викладач',
         'viewer' => 'Переглядач',
     ];
 
@@ -33,6 +34,11 @@ final class Auth
             'group' => 'Контент',
             'label' => 'Публікація новин',
             'description' => 'Публікація та зняття новин з публікації.',
+        ],
+        'news.categories.manage' => [
+            'group' => 'Контент',
+            'label' => 'Категорії новин',
+            'description' => 'Створення, перейменування та видалення глобальних категорій новин.',
         ],
         'media.manage' => [
             'group' => 'Медіа',
@@ -74,8 +80,9 @@ final class Auth
     {
         return [
             'admin' => ['*'],
-            'editor' => ['pages.manage', 'news.manage', 'media.manage', 'forms.manage'],
-            'publisher' => ['pages.manage', 'news.manage', 'news.review', 'news.publish', 'media.manage', 'forms.manage'],
+            'editor' => ['pages.manage', 'news.manage', 'news.categories.manage', 'media.manage', 'forms.manage'],
+            'publisher' => ['pages.manage', 'news.manage', 'news.review', 'news.publish', 'news.categories.manage', 'media.manage', 'forms.manage'],
+            'teacher' => ['news.manage', 'media.manage'],
             'viewer' => [],
         ];
     }
@@ -190,6 +197,18 @@ final class Auth
     {
         unset($_SESSION['user_id']);
         session_regenerate_id(true);
+    }
+
+    public function loginById(int $userId): bool
+    {
+        $user = $this->db->fetch('select id from users where id = ? and is_active = 1', [$userId]);
+        if (!$user) {
+            return false;
+        }
+
+        $_SESSION['user_id'] = (int) $user['id'];
+        session_regenerate_id(true);
+        return true;
     }
 
     public function require(): array

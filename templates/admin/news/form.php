@@ -177,7 +177,7 @@
                                     <strong><span data-category-count><?= e((string) count($selectedCategoryTitles)) ?></span> вибрано</strong>
                                     <small data-category-summary><?= e($categorySummary) ?></small>
                                 </div>
-                                <a class="button secondary icon-button" href="<?= url('/admin/news/categories') ?>" title="Редагувати категорії" aria-label="Редагувати категорії"><span class="mdi mdi-shape-outline" aria-hidden="true"></span></a>
+                                <?php if ($canManageCategories ?? false): ?><a class="button secondary icon-button" href="<?= url('/admin/news/categories') ?>" title="Редагувати категорії" aria-label="Редагувати категорії"><span class="mdi mdi-shape-outline" aria-hidden="true"></span></a><?php endif; ?>
                             </div>
                             <label class="category-picker-search">
                                 <span class="mdi mdi-magnify" aria-hidden="true"></span>

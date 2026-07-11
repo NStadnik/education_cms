@@ -127,7 +127,7 @@ final class UsersController extends \App\Controllers\AdminBaseController
     {
         $this->guard('users.manage');
         $id = (int) $request->input('id', 0);
-        $item = $id ? $this->db()->fetch('select * from users where id = ?', [$id]) : null;
+        $item = $id ? $this->db()->fetch("select u.*, (select ei.external_user_id from external_identities ei where ei.user_id=u.id and ei.provider='lcloud' limit 1) as lcloud_user_id from users u where u.id = ?", [$id]) : null;
         return $this->admin('admin/users/form', [
             'title' => 'Користувач',
             'item' => $item,
@@ -145,6 +145,7 @@ final class UsersController extends \App\Controllers\AdminBaseController
             $id = (int) $request->input('id', 0);
             $password = (string) $request->input('password', '');
             $role = (string) $request->input('role', '');
+            $lcloudUserId = trim((string) $request->input('lcloud_user_id', ''));
             $currentUser = Container::get('auth')->user() ?: [];
             $availableRoles = Container::get('auth')->roleLabels();
             if ($role === 'super_admin') {
@@ -153,6 +154,15 @@ final class UsersController extends \App\Controllers\AdminBaseController
                 }
             } elseif (!array_key_exists($role, $availableRoles)) {
                 throw new \InvalidArgumentException('Оберіть коректну роль.');
+            }
+            if ($lcloudUserId !== '') {
+                $duplicateIdentity = $this->db()->fetch(
+                    'select user_id from external_identities where provider=? and external_user_id=?' . ($id ? ' and user_id<>?' : ''),
+                    $id ? ['lcloud', $lcloudUserId, $id] : ['lcloud', $lcloudUserId]
+                );
+                if ($duplicateIdentity) {
+                    throw new \InvalidArgumentException('Цей ID ЛКЛАУД уже прив’язаний до іншого користувача.');
+                }
             }
 
             if ($id) {
@@ -169,6 +179,16 @@ final class UsersController extends \App\Controllers\AdminBaseController
                     [$request->input('name'), $request->input('email'), password_hash($password, PASSWORD_DEFAULT), $role, date('c')]
                 );
                 $id = (int) $this->db()->lastInsertId();
+            }
+
+            $existingIdentity = $this->db()->fetch('select id from external_identities where provider=? and user_id=?', ['lcloud', $id]);
+            if ($lcloudUserId === '' && $existingIdentity) {
+                $this->db()->execute('delete from external_identities where id=?', [$existingIdentity['id']]);
+            } elseif ($lcloudUserId !== '' && $existingIdentity) {
+                $this->db()->execute('update external_identities set external_user_id=?,updated_at=? where id=?', [$lcloudUserId, date('c'), $existingIdentity['id']]);
+            } elseif ($lcloudUserId !== '') {
+                $now = date('c');
+                $this->db()->execute('insert into external_identities (provider,external_user_id,user_id,created_at,updated_at) values (?,?,?,?,?)', ['lcloud', $lcloudUserId, $id, $now, $now]);
             }
 
             if ($this->isAjax($request)) {
