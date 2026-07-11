@@ -269,4 +269,4 @@
         <input type="hidden" name="ids[]" value="<?= e((string) $item['id']) ?>">
     </form>
 <?php endif; ?>
-<script src="<?= url('/assets/admin-news.js?v=20260711-2') ?>"></script>
+<script src="<?= url('/assets/admin-news.js?v=20260711-3') ?>"></script>

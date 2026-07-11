@@ -18,7 +18,7 @@ final class Mailer
             }
         }
         $boundaryHeaders = self::headers($config);
-        $body = self::body($html);
+        $body = chunk_split(base64_encode(self::body($html, $config)), 76, "\r\n");
         if (($config['transport'] ?? 'mail') === 'smtp') {
             self::smtp($config, $to, $subject, $boundaryHeaders, $body);
             return;
@@ -32,16 +32,25 @@ final class Mailer
     {
         $fromName = trim((string) ($config['from_name'] ?? ''));
         $from = ($fromName !== '' ? self::encode($fromName) . ' ' : '') . '<' . $config['from_email'] . '>';
-        $headers = ['From: ' . $from, 'MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: 8bit'];
+        $headers = ['From: ' . $from, 'MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64'];
         if (!empty($config['reply_to']) && filter_var($config['reply_to'], FILTER_VALIDATE_EMAIL)) {
             $headers[] = 'Reply-To: ' . $config['reply_to'];
         }
         return $headers;
     }
 
-    private static function body(string $html): string
+    private static function body(string $html, array $config): string
     {
-        return '<!doctype html><html lang="uk"><meta charset="utf-8"><body style="font-family:Arial,sans-serif;color:#172033;line-height:1.5">' . $html . '</body></html>';
+        $brand = trim((string) ($config['from_name'] ?? '')) ?: 'Education CMS';
+        $year = date('Y');
+        return '<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+            . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#172033;line-height:1.55">'
+            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9"><tr><td align="center" style="padding:28px 12px">'
+            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #dbe3ef;border-radius:12px;overflow:hidden">'
+            . '<tr><td style="padding:20px 28px;background:#123b70;color:#ffffff"><div style="font-size:20px;font-weight:700">' . htmlspecialchars($brand, ENT_QUOTES, 'UTF-8') . '</div><div style="margin-top:3px;font-size:12px;color:#cbdcf2">Education CMS</div></td></tr>'
+            . '<tr><td style="padding:30px 28px">' . $html . '</td></tr>'
+            . '<tr><td style="padding:18px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px">Автоматичне повідомлення від ' . htmlspecialchars($brand, ENT_QUOTES, 'UTF-8') . '. Будь ласка, не відповідайте на нього, якщо не налаштовано Reply-To.<br>© ' . $year . ' Education CMS</td></tr>'
+            . '</table></td></tr></table></body></html>';
     }
 
     private static function smtp(array $config, string $to, string $subject, array $headers, string $body): void
@@ -100,6 +109,20 @@ final class Mailer
 
     private static function encode(string $value): string
     {
-        return '=?UTF-8?B?' . base64_encode(str_replace(["\r", "\n"], '', $value)) . '?=';
+        $value = str_replace(["\r", "\n"], '', $value);
+        if ($value === '') { return ''; }
+        $words = [];
+        while ($value !== '') {
+            if (function_exists('mb_strcut')) {
+                $chunk = mb_strcut($value, 0, 36, 'UTF-8');
+                $value = substr($value, strlen($chunk));
+            } else {
+                preg_match('/^.{1,10}/us', $value, $match);
+                $chunk = (string) ($match[0] ?? substr($value, 0, 10));
+                $value = substr($value, strlen($chunk));
+            }
+            $words[] = '=?UTF-8?B?' . base64_encode($chunk) . '?=';
+        }
+        return implode("\r\n ", $words);
     }
 }

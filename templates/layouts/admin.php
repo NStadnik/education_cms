@@ -246,7 +246,7 @@
     <script src="<?= url('/assets/tiptap.bundle.20260709-7.js?v=20260709-13') ?>"></script>
     <script src="<?= url('/assets/tiptap-editor.js?v=20260710-6') ?>"></script>
     <script src="<?= url('/assets/admin-link-picker.js') ?>"></script>
-    <script src="<?= url('/assets/admin.js?v=20260710-4') ?>"></script>
+    <script src="<?= url('/assets/admin.js?v=20260711-1') ?>"></script>
     <?php if (strpos($currentPath, '/admin/forms') === 0): ?><script src="<?= url('/assets/admin-forms.js?v=20260710-1') ?>"></script><?php endif; ?>
 </body>
 </html>

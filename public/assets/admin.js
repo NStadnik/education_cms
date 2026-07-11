@@ -727,6 +727,9 @@
     });
 
     document.addEventListener('admin:content-replaced', function (event) {
+        const target = event.detail && event.detail.target ? event.detail.target : document;
+        initTiptapEditors(target);
+        initCategoryPickers();
         if (event.detail && event.detail.target && event.detail.target.matches('[data-news-category-rows]')) {
             initNewsCategoryManager();
         }
@@ -945,9 +948,9 @@
 
     initOptimizerTabs();
 
-    function initTiptapEditors() {
+    function initTiptapEditors(root) {
         if (window.TiptapEditor) {
-            window.TiptapEditor.init();
+            window.TiptapEditor.init(root || document);
         }
     }
 

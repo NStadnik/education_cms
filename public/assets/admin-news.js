@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }, true);
 
-    document.addEventListener('admin:form-saved', function (event) {
+    document.addEventListener('admin:form-saved', async function (event) {
         const form = event.detail && event.detail.form;
         const data = event.detail && event.detail.data ? event.detail.data : {};
         const isDecision = form && form.matches('.news-decision-form');
@@ -14,10 +14,29 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!form || (!isDecision && !isSubmittedForReview) || !data.redirect_url) {
             return;
         }
-        window.location.href = data.redirect_url;
+        const content = document.querySelector('.admin-content');
+        if (!content) { return; }
+        try {
+            const response = await fetch(data.redirect_url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            if (!response.ok) { throw new Error('Не вдалося оновити редактор новини.'); }
+            const documentHtml = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const freshContent = documentHtml.querySelector('.admin-content');
+            if (!freshContent) { throw new Error('Сервер повернув некоректну сторінку редактора.'); }
+            content.innerHTML = freshContent.innerHTML;
+            if (window.history && window.history.replaceState) { window.history.replaceState(null, '', data.redirect_url); }
+            document.dispatchEvent(new CustomEvent('admin:content-replaced', {detail: {target: content}}));
+        } catch (error) {
+            const message = document.createElement('div');
+            message.className = 'alert alert-danger';
+            message.textContent = error.message || 'Не вдалося оновити статус новини.';
+            content.prepend(message);
+        }
     });
 
-    document.querySelectorAll('[data-news-image-picker]').forEach(function (picker) {
+    function initNewsImagePickers(root) {
+    (root || document).querySelectorAll('[data-news-image-picker]').forEach(function (picker) {
+        if (picker.dataset.newsImagePickerReady === '1') { return; }
+        picker.dataset.newsImagePickerReady = '1';
         const input = picker.querySelector('[data-news-image-input]');
         const removeInput = picker.querySelector('[data-news-image-remove]');
         const preview = picker.querySelector('[data-news-image-preview]');
@@ -185,5 +204,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 }, 250);
             });
         }
+    });
+    }
+
+    initNewsImagePickers(document);
+    document.addEventListener('admin:content-replaced', function (event) {
+        const target = event.detail && event.detail.target ? event.detail.target : document;
+        initNewsImagePickers(target);
     });
 });

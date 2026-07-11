@@ -84,7 +84,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             Mailer::send(
                 $email,
                 'Тестове повідомлення — ' . $institution,
-                '<h2>Надсилання пошти працює</h2><p>Це тестовий лист із системи <strong>' . e($institution) . '</strong>.</p><p>Час перевірки: ' . e(date('d.m.Y H:i:s')) . '</p>'
+                '<div style="text-align:center"><div style="display:inline-block;width:58px;height:58px;line-height:58px;border-radius:50%;background:#dcfce7;color:#15803d;font-size:30px;font-weight:700">✓</div><h1 style="margin:18px 0 8px;font-size:25px;color:#0f2745">Надсилання пошти працює</h1><p style="margin:0;color:#64748b">Education CMS успішно використала збережені поштові налаштування.</p></div><div style="margin-top:24px;padding:15px 18px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0"><div style="font-size:13px;color:#64748b">Система</div><div style="font-weight:700">' . e($institution) . '</div><div style="margin-top:10px;font-size:13px;color:#64748b">Час перевірки</div><div style="font-weight:700">' . e(date('d.m.Y H:i:s')) . '</div></div>'
             );
             return $this->json(['ok' => true, 'message' => 'Тестовий лист надіслано на ' . $email . '.']);
         } catch (Throwable $e) {
