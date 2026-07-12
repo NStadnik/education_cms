@@ -131,6 +131,7 @@ final class App
         $this->router->post('/admin/login', [$admin, 'authenticate']);
         $this->router->post('/admin/logout', [$admin, 'logout']);
         $this->router->get('/admin', [$admin, 'dashboard']);
+        $this->router->get('/admin/dashboard/news-trend', [$admin, 'dashboardNewsTrend']);
         $this->router->get('/admin/profile', [$adminUsers, 'profile']);
         $this->router->post('/admin/profile/save', [$adminUsers, 'profileSave']);
         $this->router->get('/admin/pages', [$adminPages, 'pages']);
@@ -185,6 +186,7 @@ final class App
         $this->router->get('/admin/settings', [$adminSettings, 'settings']);
         $this->router->post('/admin/settings/save', [$adminSettings, 'settingsSave']);
         $this->router->post('/admin/settings/mail/test', [$adminSettings, 'mailTest']);
+        $this->router->post('/admin/settings/domain/replace', [$adminSettings, 'replaceDomainLinks']);
         $this->router->get('/api/lcloud/publications',[$lcloudApi, 'publications']);
         $this->router->get('/auth/lcloud', [$lcloudAuth, 'login']);
     }

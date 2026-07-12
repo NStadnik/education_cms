@@ -34,6 +34,33 @@
     <section class="card admin-form-card" data-settings-panel="site" hidden>
         <div class="form-section-head">
             <div>
+                <h2>Перенесення на основний домен</h2>
+                <p class="meta">Після підготовки сайту на піддомені замініть його адресу в посиланнях сторінок, новин, форм, медіаописів і налаштувань.</p>
+            </div>
+        </div>
+        <div class="domain-replace-panel">
+            <div class="form-grid wide">
+                <label>Старий домен
+                    <input type="url" name="old_domain_preview" placeholder="https://site.lcloud.example" data-old-domain>
+                </label>
+                <label>Новий домен
+                    <input type="url" name="new_domain_preview" placeholder="https://example.edu.ua" data-new-domain>
+                </label>
+            </div>
+            <label class="check-row"><input type="checkbox" data-domain-confirm> Я перевірив адреси та підтверджую заміну</label>
+            <div class="settings-domain-actions">
+                <button class="button secondary" type="button" data-domain-replace data-replace-url="<?= url('/admin/settings/domain/replace') ?>">
+                    <span class="mdi mdi-swap-horizontal" aria-hidden="true"></span><span>Замінити домен у посиланнях</span>
+                </button>
+                <span class="meta" data-domain-replace-status aria-live="polite"></span>
+            </div>
+            <p class="meta">Операція змінює лише дані в базі. Файли, системні адреси входу та домен у налаштуваннях хостингу не змінюються.</p>
+        </div>
+    </section>
+
+    <section class="card admin-form-card" data-settings-panel="site" hidden>
+        <div class="form-section-head">
+            <div>
                 <h2>Режим сайту</h2>
                 <p class="meta">Неавторизовані відвідувачі побачать сучасну заглушку. Адміністратори після входу можуть переглядати сайт без обмежень.</p>
             </div>
@@ -291,4 +318,4 @@
     </div>
 </div>
 
-<script src="<?= url('/assets/admin-settings.js?v=20260711-4') ?>"></script>
+<script src="<?= url('/assets/admin-settings.js?v=20260712-1') ?>"></script>

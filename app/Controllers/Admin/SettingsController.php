@@ -8,6 +8,7 @@ use App\Core\Container;
 use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
+use App\Services\DomainLinkReplacer;
 use App\Services\Files;
 use App\Services\MediaMetadata;
 use App\Services\LcloudConfig;
@@ -87,6 +88,35 @@ final class SettingsController extends \App\Controllers\AdminBaseController
                 '<div style="text-align:center"><div style="display:inline-block;width:58px;height:58px;line-height:58px;border-radius:50%;background:#dcfce7;color:#15803d;font-size:30px;font-weight:700">✓</div><h1 style="margin:18px 0 8px;font-size:25px;color:#0f2745">Надсилання пошти працює</h1><p style="margin:0;color:#64748b">Education CMS успішно використала збережені поштові налаштування.</p></div><div style="margin-top:24px;padding:15px 18px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0"><div style="font-size:13px;color:#64748b">Система</div><div style="font-weight:700">' . e($institution) . '</div><div style="margin-top:10px;font-size:13px;color:#64748b">Час перевірки</div><div style="font-weight:700">' . e(date('d.m.Y H:i:s')) . '</div></div>'
             );
             return $this->json(['ok' => true, 'message' => 'Тестовий лист надіслано на ' . $email . '.']);
+        } catch (Throwable $e) {
+            return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function replaceDomainLinks(Request $request): Response
+    {
+        $this->guard('settings.manage');
+        Csrf::verify();
+        try {
+            if (!$request->input('confirm_domain_replace')) {
+                throw new \InvalidArgumentException('Підтвердьте заміну посилань.');
+            }
+            $result = (new DomainLinkReplacer($this->db()))->replace(
+                (string) $request->input('old_domain', ''),
+                (string) $request->input('new_domain', '')
+            );
+            $this->audit('replace_domain_links', 'system', null, sprintf(
+                '%s -> %s; records: %d; replacements: %d',
+                $result['old_url'], $result['new_url'], $result['records'], $result['replacements']
+            ));
+
+            return $this->json([
+                'ok' => true,
+                'message' => $result['replacements'] > 0
+                    ? sprintf('Готово: виконано %d замін у %d записах.', $result['replacements'], $result['records'])
+                    : 'Посилань зі старим доменом не знайдено. Дані не змінено.',
+                'result' => $result,
+            ]);
         } catch (Throwable $e) {
             return $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
         }

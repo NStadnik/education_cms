@@ -155,6 +155,47 @@ if (mailTestButton) {
     });
 }
 
+const domainReplaceButton = document.querySelector('[data-domain-replace]');
+if (domainReplaceButton) {
+    domainReplaceButton.addEventListener('click', async function () {
+        const oldDomain = document.querySelector('[data-old-domain]');
+        const newDomain = document.querySelector('[data-new-domain]');
+        const confirmation = document.querySelector('[data-domain-confirm]');
+        const status = document.querySelector('[data-domain-replace-status]');
+        if (!oldDomain || !newDomain || !oldDomain.checkValidity() || !newDomain.checkValidity()) {
+            (oldDomain && !oldDomain.checkValidity() ? oldDomain : newDomain).reportValidity();
+            return;
+        }
+        if (!confirmation || !confirmation.checked) {
+            if (status) { status.textContent = 'Підтвердьте заміну адрес.'; status.className = 'meta text-danger'; }
+            return;
+        }
+        if (!window.confirm('Замінити всі посилання зі старим доменом? Скасувати цю операцію автоматично неможливо.')) { return; }
+
+        const originalHtml = domainReplaceButton.innerHTML;
+        domainReplaceButton.disabled = true;
+        domainReplaceButton.innerHTML = '<span class="mdi mdi-loading mdi-spin" aria-hidden="true"></span><span>Замінюємо...</span>';
+        if (status) { status.textContent = 'Оновлюємо посилання...'; status.className = 'meta'; }
+        try {
+            const body = new FormData();
+            body.set('_csrf', document.body.dataset.adminCsrfToken || '');
+            body.set('old_domain', oldDomain.value.trim());
+            body.set('new_domain', newDomain.value.trim());
+            body.set('confirm_domain_replace', '1');
+            const response = await fetch(domainReplaceButton.dataset.replaceUrl, {method: 'POST', body: body, headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            const data = await response.json();
+            if (!response.ok || !data.ok) { throw new Error(data.message || 'Не вдалося замінити домен.'); }
+            if (status) { status.textContent = data.message; status.className = 'meta text-success'; }
+            confirmation.checked = false;
+        } catch (error) {
+            if (status) { status.textContent = error.message || 'Помилка заміни домену.'; status.className = 'meta text-danger'; }
+        } finally {
+            domainReplaceButton.disabled = false;
+            domainReplaceButton.innerHTML = originalHtml;
+        }
+    });
+}
+
 document.querySelectorAll('[data-settings-logo-picker]').forEach(function (picker) {
     const input = picker.querySelector('[data-settings-logo-input]');
     const preview = picker.querySelector('[data-settings-logo-preview]');

@@ -46,6 +46,31 @@ $entityLabels = ['page' => 'сторінку', 'pages' => 'сторінки', 'n
 </section>
 <?php endif; ?>
 
+<?php if ($newsPublicationTrend):
+    $trendTotal = array_sum(array_column($newsPublicationTrend, 'count'));
+    $trendMax = max(1, ...array_column($newsPublicationTrend, 'count'));
+    $trendPeak = $newsPublicationTrend[0];
+    foreach ($newsPublicationTrend as $point) {
+        if ($point['count'] > $trendPeak['count']) $trendPeak = $point;
+    }
+?>
+<section class="dashboard-section">
+    <div class="dashboard-section-head" data-news-trend data-endpoint="<?= url('/admin/dashboard/news-trend') ?>"><div><p class="eyebrow" data-trend-label><?= e($newsTrendLabel) ?></p><h2>Тенденція публікацій новин</h2><div class="dashboard-chart-legend" data-trend-legend><span><i></i>Поточний період</span></div></div><div class="dashboard-chart-actions"><div class="dashboard-chart-toolbar"><nav class="dashboard-chart-switch" aria-label="Період графіка"><button type="button" class="<?= $newsTrendPeriod === '30_days' ? 'is-active' : '' ?>" data-trend-period="30_days">30 днів</button><button type="button" class="<?= $newsTrendPeriod === 'academic_year' ? 'is-active' : '' ?>" data-trend-period="academic_year">Навчальний рік</button></nav><div class="dashboard-chart-navigation" aria-label="Навігація періодами"><button type="button" data-trend-previous title="Попередній період"><span class="mdi mdi-chevron-left"></span></button><button type="button" data-trend-next title="Наступний період" disabled><span class="mdi mdi-chevron-right"></span></button></div></div><label class="dashboard-chart-compare"><input type="checkbox" data-trend-compare><span class="dashboard-compare-toggle" aria-hidden="true"></span><span><strong>Порівняти</strong><small>із попереднім періодом</small></span></label><div class="dashboard-chart-summary" data-trend-summary><span><strong><?= e((string) $trendTotal) ?></strong> публікацій</span><span>Пік: <strong><?= e((string) $trendPeak['count']) ?></strong> · <?= e($trendPeak['label']) ?></span></div></div></div>
+    <div class="card dashboard-chart" data-trend-chart role="img" aria-label="Графік кількості опублікованих новин: <?= e($newsTrendLabel) ?>">
+        <div class="dashboard-chart-grid" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div class="dashboard-chart-bars" style="--chart-points: <?= e((string) count($newsPublicationTrend)) ?>">
+            <?php foreach ($newsPublicationTrend as $index => $point): $height = ($point['count'] / $trendMax) * 100; ?>
+            <div class="dashboard-chart-point" title="<?= e($point['label'] . ': ' . $point['count']) ?>">
+                <span class="dashboard-chart-value"><?= $point['count'] ? e((string) $point['count']) : '' ?></span>
+                <span class="dashboard-chart-bar<?= $point['count'] ? ' has-value' : '' ?>" style="--bar-height: <?= e(number_format($height, 2, '.', '')) ?>%"></span>
+                <time datetime="<?= e($point['date']) ?>"><?= $newsTrendPeriod === 'academic_year' || $index % 5 === 0 || $index === 29 ? e($point['label']) : '' ?></time>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</section>
+<?php endif; ?>
+
 <?php if ($visibility['forms']): ?>
 <section class="dashboard-section">
     <div class="dashboard-section-head"><div><p class="eyebrow">Збір даних</p><h2>Форми та відповіді</h2></div><a class="button secondary compact" href="<?= url('/admin/forms/submissions') ?>">Усі відповіді</a></div>

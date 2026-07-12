@@ -39,7 +39,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260709-11') ?>">
-    <link rel="stylesheet" href="<?= url('/assets/admin.css?v=20260712-1') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/admin.css?v=20260712-6') ?>">
     <link rel="stylesheet" href="<?= url('/assets/tiptap-editor.css?v=20260710-1') ?>">
     <?php if (strpos($currentPath, '/admin/pages') === 0): ?>
         <link rel="stylesheet" href="<?= url('/assets/admin-pages-form.css?v=20260710-2') ?>">
@@ -247,6 +247,7 @@
     <script src="<?= url('/assets/tiptap-editor.js?v=20260710-6') ?>"></script>
     <script src="<?= url('/assets/admin-link-picker.js') ?>"></script>
     <script src="<?= url('/assets/admin.js?v=20260711-1') ?>"></script>
+    <?php if ($currentPath === '/admin'): ?><script src="<?= url('/assets/admin-dashboard.js?v=20260712-2') ?>"></script><?php endif; ?>
     <?php if (strpos($currentPath, '/admin/forms') === 0): ?><script src="<?= url('/assets/admin-forms.js?v=20260710-1') ?>"></script><?php endif; ?>
 </body>
 </html>
