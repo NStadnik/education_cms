@@ -12,6 +12,8 @@
             <div class="news-list-title">
                 <?php if (!empty($item['image_path'])): ?>
                     <img class="news-list-thumb" src="<?= url('/thumb/' . \App\Services\Files::normalize((string) $item['image_path']) . '?w=108&h=80&fit=crop') ?>" alt="" loading="lazy">
+                <?php else: ?>
+                    <span class="news-list-thumb news-list-thumb-placeholder mdi mdi-image-off-outline" aria-label="Без головного зображення" title="Без головного зображення"></span>
                 <?php endif; ?>
                 <div><strong><?= e($item['title']) ?></strong><div class="news-row-meta"><span class="mdi mdi-account-outline" aria-hidden="true"></span><span><?= e((string) ($item['author_name'] ?? 'Невідомий автор')) ?></span><?php if ($itemStatus === 'pending_review' && !empty($item['submitted_at'])): ?><span class="mdi mdi-clock-outline" aria-hidden="true"></span><span>надіслано <?= e($formatNewsDate((string) $item['submitted_at'])) ?></span><?php endif; ?></div><span class="meta"><?= e(excerpt($item['body'] ?? '', 100)) ?></span></div>
             </div>

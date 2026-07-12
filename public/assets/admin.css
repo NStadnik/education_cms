@@ -347,6 +347,7 @@ a.dashboard-feed-row:hover { background: #f5f9ff; }
 .news-image-name { min-width: 0; overflow: hidden; color: var(--muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .news-list-title { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; }
 .news-list-thumb { width: 54px; height: 40px; border: 1px solid var(--line); border-radius: 6px; object-fit: cover; background: #f1f4f9; }
+.news-list-thumb-placeholder { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); font-size: 22px; line-height: 1; }
 .source-options { display: flex; flex-wrap: wrap; gap: 12px; }
 .import-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .import-option { position: relative; display: grid !important; grid-template-columns: auto minmax(0, 1fr); gap: 10px !important; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; cursor: pointer; }
