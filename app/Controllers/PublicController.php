@@ -168,6 +168,7 @@ final class PublicController extends BaseController
             'activeCategory' => $category,
             'activeQuery' => $query,
             'menu' => $this->menu(),
+            'adminToolbar' => $this->adminToolbar('news-list'),
         ]);
     }
 
@@ -200,6 +201,7 @@ final class PublicController extends BaseController
             'settings' => $settings,
             'item' => $item,
             'menu' => $this->menu(),
+            'adminToolbar' => $this->adminToolbar('news', $item),
         ]);
     }
 
@@ -390,6 +392,7 @@ final class PublicController extends BaseController
             'formsById' => $formsById,
             'menu' => $this->menu(),
             'latestNews' => $this->cachedFetchAll('select * from news where status = ? order by published_at desc, id desc limit 3', ['published']),
+            'adminToolbar' => $this->adminToolbar('page', $page),
         ]);
     }
 

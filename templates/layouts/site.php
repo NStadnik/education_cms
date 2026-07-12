@@ -21,6 +21,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260709-11') ?>">
+    <?php if (!empty($adminToolbar)): ?><link rel="stylesheet" href="<?= url('/assets/site-admin-toolbar.css?v=20260712-1') ?>"><?php endif; ?>
     <?php
         $siteTemplateKey = preg_replace('/[^a-z0-9_-]/i', '', (string) ($settings['site_template'] ?? 'official')) ?: 'official';
         $siteTheme = \App\Services\SiteThemes::get($siteTemplateKey);
@@ -42,6 +43,7 @@
     $footerLayout = is_array($activeTemplateLayout['footer'] ?? null) ? $activeTemplateLayout['footer'] : (is_array($legacyFooterLayout) ? $legacyFooterLayout : []);
 ?>
 <body class="site-template-<?= e($siteTemplate) ?>">
+    <?php if (!empty($adminToolbar)): ?><?= $this->partial('public/partials/admin-toolbar', ['toolbar' => $adminToolbar]) ?><?php endif; ?>
     <?= $this->partial('layouts/site-header', ['settings' => $settings, 'menu' => $menu ?? [], 'headerLayout' => $headerLayout, 'isHomePage' => !empty($isHomePage)]) ?>
     <?= $content ?>
     <?= $this->partial('layouts/site-footer', ['settings' => $settings, 'globalFields' => $globalFields, 'footerLayout' => $footerLayout]) ?>

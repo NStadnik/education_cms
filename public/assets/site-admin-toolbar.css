@@ -1,0 +1,18 @@
+.site-admin-toolbar{position:sticky;top:0;z-index:1100;background:#101828;color:#fff;font:600 14px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:0 2px 8px rgba(16,24,40,.2)}
+.site-admin-toolbar-inner{display:flex;align-items:center;gap:8px;max-width:1440px;min-height:48px;margin:0 auto;padding:6px 18px}
+.site-admin-toolbar a,.site-admin-toolbar button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:34px;padding:7px 10px;border:1px solid transparent;border-radius:6px;background:transparent;color:#e4e7ec;text-decoration:none;white-space:nowrap;transition:background .15s,border-color .15s,color .15s}
+.site-admin-toolbar a:hover,.site-admin-toolbar button:hover{border-color:#475467;background:#344054;color:#fff}
+.site-admin-toolbar-brand{font-weight:800!important;color:#fff!important}
+.site-admin-toolbar-brand .mdi{font-size:19px}
+.site-admin-toolbar-nav,.site-admin-toolbar-context,.site-admin-toolbar-account{display:flex;align-items:center;gap:3px}
+.site-admin-toolbar-context{margin-left:4px}
+.site-admin-toolbar-context a.is-primary{border-color:#84adff;background:#175cd3;color:#fff}
+.site-admin-toolbar-context a.is-primary:hover{background:#1849a9}
+.site-admin-toolbar-account{margin-left:auto;padding-left:9px;border-left:1px solid #475467}
+.site-admin-toolbar-user{display:inline-flex;align-items:center;gap:6px;max-width:180px;color:#d0d5dd}
+.site-admin-toolbar-user span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site-admin-toolbar form{display:flex;margin:0}
+.site-admin-toolbar button{width:34px;padding:6px;cursor:pointer}
+@media(max-width:900px){.site-admin-toolbar-inner{overflow-x:auto;padding-inline:10px}.site-admin-toolbar-user{display:none}.site-admin-toolbar-account{margin-left:auto}.site-admin-toolbar-nav a span:last-child{display:none}}
+@media(max-width:520px){.site-admin-toolbar-inner{min-height:44px}.site-admin-toolbar-brand span:last-child{display:none}.site-admin-toolbar-context a{padding-inline:9px}.site-admin-toolbar-context a span:last-child{max-width:170px;overflow:hidden;text-overflow:ellipsis}}
+@media print{.site-admin-toolbar{display:none!important}}
