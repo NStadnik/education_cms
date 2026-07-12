@@ -38,7 +38,7 @@
     <title><?= e($title ?? 'Адмінка') ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260709-11') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260712-7') ?>">
     <link rel="stylesheet" href="<?= url('/assets/admin.css?v=20260712-6') ?>">
     <link rel="stylesheet" href="<?= url('/assets/tiptap-editor.css?v=20260710-1') ?>">
     <?php if (strpos($currentPath, '/admin/pages') === 0): ?>
@@ -89,7 +89,7 @@
                         <span class="mdi mdi-cog-outline" aria-hidden="true"></span>
                         <span>Налаштування</span>
                     </a><?php endif; ?>
-                    <a class="admin-header-button" href="<?= url('/') ?>" target="_blank" rel="noopener" title="Переглянути сайт">
+                    <a class="admin-header-button" href="<?= url('/') ?>"  rel="noopener" title="Переглянути сайт">
                         <span class="mdi mdi-open-in-new" aria-hidden="true"></span>
                         <span>Сайт</span>
                     </a>

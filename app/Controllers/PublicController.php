@@ -9,12 +9,101 @@ use App\Core\Debug;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\Installer;
+use App\Services\Files;
+use App\Services\MediaMetadata;
 use App\Services\SiteThemes;
 use App\Services\SeoMetadata;
 use App\Services\Thumbnails;
 
 final class PublicController extends BaseController
 {
+    public function search(Request $request): Response
+    {
+        $settings = $this->siteSettings();
+        if ($response = $this->siteModeResponse($settings)) {
+            return $response;
+        }
+
+        $query = trim((string) $request->input('q', ''));
+        $queryLength = function_exists('mb_strlen') ? mb_strlen($query) : strlen($query);
+        $minimumQueryLength = 3;
+        $limit = 8;
+        $offsets = [
+            'pages' => max(0, (int) $request->input('pages_offset', 0)),
+            'news' => max(0, (int) $request->input('news_offset', 0)),
+            'categories' => max(0, (int) $request->input('categories_offset', 0)),
+            'media' => max(0, (int) $request->input('media_offset', 0)),
+        ];
+        $pages = [];
+        $news = [];
+        $categories = [];
+        $media = [];
+        $totals = ['pages' => 0, 'news' => 0, 'categories' => 0, 'media' => 0];
+        if ($queryLength >= $minimumQueryLength) {
+            $like = '%' . $query . '%';
+            $pagesWhere = 'where status = ? and (title like ? or slug like ? or excerpt like ? or blocks_json like ?)';
+            $pagesParams = ['published', $like, $like, $like, $like];
+            $totals['pages'] = (int) ($this->cachedFetch('select count(*) as c from pages ' . $pagesWhere, $pagesParams)['c'] ?? 0);
+            $pages = $this->cachedFetchAll(
+                'select id, title, slug, excerpt from pages ' . $pagesWhere . ' order by sort_order asc, title asc limit ' . $limit . ' offset ' . $offsets['pages'],
+                $pagesParams
+            );
+            $newsWhere = 'where n.status = ? and (n.title like ? or n.slug like ? or n.body like ? or n.category like ?)';
+            $newsParams = ['published', $like, $like, $like, $like];
+            $totals['news'] = (int) ($this->cachedFetch('select count(distinct n.id) as c from news n ' . $newsWhere, $newsParams)['c'] ?? 0);
+            $news = $this->cachedFetchAll(
+                'select distinct n.id, n.title, n.slug, n.body, n.image_path, n.published_at from news n ' . $newsWhere . ' order by n.published_at desc, n.id desc limit ' . $limit . ' offset ' . $offsets['news'],
+                $newsParams
+            );
+            $categoryWhere = 'from news_categories c inner join news_category_links l on l.category_id = c.id inner join news n on n.id = l.news_id and n.status = ? where c.title like ? or c.slug like ?';
+            $categoryParams = ['published', $like, $like];
+            $totals['categories'] = (int) ($this->cachedFetch('select count(distinct c.id) as c ' . $categoryWhere, $categoryParams)['c'] ?? 0);
+            $categories = $this->cachedFetchAll(
+                'select c.id, c.title, c.slug, count(distinct n.id) as items_count ' . $categoryWhere . ' group by c.id, c.title, c.slug, c.sort_order order by c.sort_order asc, c.title asc limit ' . $limit . ' offset ' . $offsets['categories'],
+                $categoryParams
+            );
+            $totals['media'] = MediaMetadata::count($query);
+            $media = Files::fromMetadata(MediaMetadata::search($query, '', $limit, $offsets['media']));
+        }
+
+        $items = compact('pages', 'news', 'categories', 'media');
+        $nextOffsets = [];
+        $hasMore = [];
+        foreach ($items as $type => $typeItems) {
+            $nextOffsets[$type] = $offsets[$type] + count($typeItems);
+            $hasMore[$type] = $nextOffsets[$type] < $totals[$type];
+        }
+
+        if (strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest') {
+            $html = [];
+            foreach ($items as $type => $typeItems) {
+                $html[$type] = $this->view()->partial('public/partials/search-items', ['type' => $type, 'items' => $typeItems]);
+            }
+            return $this->json([
+                'ok' => $queryLength >= $minimumQueryLength,
+                'minimum_length' => $minimumQueryLength,
+                'html' => $html,
+                'next_offsets' => $nextOffsets,
+                'has_more' => $hasMore,
+            ], $queryLength >= $minimumQueryLength ? 200 : 422);
+        }
+
+        return $this->render('public/search', [
+            'title' => $query !== '' ? 'Пошук — ' . $query : 'Пошук',
+            'settings' => $settings,
+            'query' => $query,
+            'pages' => $pages,
+            'news' => $news,
+            'categories' => $categories,
+            'media' => $media,
+            'totals' => $totals,
+            'nextOffsets' => $nextOffsets,
+            'hasMore' => $hasMore,
+            'minimumQueryLength' => $minimumQueryLength,
+            'menu' => $this->menu(),
+        ]);
+    }
+
     public function home(): Response
     {
         if (!Installer::installed()) {

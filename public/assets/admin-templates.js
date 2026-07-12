@@ -68,6 +68,7 @@ document.addEventListener('DOMContentLoaded', function () {
         show_brand: true,
         show_home: false,
         show_news: false,
+        show_search: true,
         links: [],
         cta_label: '',
         cta_url: '',
@@ -1896,6 +1897,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     '<nav class="nav site-header-nav" aria-label="Головне меню">' + links.join('') + '</nav>' +
                     '<nav class="nav site-mobile-source-nav" aria-label="Мобільне меню">' + mobileLinks.join('') + '</nav>' +
                     (header.cta_label && header.cta_url ? '<a class="button site-header-cta' + (header.mobile_show_cta === false ? ' site-header-cta-mobile-hidden' : '') + '" href="' + escapeHtml(previewUrl(header.cta_url)) + '">' + escapeHtml(header.cta_label) + '</a>' : '') +
+                    (header.show_search === false ? '' : '<form class="site-header-search"><input type="search" placeholder="Пошук на сайті"><button type="button"><span class="mdi mdi-magnify"></span></button></form>') +
                 '</div>' +
             '</div>' +
         '</header>' + heroHtml + secondaryHtml;
@@ -2200,6 +2202,7 @@ document.addEventListener('DOMContentLoaded', function () {
         headerEditor.querySelector('[data-header-field="cta_label"]').value = header.cta_label || '';
         headerEditor.querySelector('[data-header-field="cta_url"]').value = header.cta_url || '';
         headerEditor.querySelector('[data-header-field="show_brand"]').checked = header.show_brand !== false;
+        headerEditor.querySelector('[data-header-field="show_search"]').checked = header.show_search !== false;
         headerEditor.querySelector('[data-header-field="hero_enabled"]').checked = Boolean(header.hero_enabled);
         headerEditor.querySelector('[data-header-field="hero_variant"]').value = header.hero_variant || 'default';
         headerEditor.querySelector('[data-header-field="hero_title"]').value = header.hero_title || '';

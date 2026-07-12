@@ -577,4 +577,140 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    const searchLoader = document.querySelector('[data-search-loader]');
+    if (searchLoader) {
+        let loading = false;
+        let offsets = JSON.parse(searchLoader.dataset.searchOffsets || '{}');
+        let hasMore = JSON.parse(searchLoader.dataset.searchMore || '{}');
+        const loaderText = searchLoader.querySelector('[data-search-loader-text]');
+
+        let activeSearchType = 'all';
+
+        function typeHasMore(type) {
+            return type === 'all'
+                ? Object.keys(hasMore).some(function (key) { return Boolean(hasMore[key]); })
+                : Boolean(hasMore[type]);
+        }
+
+        function applySearchFilter(type) {
+            activeSearchType = type || 'all';
+            document.querySelectorAll('[data-search-item-type]').forEach(function (item) {
+                item.hidden = activeSearchType !== 'all' && item.dataset.searchItemType !== activeSearchType;
+            });
+            document.querySelectorAll('[data-search-filter]').forEach(function (button) {
+                const active = button.dataset.searchFilter === activeSearchType;
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+            const activeButton = document.querySelector('[data-search-filter="' + activeSearchType + '"]');
+            const title = document.querySelector('[data-search-results-title]');
+            const count = document.querySelector('[data-search-visible-count]');
+            if (title) title.textContent = activeSearchType === 'all' ? 'Усі результати' : (activeButton ? activeButton.textContent.replace(/\d+\s*$/, '').trim() : 'Результати');
+            if (count && activeButton) {
+                const badge = activeButton.querySelector('strong');
+                count.textContent = badge ? badge.textContent : '';
+            }
+            const status = document.querySelector('[data-search-group-status="all"]');
+            if (status) status.hidden = !typeHasMore(activeSearchType);
+        }
+
+        async function loadMoreSearchResults(type) {
+            if (loading || !typeHasMore(type)) return;
+            loading = true;
+            const status = document.querySelector('[data-search-group-status="all"]');
+            if (status) {
+                status.hidden = false;
+                status.classList.add('is-loading');
+                status.querySelector('span:last-child').textContent = 'Завантаження…';
+            }
+            const url = new URL(searchLoader.dataset.searchUrl || '/search', window.location.origin);
+            url.searchParams.set('q', searchLoader.dataset.searchQuery || '');
+            Object.keys(offsets).forEach(function (type) {
+                url.searchParams.set(type + '_offset', String(offsets[type] || 0));
+            });
+            try {
+                const response = await fetch(url.toString(), {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const data = await response.json();
+                if (!response.ok || !data.ok) throw new Error('Не вдалося завантажити результати.');
+                const target = document.querySelector('[data-search-results="all"]');
+                Object.keys(data.html || {}).forEach(function (resultType) {
+                    if (type !== 'all' && resultType !== type) return;
+                    if (target && hasMore[resultType] && data.html[resultType]) target.insertAdjacentHTML('beforeend', data.html[resultType]);
+                    if (type === 'all' || resultType === type) {
+                        offsets[resultType] = data.next_offsets && data.next_offsets[resultType] !== undefined ? data.next_offsets[resultType] : offsets[resultType];
+                        hasMore[resultType] = Boolean(data.has_more && data.has_more[resultType]);
+                    }
+                });
+                searchLoader.dataset.searchOffsets = JSON.stringify(offsets);
+                searchLoader.dataset.searchMore = JSON.stringify(hasMore);
+                if (status) status.hidden = !typeHasMore(activeSearchType);
+                applySearchFilter(activeSearchType);
+            } catch (error) {
+                if (status) {
+                    status.hidden = false;
+                    status.querySelector('span:last-child').textContent = error.message || 'Помилка завантаження.';
+                } else if (loaderText) {
+                    loaderText.textContent = error.message || 'Помилка завантаження.';
+                }
+            } finally {
+                loading = false;
+                if (status) {
+                    status.classList.remove('is-loading');
+                    if (typeHasMore(activeSearchType)) status.querySelector('span:last-child').textContent = 'Прокрутіть список, щоб показати ще';
+                }
+            }
+        }
+
+        const groupStatus = document.querySelector('[data-search-group-status="all"]');
+        if (groupStatus && 'IntersectionObserver' in window) {
+            const searchObserver = new IntersectionObserver(function (entries) {
+                if (entries.some(function (entry) { return entry.isIntersecting; })) {
+                    loadMoreSearchResults(activeSearchType);
+                }
+            }, {rootMargin: '300px 0px'});
+            searchObserver.observe(groupStatus);
+        }
+        document.querySelectorAll('[data-search-filter]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                applySearchFilter(button.dataset.searchFilter || 'all');
+            });
+        });
+    }
+
+    const publicMediaModalNode = document.getElementById('publicSearchMediaModal');
+    if (publicMediaModalNode && window.bootstrap) {
+        const publicMediaModal = new window.bootstrap.Modal(publicMediaModalNode);
+        const mediaTitle = publicMediaModalNode.querySelector('[data-public-media-title]');
+        const mediaMeta = publicMediaModalNode.querySelector('[data-public-media-meta]');
+        const mediaViewer = publicMediaModalNode.querySelector('[data-public-media-viewer]');
+        const mediaOpen = publicMediaModalNode.querySelector('[data-public-media-open]');
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+        document.addEventListener('click', function (event) {
+            const trigger = event.target.closest('[data-search-media-preview]');
+            if (!trigger) return;
+            event.preventDefault();
+            const fileUrl = trigger.href;
+            const title = trigger.dataset.mediaTitle || 'Медіафайл';
+            const extension = String(trigger.dataset.mediaExtension || '').toLowerCase();
+            if (mediaTitle) mediaTitle.textContent = title;
+            if (mediaMeta) mediaMeta.textContent = [trigger.dataset.mediaType || '', trigger.dataset.mediaSize || ''].filter(Boolean).join(' · ');
+            if (mediaOpen) mediaOpen.href = fileUrl;
+            if (mediaViewer) {
+                if (imageExtensions.indexOf(extension) !== -1) {
+                    mediaViewer.innerHTML = '<img src="' + fileUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '" alt="">';
+                } else if (extension === 'pdf') {
+                    mediaViewer.innerHTML = '<iframe src="' + fileUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '" title="Перегляд PDF"></iframe>';
+                } else {
+                    mediaViewer.innerHTML = '<div class="public-media-viewer-empty"><span class="mdi mdi-file-outline" aria-hidden="true"></span><strong>Попередній перегляд недоступний</strong><p>Відкрийте файл у новій вкладці для перегляду або завантаження.</p></div>';
+                }
+            }
+            publicMediaModal.show();
+        });
+
+        publicMediaModalNode.addEventListener('hidden.bs.modal', function () {
+            if (mediaViewer) mediaViewer.innerHTML = '';
+        });
+    }
 });

@@ -4,6 +4,7 @@
         'show_brand' => true,
         'show_home' => false,
         'show_news' => false,
+        'show_search' => true,
         'links' => [],
         'cta_label' => '',
         'cta_url' => '',
@@ -256,6 +257,7 @@
                     </div>
                     <div class="template-toggle-grid" data-template-tab-panel="menu">
                         <label class="check-row"><input type="checkbox" data-header-field="show_brand"> Показувати бренд</label>
+                        <label class="check-row"><input type="checkbox" data-header-field="show_search"> Показувати пошук для користувачів</label>
                     </div>
                     <div class="template-link-quick-add" data-menu-quick-add data-template-tab-panel="menu">
                         <div>
@@ -865,4 +867,4 @@
     </div>
 </div>
 
-<script src="<?= url('/assets/admin-templates.js') ?>"></script>
+<script src="<?= url('/assets/admin-templates.js?v=20260712-1') ?>"></script>

@@ -4,6 +4,7 @@
         'show_brand' => true,
         'show_home' => false,
         'show_news' => false,
+        'show_search' => true,
         'links' => [],
         'cta_label' => '',
         'cta_url' => '',
@@ -166,6 +167,13 @@
             </nav>
             <?php if (!empty($layout['cta_label']) && !empty($layout['cta_url'])): ?>
                 <a class="button site-header-cta <?= empty($layout['mobile_show_cta']) ? 'site-header-cta-mobile-hidden' : '' ?>" href="<?= e((string) $layout['cta_url']) ?>"><?= e((string) $layout['cta_label']) ?></a>
+            <?php endif; ?>
+            <?php if (!empty($layout['show_search'])): ?>
+                <form class="site-header-search" method="get" action="<?= url('/search') ?>" role="search">
+                    <label class="visually-hidden" for="siteHeaderSearch">Пошук на сайті</label>
+                    <input id="siteHeaderSearch" type="search" name="q" placeholder="Пошук на сайті" value="<?= e((string) ($_GET['q'] ?? '')) ?>" minlength="3" required>
+                    <button type="submit" aria-label="Знайти"><span class="mdi mdi-magnify" aria-hidden="true"></span></button>
+                </form>
             <?php endif; ?>
         </div>
     </div>

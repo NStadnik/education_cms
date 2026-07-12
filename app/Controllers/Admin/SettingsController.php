@@ -404,6 +404,7 @@ final class SettingsController extends \App\Controllers\AdminBaseController
             'show_brand' => array_key_exists('show_brand', $data) ? !empty($data['show_brand']) : true,
             'show_home' => false,
             'show_news' => false,
+            'show_search' => array_key_exists('show_search', $data) ? !empty($data['show_search']) : true,
             'links' => array_slice($links, 0, 16),
             'cta_label' => $this->limitString(trim((string) ($data['cta_label'] ?? '')), 80),
             'cta_url' => $this->limitString($ctaUrl, 240),
