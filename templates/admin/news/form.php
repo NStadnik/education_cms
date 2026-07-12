@@ -64,7 +64,7 @@
     <div class="news-workflow-summary">
         <span class="news-workflow-icon mdi <?= e(['draft' => 'mdi-pencil-outline', 'pending_review' => 'mdi-clock-outline', 'changes_requested' => 'mdi-message-alert-outline', 'published' => 'mdi-check-circle-outline'][$currentStatus] ?? 'mdi-circle-outline') ?>" aria-hidden="true"></span>
         <div><span class="news-status-badge"><?= e($statusLabel) ?></span><h2><?= e($statusTitle) ?></h2><p><?= e($statusMessage) ?></p></div>
-        <div class="news-workflow-meta"><span><span class="mdi mdi-account-outline" aria-hidden="true"></span><?= e((string) ($item['author_name'] ?? ($user['name'] ?? 'Ви'))) ?></span><span><span class="mdi mdi-format-text" aria-hidden="true"></span><?= e((string) $words) ?> слів</span><span><span class="mdi mdi-shape-outline" aria-hidden="true"></span><?= e($categorySummary) ?></span></div>
+        <div class="news-workflow-meta"><span><span class="mdi mdi-account-outline" aria-hidden="true"></span><?= e((string) ($item['author_name'] ?? ($user['name'] ?? 'Ви'))) ?></span><span><span class="mdi mdi-format-text" aria-hidden="true"></span><?= e((string) $words) ?> слів</span><span><span class="mdi mdi-shape-outline" aria-hidden="true"></span><?= e($categorySummary) ?></span><?php if ($isEdit): ?><span><span class="mdi mdi-eye-outline" aria-hidden="true"></span><?= e((string) ($item['views_count'] ?? 0)) ?> переглядів</span><?php endif; ?></div>
     </div>
     <ol class="news-workflow-steps" aria-label="Етапи публікації">
         <?php foreach ([1 => ['Чернетка', 'Підготовка матеріалу'], 2 => ['Модерація', 'Перевірка редактором'], 3 => ['Публікація', 'Доступно на сайті']] as $step => [$stepTitle, $stepHint]): ?>
@@ -131,6 +131,21 @@
         </section>
 
         <aside class="card admin-form-card editor-sidebar">
+            <?php if ($isEdit): ?>
+                <div class="sidebar-section">
+                    <?php $viewStats = is_array($viewStats ?? null) ? $viewStats : []; ?>
+                    <div class="form-section-head"><div><h2>Статистика переглядів</h2><p class="meta">Унікальні перегляди в межах сесії за добу.</p></div></div>
+                    <div class="form-grid">
+                        <div class="form-field"><div class="field-label">Усього</div><strong><?= e((string) ($item['views_count'] ?? 0)) ?></strong></div>
+                        <div class="form-field"><div class="field-label">Сьогодні</div><strong><?= e((string) ($viewStats['today'] ?? 0)) ?></strong></div>
+                        <div class="form-field"><div class="field-label">Останні 30 днів</div><strong><?= e((string) ($viewStats['last_30_days'] ?? 0)) ?></strong></div>
+                    </div>
+                    <?php if (!empty($viewStats['days'])): ?>
+                        <details class="moderation-history"><summary>Статистика за днями <span><?= e((string) count($viewStats['days'])) ?></span></summary><div class="moderation-history-list"><?php foreach (array_reverse($viewStats['days']) as $day): ?><article><span class="mdi mdi-calendar-outline" aria-hidden="true"></span><div><strong><?= e(date('d.m.Y', strtotime((string) $day['view_date']))) ?></strong><p><?= e((string) $day['views_count']) ?> переглядів</p></div></article><?php endforeach; ?></div></details>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
             <div class="sidebar-section">
                 <div class="form-section-head">
                     <div>

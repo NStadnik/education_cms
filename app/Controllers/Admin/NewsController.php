@@ -85,6 +85,7 @@ final class NewsController extends \App\Controllers\AdminBaseController
             'canEdit' => $item ? $this->canEditNews($item) : Container::get('auth')->can('news.manage'),
             'moderationEvents' => $id ? $this->newsModerationEvents($id) : [],
             'canManageCategories' => Container::get('auth')->can('news.categories.manage'),
+            'viewStats' => $id ? $this->newsViewStats($id) : [],
         ]);
     }
 
@@ -632,8 +633,27 @@ final class NewsController extends \App\Controllers\AdminBaseController
             'title_desc' => 'n.title desc, n.id desc',
             'updated_desc' => 'n.updated_at desc, n.id desc',
             'created_desc' => 'n.created_at desc, n.id desc',
+            'popular' => 'n.views_count desc, n.id desc',
             'moderation' => 'n.submitted_at asc, n.id asc',
         ][$sort] ?? 'coalesce(n.published_at, n.created_at) desc, n.id desc';
+    }
+
+    private function newsViewStats(int $newsId): array
+    {
+        $days = $this->db()->fetchAll(
+            'select view_date, views_count from news_view_stats
+             where news_id = ? and view_date >= date_sub(current_date, interval 29 day)
+             order by view_date asc',
+            [$newsId]
+        );
+        $last30Days = array_sum(array_map(static fn (array $day): int => (int) $day['views_count'], $days));
+        $today = date('Y-m-d');
+        $todayViews = 0;
+        foreach ($days as $day) {
+            if ((string) $day['view_date'] === $today) { $todayViews = (int) $day['views_count']; }
+        }
+
+        return ['days' => $days, 'today' => $todayViews, 'last_30_days' => $last30Days];
     }
 
     private function canReviewNews(): bool

@@ -10,6 +10,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Services\Installer;
 use App\Services\SiteThemes;
+use App\Services\SeoMetadata;
 use App\Services\Thumbnails;
 
 final class PublicController extends BaseController
@@ -156,7 +157,8 @@ final class PublicController extends BaseController
         }
 
         return $this->render('public/news', [
-            'title' => 'Новини',
+            'title' => $category !== '' ? 'Новини — ' . $category : 'Новини',
+            'seo' => SeoMetadata::newsList($settings, $category, $query, $currentPage),
             'settings' => $settings,
             'items' => $items,
             'total' => $total,
@@ -189,8 +191,12 @@ final class PublicController extends BaseController
             return ErrorController::response(404);
         }
 
+        $this->recordNewsView((int) $item['id']);
+        $item['views_count'] = (int) ($this->db()->fetch('select views_count from news where id = ?', [(int) $item['id']])['views_count'] ?? 0);
+
         return $this->render('public/news-show', [
             'title' => $item['title'],
+            'seo' => SeoMetadata::news($item, $settings),
             'settings' => $settings,
             'item' => $item,
             'menu' => $this->menu(),
@@ -208,6 +214,41 @@ final class PublicController extends BaseController
              order by c.sort_order asc, c.title asc",
             ['published']
         );
+    }
+
+    private function recordNewsView(int $newsId): bool
+    {
+        if (Container::get('auth')->user()
+            || preg_match('/bot|crawl|spider|slurp|preview/i', (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''))) {
+            return false;
+        }
+        $today = date('Y-m-d');
+        $viewed = is_array($_SESSION['news_views'] ?? null) ? $_SESSION['news_views'] : [];
+        if (($viewed[$newsId] ?? '') === $today) {
+            return false;
+        }
+
+        $transactionStarted = false;
+        try {
+            $this->db()->pdo()->beginTransaction();
+            $transactionStarted = true;
+            $this->db()->execute('update news set views_count = views_count + 1 where id = ? and status = ?', [$newsId, 'published']);
+            $this->db()->execute(
+                'insert into news_view_stats (news_id, view_date, views_count) values (?, ?, 1)
+                 on duplicate key update views_count = views_count + 1',
+                [$newsId, $today]
+            );
+            $this->db()->pdo()->commit();
+        } catch (\Throwable) {
+            if ($transactionStarted && $this->db()->pdo()->inTransaction()) {
+                $this->db()->pdo()->rollBack();
+            }
+            return false;
+        }
+
+        $viewed[$newsId] = $today;
+        $_SESSION['news_views'] = array_slice($viewed, -200, null, true);
+        return true;
     }
 
     public function upload(Request $request, array $params): Response
@@ -340,6 +381,7 @@ final class PublicController extends BaseController
         }
         return $this->render('public/page', [
             'title' => $page['title'],
+            'seo' => SeoMetadata::page($page, $settings, $isHomePage ? '/' : '/page/' . (string) ($page['slug'] ?? '')),
             'settings' => $settings,
             'page' => $page,
             'isHomePage' => $isHomePage,

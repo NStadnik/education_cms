@@ -73,6 +73,8 @@ final class SchemaUpgrade
                 $db->execute('insert into settings (name, value) values (?, ?)', ['schema_news_moderation', '1']);
             }
 
+            self::ensureNewsViewsSchema($db);
+
             self::createMediaTable($db);
             self::createFormsTables($db);
             self::upgradeFormsPermissions($db);
@@ -123,6 +125,22 @@ final class SchemaUpgrade
         }
 
         $db->pdo()->exec('alter table news add column image_path varchar(255) null after category');
+    }
+
+    private static function ensureNewsViewsSchema(Database $db): void
+    {
+        if (!self::hasColumn($db, 'news', 'views_count')) {
+            $db->pdo()->exec('alter table news add column views_count bigint unsigned not null default 0 after body');
+        }
+        $db->pdo()->exec(
+            'create table if not exists news_view_stats (
+                news_id bigint unsigned not null,
+                view_date date not null,
+                views_count int unsigned not null default 0,
+                primary key (news_id, view_date),
+                constraint news_view_stats_news_id_foreign foreign key(news_id) references news(id) on delete cascade
+            ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci'
+        );
     }
 
     private static function createNewsCategoriesTable(Database $db): void

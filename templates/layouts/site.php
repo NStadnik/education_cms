@@ -3,7 +3,21 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= e($title ?? 'Сайт закладу освіти') ?></title>
+    <?php
+        $seo = is_array($seo ?? null) ? $seo : [];
+        $metaTitle = (string) ($seo['title'] ?? $title ?? 'Сайт закладу освіти');
+        $metaDescription = trim((string) ($seo['description'] ?? ''));
+    ?>
+    <title><?= e($metaTitle) ?></title>
+    <?php if ($metaDescription !== ''): ?><meta name="description" content="<?= e($metaDescription) ?>"><?php endif; ?>
+    <?php if (!empty($seo['url'])): ?><link rel="canonical" href="<?= e((string) $seo['url']) ?>"><?php endif; ?>
+    <meta property="og:locale" content="uk_UA">
+    <meta property="og:type" content="<?= e((string) ($seo['type'] ?? 'website')) ?>">
+    <meta property="og:title" content="<?= e($metaTitle) ?>">
+    <?php if ($metaDescription !== ''): ?><meta property="og:description" content="<?= e($metaDescription) ?>"><?php endif; ?>
+    <?php if (!empty($seo['url'])): ?><meta property="og:url" content="<?= e((string) $seo['url']) ?>"><?php endif; ?>
+    <?php if (!empty($seo['site_name'])): ?><meta property="og:site_name" content="<?= e((string) $seo['site_name']) ?>"><?php endif; ?>
+    <?php if (!empty($seo['image'])): ?><meta property="og:image" content="<?= e((string) $seo['image']) ?>"><?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260709-11') ?>">

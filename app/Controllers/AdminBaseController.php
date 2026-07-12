@@ -174,6 +174,7 @@ abstract class AdminBaseController extends BaseController
                 'title_desc' => 'n.title desc, n.id desc',
                 'updated_desc' => 'n.updated_at desc, n.id desc',
                 'created_desc' => 'n.created_at desc, n.id desc',
+                'popular' => 'n.views_count desc, n.id desc',
                 'moderation' => 'n.submitted_at asc, n.id asc',
             ][(string) $request->input('sort', 'newest')] ?? $config['order'];
             $items = $this->db()->fetchAll(

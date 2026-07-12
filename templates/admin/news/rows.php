@@ -18,6 +18,7 @@
         </td>
         <td><?= e($item['category_titles'] ?: ($item['category'] ?? 'Загальні')) ?></td>
         <td><span class="status <?= e($statusClasses[$itemStatus] ?? '') ?>"><?= e($statusLabels[$itemStatus] ?? $itemStatus) ?></span></td>
+        <td><span class="mdi mdi-eye-outline" aria-hidden="true"></span> <?= e((string) ($item['views_count'] ?? 0)) ?></td>
         <td><?= e($formatNewsDate((string) ($item['published_at'] ?? ''))) ?></td>
         <td><?= e($formatNewsDate((string) ($item['updated_at'] ?? ''))) ?></td>
         <td><a class="button secondary compact" href="<?= url('/admin/news/edit?id=' . $item['id']) ?>"><span class="mdi <?= $itemStatus === 'pending_review' && ($canModerate ?? false) ? 'mdi-clipboard-check-outline' : 'mdi-arrow-right' ?>" aria-hidden="true"></span><span><?= e($actionLabel) ?></span></a></td>

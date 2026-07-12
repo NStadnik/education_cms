@@ -68,6 +68,7 @@
                     <option value="title_desc" <?= selected($filters['sort'] ?? '', 'title_desc') ?>>Назва Я-А</option>
                     <option value="updated_desc" <?= selected($filters['sort'] ?? '', 'updated_desc') ?>>Оновлені спочатку</option>
                     <option value="created_desc" <?= selected($filters['sort'] ?? '', 'created_desc') ?>>Створені спочатку</option>
+                    <option value="popular" <?= selected($filters['sort'] ?? '', 'popular') ?>>Найпопулярніші</option>
                     <option value="moderation" <?= selected($filters['sort'] ?? '', 'moderation') ?>>Найдовше очікують</option>
                 </select>
             </label>
@@ -85,7 +86,7 @@
     </div>
     <div class="table-scroll">
         <table>
-            <thead><tr><th><input type="checkbox" data-bulk-check-all aria-label="Вибрати всі"></th><th>Назва</th><th>Категорія</th><th>Статус</th><th>Дата публікації</th><th>Оновлено</th><th></th></tr></thead>
+            <thead><tr><th><input type="checkbox" data-bulk-check-all aria-label="Вибрати всі"></th><th>Назва</th><th>Категорія</th><th>Статус</th><th>Перегляди</th><th>Дата публікації</th><th>Оновлено</th><th></th></tr></thead>
             <tbody id="newsRows"><?= $this->partial('admin/news/rows', ['items' => $items, 'canModerate' => ($canReview ?? false) || ($canPublish ?? false)]) ?></tbody>
         </table>
     </div>
