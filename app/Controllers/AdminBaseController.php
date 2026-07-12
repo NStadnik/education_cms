@@ -87,7 +87,7 @@ abstract class AdminBaseController extends BaseController
         }
 
         if ($resource === 'media') {
-            return array_replace($this->mediaListPayload($query, $pagination, (string) $request->input('folder', '')), ['message' => $message]);
+            return array_replace($this->mediaListPayload($query, $pagination, (string) $request->input('folder', ''), (string) $request->input('file_type', '')), ['message' => $message]);
         }
 
         $map = [
@@ -2879,18 +2879,21 @@ abstract class AdminBaseController extends BaseController
         return $references;
     }
 
-    protected function mediaListPayload(string $query, array $pagination, string $folder = ''): array
+    protected function mediaListPayload(string $query, array $pagination, string $folder = '', string $fileType = ''): array
     {
         $folder = $folder === '__none' ? '__none' : MediaMetadata::normalizeFolder($folder);
+        $fileType = MediaMetadata::normalizeFileType($fileType);
         $uploadedBy = $this->canManageAllContent() ? null : $this->currentUserId();
         $references = $this->mediaReferences();
-        $total = MediaMetadata::count($query, $folder, $uploadedBy);
+        $total = MediaMetadata::count($query, $folder, $uploadedBy, false, $fileType);
         $items = Files::fromMetadata(MediaMetadata::search(
             $query,
             $folder,
             $pagination['limit'],
             $pagination['offset'],
-            $uploadedBy
+            $uploadedBy,
+            false,
+            $fileType
         ), $references);
         $loaded = $pagination['offset'] + count($items);
         $stats = MediaMetadata::statistics($uploadedBy);

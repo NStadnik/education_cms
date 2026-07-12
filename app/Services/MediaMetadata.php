@@ -36,9 +36,9 @@ final class MediaMetadata
         return $row === null ? [] : self::rowEntry($row);
     }
 
-    public static function search(string $query, string $folder, int $limit, int $offset, ?int $uploadedBy = null, bool $imagesOnly = false): array
+    public static function search(string $query, string $folder, int $limit, int $offset, ?int $uploadedBy = null, bool $imagesOnly = false, string $fileType = ''): array
     {
-        [$where, $params] = self::searchWhere($query, $folder, $uploadedBy, $imagesOnly);
+        [$where, $params] = self::searchWhere($query, $folder, $uploadedBy, $imagesOnly, $fileType);
         $limit = max(1, $limit);
         $offset = max(0, $offset);
         $rows = self::db()->fetchAll(
@@ -49,9 +49,9 @@ final class MediaMetadata
         return array_map(static fn (array $row): array => self::rowEntry($row), $rows);
     }
 
-    public static function count(string $query = '', string $folder = '', ?int $uploadedBy = null, bool $imagesOnly = false): int
+    public static function count(string $query = '', string $folder = '', ?int $uploadedBy = null, bool $imagesOnly = false, string $fileType = ''): int
     {
-        [$where, $params] = self::searchWhere($query, $folder, $uploadedBy, $imagesOnly);
+        [$where, $params] = self::searchWhere($query, $folder, $uploadedBy, $imagesOnly, $fileType);
         return (int) (self::db()->fetch('select count(*) as c from media ' . $where, $params)['c'] ?? 0);
     }
 
@@ -264,13 +264,19 @@ final class MediaMetadata
         return self::limit($folder, 80);
     }
 
+    public static function normalizeFileType(string $fileType): string
+    {
+        $fileType = strtolower(trim($fileType));
+        return in_array($fileType, ['image', 'pdf', 'word', 'excel', 'other'], true) ? $fileType : '';
+    }
+
     private static function find(string $path): ?array
     {
         $path = Files::normalize($path);
         return $path === '' ? null : self::db()->fetch('select * from media where path = ?', [$path]);
     }
 
-    private static function searchWhere(string $query, string $folder, ?int $uploadedBy, bool $imagesOnly = false): array
+    private static function searchWhere(string $query, string $folder, ?int $uploadedBy, bool $imagesOnly = false, string $fileType = ''): array
     {
         $clauses = [];
         $params = [];
@@ -294,6 +300,22 @@ final class MediaMetadata
 
         if ($imagesOnly) {
             $clauses[] = "extension in ('jpg', 'jpeg', 'png', 'webp')";
+        } else {
+            $fileType = self::normalizeFileType($fileType);
+            $extensions = [
+                'image' => ['jpg', 'jpeg', 'png', 'webp'],
+                'pdf' => ['pdf'],
+                'word' => ['doc', 'docx'],
+                'excel' => ['xls', 'xlsx'],
+            ];
+            if (isset($extensions[$fileType])) {
+                $clauses[] = 'extension in (' . implode(',', array_fill(0, count($extensions[$fileType]), '?')) . ')';
+                array_push($params, ...$extensions[$fileType]);
+            } elseif ($fileType === 'other') {
+                $known = array_merge(...array_values($extensions));
+                $clauses[] = 'extension not in (' . implode(',', array_fill(0, count($known), '?')) . ')';
+                array_push($params, ...$known);
+            }
         }
 
         return [$clauses ? 'where ' . implode(' and ', $clauses) : '', $params];

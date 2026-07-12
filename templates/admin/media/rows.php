@@ -1,5 +1,9 @@
 <?php foreach ($items as $item): ?>
-    <tr data-list-row>
+    <?php
+        $extension = strtolower((string) ($item['extension'] ?? ''));
+        $fileKind = !empty($item['is_image']) ? 'image' : (in_array($extension, ['doc', 'docx'], true) ? 'word' : (in_array($extension, ['xls', 'xlsx'], true) ? 'excel' : ($extension === 'pdf' ? 'pdf' : 'other')));
+    ?>
+    <tr data-list-row data-media-kind="<?= e($fileKind) ?>">
         <td>
             <?php if (empty($item['is_used'])): ?>
                 <input type="checkbox" name="paths[]" value="<?= e($item['path']) ?>" data-bulk-check form="mediaBulkForm" aria-label="Вибрати">
@@ -10,11 +14,15 @@
                 <?php if (!empty($item['is_image'])): ?>
                     <img class="media-thumb" src="<?= url('/thumb/' . $item['path'] . '?w=360&h=240&fit=crop') ?>" alt="" loading="lazy">
                 <?php else: ?>
-                    <span class="media-thumb media-thumb-icon mdi mdi-file-outline" aria-hidden="true"></span>
+                    <span class="media-thumb media-file-placeholder" aria-hidden="true">
+                        <span class="mdi mdi-file-outline"></span>
+                        <small><?= e(strtoupper($extension ?: 'file')) ?></small>
+                    </span>
                 <?php endif; ?>
                 <span class="media-file-copy">
                     <strong><?= e($item['name']) ?></strong><br>
                     <code><?= e($item['path']) ?></code>
+                    <span class="media-file-extension"><?= e(strtoupper($extension ?: 'file')) ?></span>
                     <?php if ((string) ($item['title'] ?? '') !== ''): ?>
                         <small class="media-file-title"><?= e((string) $item['title']) ?></small>
                     <?php endif; ?>
@@ -28,10 +36,10 @@
                 <span class="meta">Без папки</span>
             <?php endif; ?>
         </td>
-        <td><?= e($item['type']) ?></td>
-        <td><?= e($item['size_label']) ?></td>
-        <td><?= e($item['modified_at']) ?></td>
-        <td>
+        <td class="media-type-cell"><span class="media-type-pill"><?= e($item['type']) ?></span></td>
+        <td class="media-size-cell"><?= e($item['size_label']) ?></td>
+        <td class="media-updated-cell"><?= e($item['modified_at']) ?></td>
+        <td class="media-usage-cell">
             <?php if (!empty($item['is_used'])): ?>
                 <span class="status ok">використовується</span><br>
                 <a class="meta" href="<?= e($item['reference']['url']) ?>"><?= e($item['reference']['label']) ?></a>

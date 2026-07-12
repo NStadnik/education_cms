@@ -5,6 +5,7 @@ let mediaPreviewModal = null;
 let mediaMetadataModal = null;
 
 initMediaViewMode();
+initMediaTypeViewMode();
 initMediaUploadField();
 initMediaRowsObserver();
 updateMediaSelectedCount();
@@ -125,6 +126,7 @@ document.addEventListener('submit', async function (event) {
     const target = document.querySelector(panel.getAttribute('data-list-target'));
     const input = panel.querySelector('[data-filter-input]');
     const folderFilter = panel.querySelector('[data-media-folder-filter]');
+    const typeFilter = panel.querySelector('[data-media-type-filter]');
     const button = form.querySelector('button[type="submit"]');
     const originalHtml = button ? button.innerHTML : '';
     const body = new FormData(form);
@@ -136,6 +138,9 @@ document.addEventListener('submit', async function (event) {
         if (form.matches('[data-media-delete]')) {
             body.set('folder', folderFilter.value);
         }
+    }
+    if (typeFilter) {
+        body.set('file_type', typeFilter.value);
     }
 
     if (button) {
@@ -289,8 +294,45 @@ function setMediaMessage(message, isError) {
 
 function initMediaViewMode() {
     const stored = window.localStorage ? (localStorage.getItem('adminMediaViewMode') || 'compact') : 'compact';
-    const mode = stored === 'large' || stored === 'grid' ? 'large' : 'compact';
+    const mode = stored === 'large' || stored === 'grid' ? 'large' : (stored === 'list' ? 'list' : 'compact');
     setMediaViewMode(mode, false);
+}
+
+function initMediaTypeViewMode() {
+    const typeFilter = document.querySelector('[data-media-type-filter]');
+    if (!typeFilter) {
+        return;
+    }
+
+    syncMediaViewModeForType(typeFilter.value);
+    typeFilter.addEventListener('change', function () {
+        syncMediaViewModeForType(typeFilter.value);
+    });
+}
+
+function syncMediaViewModeForType(fileType) {
+    const panel = document.querySelector('[data-infinite-list]');
+    if (!panel) {
+        return;
+    }
+
+    const listOnly = ['pdf', 'word', 'excel', 'other'].includes(fileType);
+    document.querySelectorAll('[data-media-view="compact"], [data-media-view="large"]').forEach(function (button) {
+        button.hidden = listOnly;
+    });
+
+    if (listOnly) {
+        panel.dataset.mediaForcedList = '1';
+        setMediaViewMode('list', false);
+        return;
+    }
+
+    if (panel.dataset.mediaForcedList === '1') {
+        delete panel.dataset.mediaForcedList;
+        const stored = window.localStorage ? (localStorage.getItem('adminMediaViewMode') || 'compact') : 'compact';
+        const restored = stored === 'large' || stored === 'grid' ? 'large' : (stored === 'list' ? 'list' : 'compact');
+        setMediaViewMode(restored, false);
+    }
 }
 
 function initMediaUploadField() {
@@ -365,7 +407,7 @@ function setMediaViewMode(mode, persist) {
     if (!panel) {
         return;
     }
-    const normalized = mode === 'large' ? 'large' : 'compact';
+    const normalized = ['compact', 'large', 'list'].includes(mode) ? mode : 'compact';
     panel.dataset.mediaViewMode = normalized;
     document.querySelectorAll('[data-media-view]').forEach(function (button) {
         const active = button.dataset.mediaView === normalized;

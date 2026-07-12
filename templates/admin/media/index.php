@@ -70,9 +70,21 @@
                     <?php endforeach; ?>
                 </select>
             </label>
+            <label class="list-select-field">
+                <span class="mdi mdi-file-multiple-outline" aria-hidden="true"></span>
+                <select name="file_type" data-list-filter data-media-type-filter aria-label="Тип файлу">
+                    <option value="">Усі типи</option>
+                    <option value="image" <?= selected($fileType ?? '', 'image') ?>>Зображення</option>
+                    <option value="pdf" <?= selected($fileType ?? '', 'pdf') ?>>PDF</option>
+                    <option value="word" <?= selected($fileType ?? '', 'word') ?>>Word</option>
+                    <option value="excel" <?= selected($fileType ?? '', 'excel') ?>>Excel</option>
+                    <option value="other" <?= selected($fileType ?? '', 'other') ?>>Інші</option>
+                </select>
+            </label>
             <div class="admin-view-switch" role="group" aria-label="Режим перегляду медіафайлів">
                 <button class="button secondary compact" type="button" data-media-view="compact" title="Компактні превʼю" aria-label="Компактні превʼю"><span class="mdi mdi-view-grid-outline" aria-hidden="true"></span></button>
                 <button class="button secondary compact" type="button" data-media-view="large" title="Великі превʼю" aria-label="Великі превʼю"><span class="mdi mdi-view-dashboard-outline" aria-hidden="true"></span></button>
+                <button class="button secondary compact" type="button" data-media-view="list" title="Список файлів" aria-label="Список файлів без превʼю"><span class="mdi mdi-view-list-outline" aria-hidden="true"></span></button>
             </div>
         </div>
         <div class="bulk-actions list-bulk-modern media-bulk-actions">
@@ -87,7 +99,7 @@
     </div>
     <div class="table-scroll">
         <table>
-            <thead><tr><th><input type="checkbox" data-bulk-check-all form="mediaBulkForm" aria-label="Вибрати всі"></th><th>Файл</th><th>Папка</th><th>Тип</th><th>Розмір</th><th>Оновлено</th><th>Використання</th><th></th></tr></thead>
+            <thead><tr><th><input type="checkbox" data-bulk-check-all form="mediaBulkForm" aria-label="Вибрати всі"></th><th>Файл</th><th>Папка</th><th>Тип</th><th>Розмір</th><th>Оновлено</th><th>Використання</th><th><span class="visually-hidden">Дії</span></th></tr></thead>
             <tbody id="mediaRows"><?= $this->partial('admin/media/rows', ['items' => $items]) ?></tbody>
         </table>
     </div>
@@ -170,4 +182,4 @@
     </div>
 </div>
 
-<script src="<?= url('/assets/admin-media.js?v=20260710-2') ?>"></script>
+<script src="<?= url('/assets/admin-media.js?v=20260712-2') ?>"></script>

@@ -19,8 +19,9 @@ final class MediaController extends \App\Controllers\AdminBaseController
         $this->guard('media.manage');
         $query = trim((string) $request->input('q', ''));
         $folder = MediaMetadata::normalizeFolder((string) $request->input('folder', ''));
+        $fileType = MediaMetadata::normalizeFileType((string) $request->input('file_type', ''));
         $pagination = $this->pagination($request);
-        $list = $this->mediaListPayload($query, $pagination, $folder);
+        $list = $this->mediaListPayload($query, $pagination, $folder, $fileType);
 
         if ($this->isAjaxRequest()) {
             return $this->json($list);
@@ -34,6 +35,7 @@ final class MediaController extends \App\Controllers\AdminBaseController
             'stats' => $list['stats'],
             'folders' => $list['folders'],
             'folder' => $folder,
+            'fileType' => $fileType,
             'query' => $query,
             'uploadLimitBytes' => Files::uploadLimitBytes(),
             'uploadLimitLabel' => Files::uploadLimitLabel(),
@@ -112,7 +114,7 @@ final class MediaController extends \App\Controllers\AdminBaseController
                 return $this->json(array_replace($this->mediaListPayload(trim((string) $request->input('q', '')), [
                     'limit' => self::LIST_LIMIT,
                     'offset' => 0,
-                ], MediaMetadata::normalizeFolder((string) $request->input('current_folder', ''))), [
+                ], MediaMetadata::normalizeFolder((string) $request->input('current_folder', '')), (string) $request->input('file_type', '')), [
                     'message' => 'Файл завантажено.',
                     'uploaded_path' => $filePath,
                 ]));
@@ -133,6 +135,7 @@ final class MediaController extends \App\Controllers\AdminBaseController
                 'stats' => $list['stats'],
                 'folders' => $list['folders'],
                 'folder' => '',
+                'fileType' => '',
                 'query' => '',
                 'uploadLimitBytes' => Files::uploadLimitBytes(),
                 'uploadLimitLabel' => Files::uploadLimitLabel(),
@@ -163,7 +166,7 @@ final class MediaController extends \App\Controllers\AdminBaseController
             return $this->json(array_replace($this->mediaListPayload(trim((string) $request->input('q', '')), [
                 'limit' => self::LIST_LIMIT,
                 'offset' => 0,
-            ], MediaMetadata::normalizeFolder((string) $request->input('folder', ''))), [
+            ], MediaMetadata::normalizeFolder((string) $request->input('folder', '')), (string) $request->input('file_type', '')), [
                 'message' => 'Файл видалено.',
                 'deleted_path' => $path,
             ]));
@@ -233,7 +236,7 @@ final class MediaController extends \App\Controllers\AdminBaseController
             $payload = $this->mediaListPayload(trim((string) $request->input('q', '')), [
                 'limit' => self::LIST_LIMIT,
                 'offset' => 0,
-            ], MediaMetadata::normalizeFolder((string) $request->input('current_folder', '')));
+            ], MediaMetadata::normalizeFolder((string) $request->input('current_folder', '')), (string) $request->input('file_type', ''));
 
             return $this->json(array_replace($payload, [
                 'message' => 'Метадані файлу збережено.',
