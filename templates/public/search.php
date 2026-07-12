@@ -16,7 +16,7 @@
             <p class="eyebrow">Пошук</p>
             <h1>Знайдіть потрібну інформацію</h1>
             <p>Шукайте серед сторінок, новин, категорій та медіафайлів сайту.</p>
-            <form class="public-search-form" method="get" action="<?= url('/search') ?>" role="search">
+            <form class="public-search-form" method="get" action="<?= url('/search') ?>" role="search" data-public-search-form>
                 <label class="visually-hidden" for="publicSearchQuery">Пошуковий запит</label>
                 <span class="mdi mdi-magnify public-search-form-icon" aria-hidden="true"></span>
                 <input id="publicSearchQuery" type="search" name="q" value="<?= e($query) ?>" placeholder="Введіть щонайменше <?= e((string) $minimumQueryLength) ?> символи" minlength="<?= e((string) $minimumQueryLength) ?>" required autofocus>
@@ -25,7 +25,7 @@
         </div>
     </section>
 
-    <div class="container public-search-content">
+    <div class="container public-search-content" data-public-search-content>
 
     <?php if ($queryLength < $minimumQueryLength): ?>
         <div class="public-search-empty">

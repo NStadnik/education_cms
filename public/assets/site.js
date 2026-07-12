@@ -578,8 +578,15 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    let publicSearchObserver = null;
+
+    function initPublicSearchResults() {
     const searchLoader = document.querySelector('[data-search-loader]');
     if (searchLoader) {
+        if (publicSearchObserver) {
+            publicSearchObserver.disconnect();
+            publicSearchObserver = null;
+        }
         let loading = false;
         let offsets = JSON.parse(searchLoader.dataset.searchOffsets || '{}');
         let hasMore = JSON.parse(searchLoader.dataset.searchMore || '{}');
@@ -664,17 +671,67 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const groupStatus = document.querySelector('[data-search-group-status="all"]');
         if (groupStatus && 'IntersectionObserver' in window) {
-            const searchObserver = new IntersectionObserver(function (entries) {
+            publicSearchObserver = new IntersectionObserver(function (entries) {
                 if (entries.some(function (entry) { return entry.isIntersecting; })) {
                     loadMoreSearchResults(activeSearchType);
                 }
             }, {rootMargin: '300px 0px'});
-            searchObserver.observe(groupStatus);
+            publicSearchObserver.observe(groupStatus);
         }
         document.querySelectorAll('[data-search-filter]').forEach(function (button) {
             button.addEventListener('click', function () {
                 applySearchFilter(button.dataset.searchFilter || 'all');
             });
+        });
+    }
+    }
+
+    initPublicSearchResults();
+
+    const publicSearchForm = document.querySelector('[data-public-search-form]');
+    if (publicSearchForm) {
+        let publicSearchRequest = null;
+        publicSearchForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            if (!publicSearchForm.reportValidity()) return;
+            if (publicSearchRequest) publicSearchRequest.abort();
+            const requestController = new AbortController();
+            publicSearchRequest = requestController;
+            const input = publicSearchForm.querySelector('input[name="q"]');
+            const button = publicSearchForm.querySelector('[type="submit"]');
+            const query = input ? input.value.trim() : '';
+            const url = new URL(publicSearchForm.action, window.location.origin);
+            url.searchParams.set('q', query);
+            if (button) button.disabled = true;
+            publicSearchForm.classList.add('is-loading');
+            try {
+                const response = await fetch(url.toString(), {signal: requestController.signal});
+                if (!response.ok) throw new Error('Не вдалося виконати пошук.');
+                const html = await response.text();
+                const parsed = new DOMParser().parseFromString(html, 'text/html');
+                const nextContent = parsed.querySelector('[data-public-search-content]');
+                const currentContent = document.querySelector('[data-public-search-content]');
+                if (!nextContent || !currentContent) throw new Error('Не вдалося оновити результати.');
+                currentContent.replaceWith(nextContent);
+                window.history.pushState({publicSearch: true}, '', url.toString());
+                document.title = parsed.title || document.title;
+                initPublicSearchResults();
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    const currentContent = document.querySelector('[data-public-search-content]');
+                    if (currentContent) currentContent.innerHTML = '<div class="public-search-empty"><span class="mdi mdi-alert-circle-outline" aria-hidden="true"></span><h2>Помилка пошуку</h2><p>' + String(error.message || 'Спробуйте ще раз.').replace(/[&<>"']/g, function (character) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[character]; }) + '</p></div>';
+                }
+            } finally {
+                if (publicSearchRequest === requestController) {
+                    publicSearchRequest = null;
+                    if (button) button.disabled = false;
+                    publicSearchForm.classList.remove('is-loading');
+                }
+            }
+        });
+
+        window.addEventListener('popstate', function () {
+            window.location.reload();
         });
     }
 

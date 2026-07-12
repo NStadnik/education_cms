@@ -20,7 +20,7 @@
     <?php if (!empty($seo['image'])): ?><meta property="og:image" content="<?= e((string) $seo['image']) ?>"><?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260712-7') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260712-8') ?>">
     <?php if (!empty($adminToolbar)): ?><link rel="stylesheet" href="<?= url('/assets/site-admin-toolbar.css?v=20260712-1') ?>"><?php endif; ?>
     <?php
         $siteTemplateKey = preg_replace('/[^a-z0-9_-]/i', '', (string) ($settings['site_template'] ?? 'official')) ?: 'official';
@@ -48,6 +48,6 @@
     <?= $content ?>
     <?= $this->partial('layouts/site-footer', ['settings' => $settings, 'globalFields' => $globalFields, 'footerLayout' => $footerLayout]) ?>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="<?= url('/assets/site.js?v=20260712-5') ?>"></script>
+    <script src="<?= url('/assets/site.js?v=20260712-6') ?>"></script>
 </body>
 </html>
