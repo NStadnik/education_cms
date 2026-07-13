@@ -26,8 +26,8 @@
 .dashboard-chart-navigation { display: inline-flex; gap: 3px; }
 .dashboard-chart-navigation button { display: grid; place-items: center; width: 34px; min-height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--brand); }
 .dashboard-chart-navigation button:disabled { color: #b3bdca; cursor: not-allowed; }
-.dashboard-chart-compare { display: flex; align-items: center; gap: 9px; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--muted); font-size: 13px; cursor: pointer; }
-.dashboard-chart-compare input { position: absolute; opacity: 0; pointer-events: none; }
+.dashboard-chart-actions label.dashboard-chart-compare { position: relative; display: flex; align-items: center; gap: 9px; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--muted); font-size: 13px; cursor: pointer; }
+.dashboard-chart-actions .dashboard-chart-compare input { position: absolute; width: 1px; height: 1px; min-height: 0; margin: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
 .dashboard-compare-toggle { position: relative; width: 36px; height: 20px; border-radius: 999px; background: #cbd5e1; transition: background .15s; }
 .dashboard-compare-toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .15s; }
 .dashboard-chart-compare input:checked + .dashboard-compare-toggle { background: var(--brand); }
