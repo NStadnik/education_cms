@@ -36,6 +36,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($title ?? 'Адмінка') ?></title>
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= url('/assets/images/Education_cms_icon_32.png') ?>">
+    <link rel="icon" type="image/png" sizes="192x192" href="<?= url('/assets/images/Education_cms_icon_192.png') ?>">
+    <link rel="icon" type="image/png" sizes="512x512" href="<?= url('/assets/images/Education_cms_icon_512.png') ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= url('/assets/images/Education_cms_icon_180.png') ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260712-8') ?>">

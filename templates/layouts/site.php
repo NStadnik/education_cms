@@ -9,6 +9,10 @@
         $metaDescription = trim((string) ($seo['description'] ?? ''));
     ?>
     <title><?= e($metaTitle) ?></title>
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= url('/assets/images/Education_cms_icon_32.png') ?>">
+    <link rel="icon" type="image/png" sizes="192x192" href="<?= url('/assets/images/Education_cms_icon_192.png') ?>">
+    <link rel="icon" type="image/png" sizes="512x512" href="<?= url('/assets/images/Education_cms_icon_512.png') ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= url('/assets/images/Education_cms_icon_180.png') ?>">
     <?php if ($metaDescription !== ''): ?><meta name="description" content="<?= e($metaDescription) ?>"><?php endif; ?>
     <?php if (!empty($seo['url'])): ?><link rel="canonical" href="<?= e((string) $seo['url']) ?>"><?php endif; ?>
     <meta property="og:locale" content="uk_UA">
