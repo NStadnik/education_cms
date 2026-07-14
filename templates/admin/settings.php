@@ -220,7 +220,7 @@
                 <h2>Інтеграція з ЛКЛАУД</h2>
                 <p class="meta">Налаштуйте SSO-вхід викладачів і захист API публікацій. Секрети після збереження не відображаються.</p>
             </div>
-            <span class="status <?= !empty($lcloud['enabled']) ? 'ok' : 'warn' ?>"><?= !empty($lcloud['enabled']) ? 'Увімкнено' : 'Вимкнено' ?></span>
+            <div class="d-flex align-items-center gap-2"><button class="admin-inline-help" type="button" data-admin-help-open data-help-topic="settings" data-help-anchor="lcloud" aria-label="Довідка про інтеграцію з ЛКЛАУД"><span class="mdi mdi-help" aria-hidden="true"></span></button><span class="status <?= !empty($lcloud['enabled']) ? 'ok' : 'warn' ?>"><?= !empty($lcloud['enabled']) ? 'Увімкнено' : 'Вимкнено' ?></span></div>
         </div>
         <label class="check-row"><input type="checkbox" name="lcloud_enabled" value="1" <?= checked(!empty($lcloud['enabled'])) ?>> Увімкнути SSO ЛКЛАУД</label>
         <div class="form-grid wide">

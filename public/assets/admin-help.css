@@ -1,0 +1,43 @@
+.admin-help-drawer { width: min(480px, 100vw); color: var(--text); }
+.admin-help-header { min-height: 76px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.admin-help-header h2 { margin: 0; }
+.admin-help-search { position: relative; display: flex; align-items: center; margin: 14px 20px 4px; }
+.admin-help-search > .mdi { position: absolute; left: 13px; color: var(--muted); font-size: 20px; pointer-events: none; }
+.admin-help-search input { width: 100%; min-height: 44px; padding: 9px 42px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.admin-help-search input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(31,111,235,.12); outline: 0; }
+.admin-help-search button { position: absolute; right: 6px; display: grid; width: 32px; height: 32px; padding: 0; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--muted); }
+.admin-help-search button:hover { background: #eef4ff; color: var(--brand-strong); }
+.admin-help-body { padding: 16px 20px 28px; scroll-padding-top: 16px; }
+.admin-help-loading { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 180px; color: var(--muted); }
+.admin-help-article-head { padding-bottom: 18px; }
+.admin-help-article-head h3, .admin-help-search-summary h3 { margin: 2px 0 8px; font-size: 24px; }
+.admin-help-article-head > p:last-child, .admin-help-search-summary > p:last-child { margin: 0; color: var(--muted); line-height: 1.55; }
+.admin-help-toc { display: flex; flex-wrap: wrap; gap: 7px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.admin-help-toc a { padding: 6px 9px; border: 1px solid #dbe5f4; border-radius: 999px; background: #f7faff; color: var(--brand-strong); font-size: 13px; font-weight: 650; text-decoration: none; }
+.admin-help-toc a:hover { border-color: rgba(31,111,235,.45); background: #eef4ff; }
+.admin-help-sections { display: grid; gap: 0; }
+.admin-help-sections section { margin: 0 -8px; padding: 22px 8px; border-bottom: 1px solid var(--line); border-radius: 8px; scroll-margin-top: 16px; transition: background-color .25s ease; }
+.admin-help-sections section.is-highlighted { background: #fff8d8; }
+.admin-help-sections h4, .admin-help-related h4 { margin: 0 0 10px; font-size: 17px; }
+.admin-help-sections p { margin: 0; color: #39475b; line-height: 1.6; }
+.admin-help-sections ol { display: grid; gap: 9px; margin: 0; padding-left: 24px; color: #39475b; line-height: 1.5; }
+.admin-help-note { display: grid; grid-template-columns: auto 1fr; gap: 9px; margin-top: 14px; padding: 11px 12px; border: 1px solid #cfe0f7; border-radius: 8px; background: #f1f6fd; }
+.admin-help-note .mdi { color: var(--brand); font-size: 20px; }
+.admin-help-note p { font-size: 14px; }
+.admin-help-related { padding-top: 24px; }
+.admin-help-related > div, .admin-help-result-list { display: grid; gap: 8px; }
+.admin-help-related a, .admin-help-result-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); text-decoration: none; }
+.admin-help-related a:hover, .admin-help-result-list a:hover { border-color: rgba(31,111,235,.45); background: #f7faff; color: var(--brand-strong); }
+.admin-help-search-summary { padding-bottom: 18px; }
+.admin-help-result-list a { grid-template-columns: auto minmax(0, 1fr) auto; }
+.admin-help-result-list > a > .mdi:first-child { color: var(--brand); font-size: 22px; }
+.admin-help-result-list strong, .admin-help-result-list small { display: block; }
+.admin-help-result-list small { margin-top: 3px; color: var(--muted); line-height: 1.35; }
+.admin-help-empty { display: grid; justify-items: center; min-height: 200px; padding: 30px 12px; text-align: center; align-content: center; }
+.admin-help-empty > .mdi { margin-bottom: 8px; color: #8091a8; font-size: 40px; }
+.admin-help-empty h3 { margin: 0 0 6px; font-size: 18px; }
+.admin-help-empty p { max-width: 350px; margin: 0 0 14px; color: var(--muted); line-height: 1.5; }
+.admin-inline-help { display: inline-grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 1px solid #d5e1f1; border-radius: 50%; background: #f7faff; color: var(--brand-strong); font-size: 17px; }
+.admin-inline-help:hover { border-color: var(--brand); background: #eef4ff; }
+@media (max-width: 800px) { .admin-help-search { margin-inline: 16px; } .admin-help-body { padding-inline: 16px; } }
+@media (prefers-reduced-motion: reduce) { .admin-help-sections section { transition: none; } }

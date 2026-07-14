@@ -14,6 +14,7 @@ use App\Controllers\Admin\SettingsController;
 use App\Controllers\Admin\UpdatesController;
 use App\Controllers\Admin\UsersController;
 use App\Controllers\Admin\FormsController;
+use App\Controllers\Admin\HelpController;
 use App\Controllers\FormSubmissionController;
 use App\Controllers\ErrorController;
 use App\Controllers\InstallController;
@@ -109,6 +110,7 @@ final class App
         $adminImport = ImportController::class;
         $adminUpdates = UpdatesController::class;
         $adminForms = FormsController::class;
+        $adminHelp = HelpController::class;
         $formSubmissions = FormSubmissionController::class;
         $install = InstallController::class;
         $lcloudApi = LcloudApiController::class;
@@ -133,6 +135,7 @@ final class App
         $this->router->post('/admin/logout', [$admin, 'logout']);
         $this->router->get('/admin', [$admin, 'dashboard']);
         $this->router->get('/admin/dashboard/news-trend', [$admin, 'dashboardNewsTrend']);
+        $this->router->get('/admin/help', [$adminHelp, 'show']);
         $this->router->get('/admin/profile', [$adminUsers, 'profile']);
         $this->router->post('/admin/profile/save', [$adminUsers, 'profileSave']);
         $this->router->get('/admin/pages', [$adminPages, 'pages']);

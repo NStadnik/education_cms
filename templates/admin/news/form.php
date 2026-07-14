@@ -152,6 +152,7 @@
                         <h2>Публікація</h2>
                         <p class="meta">Дата заповниться автоматично для опублікованої новини.</p>
                     </div>
+                    <button class="admin-inline-help" type="button" data-admin-help-open data-help-topic="news-editor" data-help-anchor="moderation" aria-label="Довідка про модерацію новини"><span class="mdi mdi-help" aria-hidden="true"></span></button>
                 </div>
 
                 <div class="form-grid">

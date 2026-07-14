@@ -2,6 +2,10 @@
 <?php
     $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/admin', PHP_URL_PATH) ?: '/admin';
     $auth = \App\Core\Container::get('auth');
+    $adminHelp = new \App\Services\AdminHelp($auth);
+    $currentHelpTopic = isset($helpTopic) && is_string($helpTopic) && $adminHelp->topic($helpTopic)
+        ? $helpTopic
+        : $adminHelp->topicForPath($currentPath);
     $isSuperAdmin = (string) (($auth->user()['role'] ?? '')) === 'super_admin';
     $canAny = static function (array $permissions) use ($auth, $isSuperAdmin): bool {
         foreach ($permissions as $permission) {
@@ -44,6 +48,7 @@
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= url('/assets/site.css?v=20260712-8') ?>">
     <link rel="stylesheet" href="<?= url('/assets/admin.css?v=20260712-15') ?>">
+    <link rel="stylesheet" href="<?= url('/assets/admin-help.css?v=20260714-1') ?>">
     <link rel="stylesheet" href="<?= url('/assets/tiptap-editor.css?v=20260710-1') ?>">
     <?php if (strpos($currentPath, '/admin/pages') === 0): ?>
         <link rel="stylesheet" href="<?= url('/assets/admin-pages-form.css?v=20260710-2') ?>">
@@ -53,7 +58,7 @@
         <link rel="stylesheet" href="<?= url('/assets/admin-templates.css') ?>">
     <?php endif; ?>
 </head>
-<body data-admin-csrf-token="<?= e(\App\Core\Csrf::token()) ?>" data-rich-media-picker-url="<?= url('/admin/media/picker') ?>" data-rich-media-upload-url="<?= url('/admin/media/upload') ?>" data-admin-link-picker-url="<?= url('/admin/link-picker') ?>">
+<body data-admin-csrf-token="<?= e(\App\Core\Csrf::token()) ?>" data-rich-media-picker-url="<?= url('/admin/media/picker') ?>" data-rich-media-upload-url="<?= url('/admin/media/upload') ?>" data-admin-link-picker-url="<?= url('/admin/link-picker') ?>" data-admin-help-url="<?= url('/admin/help') ?>" data-admin-help-topic="<?= e($currentHelpTopic) ?>">
     <div class="admin-shell">
         <aside class="admin-sidebar">
             <div class="admin-brand mb-4">
@@ -81,6 +86,10 @@
                         <span class="mdi mdi-account-circle-outline" aria-hidden="true"></span>
                         <span data-admin-user-name><?= e($user['name'] ?? 'Адміністратор') ?></span>
                     </span>
+                    <button class="admin-header-button" type="button" data-admin-help-open data-help-topic="<?= e($currentHelpTopic) ?>" aria-controls="adminHelpDrawer" aria-expanded="false">
+                        <span class="mdi mdi-help-circle-outline" aria-hidden="true"></span>
+                        <span>Довідка</span>
+                    </button>
                     <a class="admin-header-button <?= strpos($currentPath, '/admin/profile') === 0 ? 'active' : '' ?>" href="<?= url('/admin/profile') ?>" title="Профіль">
                         <span class="mdi mdi-account-cog-outline" aria-hidden="true"></span>
                         <span>Профіль</span>
@@ -111,6 +120,24 @@
             </div>
         </main>
     </div>
+    <aside class="offcanvas offcanvas-end admin-help-drawer" tabindex="-1" id="adminHelpDrawer" aria-labelledby="adminHelpDrawerTitle">
+        <div class="offcanvas-header admin-help-header">
+            <div>
+                <p class="eyebrow mb-1">Education CMS</p>
+                <h2 class="offcanvas-title h5" id="adminHelpDrawerTitle">Довідка</h2>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрити довідку"></button>
+        </div>
+        <div class="admin-help-search">
+            <label for="adminHelpSearch" class="visually-hidden">Пошук у довідці</label>
+            <span class="mdi mdi-magnify" aria-hidden="true"></span>
+            <input id="adminHelpSearch" type="search" placeholder="Пошук у довідці" autocomplete="off" data-admin-help-search>
+            <button type="button" data-admin-help-search-clear aria-label="Очистити пошук" hidden><span class="mdi mdi-close" aria-hidden="true"></span></button>
+        </div>
+        <div class="offcanvas-body admin-help-body" data-admin-help-content aria-live="polite" aria-busy="false">
+            <div class="admin-help-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Завантаження довідки…</span></div>
+        </div>
+    </aside>
     <div class="modal fade" id="adminLinkPickerModal" tabindex="-1" aria-labelledby="adminLinkPickerTitle" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
@@ -251,6 +278,7 @@
     <script src="<?= url('/assets/tiptap-editor.js?v=20260710-6') ?>"></script>
     <script src="<?= url('/assets/admin-link-picker.js') ?>"></script>
     <script src="<?= url('/assets/admin.js?v=20260711-1') ?>"></script>
+    <script src="<?= url('/assets/admin-help.js?v=20260714-1') ?>"></script>
     <?php if ($currentPath === '/admin'): ?><script src="<?= url('/assets/admin-dashboard.js?v=20260712-2') ?>"></script><?php endif; ?>
     <?php if (strpos($currentPath, '/admin/forms') === 0): ?><script src="<?= url('/assets/admin-forms.js?v=20260710-1') ?>"></script><?php endif; ?>
 </body>

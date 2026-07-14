@@ -49,6 +49,7 @@
                 <h2>Джерело</h2>
                 <p class="meta">Оберіть файл/текст або підключення до зовнішньої бази даних.</p>
             </div>
+            <button class="admin-inline-help" type="button" data-admin-help-open data-help-topic="import" data-help-anchor="safe-run" aria-label="Довідка про безпечний імпорт"><span class="mdi mdi-help" aria-hidden="true"></span></button>
         </div>
 
         <div class="source-options">
